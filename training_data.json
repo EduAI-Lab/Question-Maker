@@ -1,0 +1,16 @@
+{
+    "data": [
+        {
+            "question": "What is the capital of France?",
+            "label": "factual"
+        },
+        {
+            "question": "Can you explain how photosynthesis works?",
+            "label": "conceptual"
+        },
+        {
+            "question": "What are your thoughts on climate change?",
+            "label": "opinion"
+        }
+    ]
+} 
