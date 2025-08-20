@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select"
 import LoadingOverlay from './components/LoadingOverlay'
 
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 interface Question {
   id: number;
