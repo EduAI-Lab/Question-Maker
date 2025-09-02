@@ -9,6 +9,10 @@ minio
 python-dotenv
 psycopg2-binary
 PyPDF2
+pdfplumber
+pdf2image
+pytesseract
+pdfminer.six
 python-docx
 python-pptx
 asyncio
@@ -30,3 +34,5 @@ beautifulsoup4>=4.9.3
 pandas>=1.3.0
 tqdm>=4.65.0
 sentencepiece  # Required for BART model tokenization
+groq
+openai
