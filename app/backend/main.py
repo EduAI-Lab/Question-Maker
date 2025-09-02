@@ -69,16 +69,16 @@ minio_client = Minio(
 
 # Initialize Groq client
 groq_client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY", "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")
+    api_key=os.environ.get("GROQ_API_KEY", "")
 )
 
 # Initialize OpenAI client
 openai_client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY", "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")
+    api_key=os.environ.get("OPENAI_API_KEY", "")
 )
 
 # Add DeepSeek API key
-DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "sk-31e81ceb4dd94d3aabce9b67c8fcfc57")
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 MODEL_ID = "llama-3.3-70b-versatile"
 MAX_CHUNK_SIZE = 8000

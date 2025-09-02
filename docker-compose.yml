@@ -1,4 +1,4 @@
-version: "3.9"
+# Docker Compose configuration for EduQuery.ai
 services:
   db:
     image: postgres:15
@@ -10,6 +10,11 @@ services:
       - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   minio:
     image: minio/minio:latest
@@ -29,30 +34,54 @@ services:
       dockerfile: app/backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/eduquery
-      SECRET_KEY: change-me
+      SECRET_KEY: ${SECRET_KEY:-change-me}
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
-      # GROQ_API_KEY: ""
-      # OPENAI_API_KEY: ""
-      # DEEPSEEK_API_KEY: ""
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
     depends_on:
-      - db
-      - minio
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
-    image: node:18-alpine
-    working_dir: /app
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile.dev
     volumes:
-      - ./app/frontend:/app
+      # Mount only source files that change frequently
+      - ./app/frontend/src:/app/src
+      - ./app/frontend/public:/app/public
+      - ./app/frontend/index.html:/app/index.html
+      - ./app/frontend/vite.config.ts:/app/vite.config.ts
+      - ./app/frontend/tsconfig.json:/app/tsconfig.json
+      - ./app/frontend/tsconfig.node.json:/app/tsconfig.node.json
+      - ./app/frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./app/frontend/postcss.config.js:/app/postcss.config.js
+      # node_modules stays in container (no volume mount)
     environment:
       # Frontend calls the API via Nginx path
       VITE_API_URL: /api
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
     expose:
       - "5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   nginx:
     image: nginx:alpine
@@ -61,8 +90,15 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   db_data:
