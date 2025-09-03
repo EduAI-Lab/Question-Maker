@@ -1,5 +1,4 @@
 # Base Docker Compose configuration for EduQuery.ai
-version: '3.8'
 
 services:
   # Database
@@ -40,7 +39,7 @@ services:
   # Backend API
   backend:
     build:
-      context: ../..
+      context: .
       dockerfile: docker/backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/eduquery
@@ -66,18 +65,18 @@ services:
   # Frontend
   frontend:
     build:
-      context: ../..
+      context: .
       dockerfile: docker/frontend/Dockerfile.dev
     volumes:
       # Mount only source files that change frequently
-      - ../../app/frontend/src:/app/src
-      - ../../app/frontend/public:/app/public
-      - ../../app/frontend/index.html:/app/index.html
-      - ../../app/frontend/vite.config.ts:/app/vite.config.ts
-      - ../../app/frontend/tsconfig.json:/app/tsconfig.json
-      - ../../app/frontend/tsconfig.node.json:/app/tsconfig.node.json
-      - ../../app/frontend/tailwind.config.js:/app/tailwind.config.js
-      - ../../app/frontend/postcss.config.js:/app/postcss.config.js
+      - ./app/frontend/src:/app/src
+      - ./app/frontend/public:/app/public
+      - ./app/frontend/index.html:/app/index.html
+      - ./app/frontend/vite.config.ts:/app/vite.config.ts
+      - ./app/frontend/tsconfig.json:/app/tsconfig.json
+      - ./app/frontend/tsconfig.node.json:/app/tsconfig.node.json
+      - ./app/frontend/tailwind.config.js:/app/tailwind.config.js
+      - ./app/frontend/postcss.config.js:/app/postcss.config.js
       # node_modules stays in container (no volume mount)
     environment:
       # Frontend calls the API via Nginx path
@@ -88,7 +87,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://0.0.0.0:5173/"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -100,7 +99,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ../../nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       frontend:
         condition: service_healthy
