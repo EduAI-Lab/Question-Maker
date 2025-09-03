@@ -12,38 +12,123 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 import requests
-import docx
 import tempfile
 import asyncio
-from utils.file_processor import FileProcessor
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from models import Class, Draft
-import pdfplumber
-import pdf2image
-import pytesseract
-from pdf2image import convert_from_bytes
-import pdfminer.high_level
 import re
-from tika import parser
-import tika
-from minio.error import S3Error
-from minio import Minio
-import PyPDF2
 import hashlib
-from difflib import SequenceMatcher
-import numpy as np
 import io
 import csv
-from fastapi.responses import JSONResponse, Response
-from huggingface_hub import InferenceClient
-from tenacity import retry, stop_after_attempt, wait_exponential
-from groq import Groq
-from enum import Enum
-import torch
-import torch.nn as nn
-from transformers import ElectraModel, ElectraTokenizer, pipeline
-from openai import OpenAI
 import json
+from difflib import SequenceMatcher
+from enum import Enum
+from fastapi.responses import JSONResponse, Response
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+# Optional imports with error handling
+try:
+    import docx
+except ImportError:
+    docx = None
+    print("Warning: python-docx not available")
+
+try:
+    import pdfplumber
+except ImportError:
+    pdfplumber = None
+    print("Warning: pdfplumber not available")
+
+try:
+    import pdf2image
+    from pdf2image import convert_from_bytes
+except ImportError:
+    pdf2image = None
+    convert_from_bytes = None
+    print("Warning: pdf2image not available")
+
+try:
+    import pytesseract
+except ImportError:
+    pytesseract = None
+    print("Warning: pytesseract not available")
+
+try:
+    import pdfminer.high_level
+except ImportError:
+    pdfminer = None
+    print("Warning: pdfminer not available")
+
+try:
+    from tika import parser
+    import tika
+except ImportError:
+    parser = None
+    tika = None
+    print("Warning: tika not available")
+
+try:
+    from minio.error import S3Error
+    from minio import Minio
+except ImportError:
+    S3Error = None
+    Minio = None
+    print("Warning: minio not available")
+
+try:
+    import PyPDF2
+except ImportError:
+    PyPDF2 = None
+    print("Warning: PyPDF2 not available")
+
+try:
+    import numpy as np
+except ImportError:
+    np = None
+    print("Warning: numpy not available")
+
+try:
+    from huggingface_hub import InferenceClient
+except ImportError:
+    InferenceClient = None
+    print("Warning: huggingface_hub not available")
+
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
+    print("Warning: groq not available")
+
+try:
+    import torch
+    import torch.nn as nn
+    from transformers import ElectraModel, ElectraTokenizer, pipeline
+except ImportError:
+    torch = None
+    nn = None
+    ElectraModel = None
+    ElectraTokenizer = None
+    pipeline = None
+    print("Warning: torch/transformers not available")
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
+    print("Warning: openai not available")
+
+# Local imports
+try:
+    from utils.file_processor import FileProcessor
+except ImportError:
+    FileProcessor = None
+    print("Warning: FileProcessor not available")
+
+try:
+    from models import Class, Draft
+except ImportError:
+    Class = None
+    Draft = None
+    print("Warning: models not available")
 
 load_dotenv()
 
@@ -60,22 +145,40 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 # Initialize MinIO client
-minio_client = Minio(
-    os.getenv("MINIO_ENDPOINT"),
-    access_key=os.getenv("MINIO_ACCESS_KEY"),
-    secret_key=os.getenv("MINIO_SECRET_KEY"),
-    secure=False
-)
+minio_client = None
+if Minio:
+    try:
+        minio_client = Minio(
+            os.getenv("MINIO_ENDPOINT"),
+            access_key=os.getenv("MINIO_ACCESS_KEY"),
+            secret_key=os.getenv("MINIO_SECRET_KEY"),
+            secure=False
+        )
+    except Exception as e:
+        print(f"Warning: Failed to initialize MinIO client: {e}")
+        minio_client = None
 
 # Initialize Groq client
-groq_client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY", "")
-)
+groq_client = None
+if Groq:
+    try:
+        groq_client = Groq(
+            api_key=os.environ.get("GROQ_API_KEY", "")
+        )
+    except Exception as e:
+        print(f"Warning: Failed to initialize Groq client: {e}")
+        groq_client = None
 
 # Initialize OpenAI client
-openai_client = OpenAI(
-    api_key=os.environ.get("OPENAI_API_KEY", "")
-)
+openai_client = None
+if OpenAI:
+    try:
+        openai_client = OpenAI(
+            api_key=os.environ.get("OPENAI_API_KEY", "")
+        )
+    except Exception as e:
+        print(f"Warning: Failed to initialize OpenAI client: {e}")
+        openai_client = None
 
 # Add DeepSeek API key
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
@@ -128,6 +231,9 @@ class Question(Base):
 async def call_groq_api(prompt: str, params: QuestionGenerationParams) -> str:
     """Call Groq API with user-specified parameters"""
     try:
+        if groq_client is None:
+            raise Exception("Groq client not available")
+            
         chat_completion = await asyncio.to_thread(
             groq_client.chat.completions.create,
             messages=[
@@ -246,18 +352,23 @@ class QuestionClassifier:
     def __init__(self):
         if not self._initialized:
             try:
-                # Initialize the classifiers with zero-shot models
-                self.difficulty_classifier = pipeline(
-                    "zero-shot-classification",
-                    model="facebook/bart-large-mnli",
-                    device=-1  # Use CPU for inference
-                )
-                
-                self.bloom_classifier = pipeline(
-                    "zero-shot-classification",
-                    model="facebook/bart-large-mnli",
-                    device=-1  # Use CPU for inference
-                )
+                if pipeline is None:
+                    print("Warning: transformers pipeline not available, using fallback classification")
+                    self.difficulty_classifier = None
+                    self.bloom_classifier = None
+                else:
+                    # Initialize the classifiers with zero-shot models
+                    self.difficulty_classifier = pipeline(
+                        "zero-shot-classification",
+                        model="facebook/bart-large-mnli",
+                        device=-1  # Use CPU for inference
+                    )
+                    
+                    self.bloom_classifier = pipeline(
+                        "zero-shot-classification",
+                        model="facebook/bart-large-mnli",
+                        device=-1  # Use CPU for inference
+                    )
                 
                 # Define the candidate labels for classification
                 self.difficulty_labels = [
@@ -330,7 +441,7 @@ class QuestionClassifier:
     def classify_difficulty(self, question: str) -> QuestionDifficulty:
         """Classify question difficulty using zero-shot classification"""
         try:
-            if not self._initialized:
+            if not self._initialized or self.difficulty_classifier is None:
                 return QuestionDifficulty.MEDIUM
                 
             question = question.strip()
@@ -432,12 +543,16 @@ class QuestionClassifier:
                 return "analyze"
             
             # If no patterns match, use zero-shot classification
-            print("Using zero-shot classification")
-            result = self.bloom_classifier(
-                question,
-                self.bloom_labels,
-                multi_label=False
-            )
+            if self.bloom_classifier is not None:
+                print("Using zero-shot classification")
+                result = self.bloom_classifier(
+                    question,
+                    self.bloom_labels,
+                    multi_label=False
+                )
+            else:
+                print("Zero-shot classifier not available, using fallback")
+                return "understand"
             
             highest_label = result['labels'][0]
             highest_score = result['scores'][0]
@@ -1931,6 +2046,9 @@ async def call_deepseek_api(prompt: str, params: QuestionGenerationParams) -> st
 async def call_openai_api(prompt: str, params: QuestionGenerationParams) -> str:
     """Call OpenAI API with user-specified parameters"""
     try:
+        if openai_client is None:
+            raise Exception("OpenAI client not available")
+            
         completion = await asyncio.to_thread(
             lambda: openai_client.chat.completions.create(
                 model="o3-mini",

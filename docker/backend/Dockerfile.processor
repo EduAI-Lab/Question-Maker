@@ -1,0 +1,26 @@
+# File Processing Service Container
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# System dependencies for file processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr poppler-utils default-jre \
+    curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy requirements for file processing
+COPY docker/backend/requirements/processor.txt ./requirements.txt
+
+# Install file processing dependencies
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Copy file processing code
+COPY app/backend/file_processor.py ./
+COPY app/backend/utils/ ./utils/
+
+EXPOSE 8002
+CMD ["uvicorn", "file_processor:app", "--host", "0.0.0.0", "--port", "8002"]

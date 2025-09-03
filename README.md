@@ -85,14 +85,20 @@ DEEPSEEK_API_KEY=your-deepseek-api-key
 ### 3. Start the Application
 
 ```bash
-# Development mode (with hot reload)
-docker-compose up -d
+# Quick start (lightweight, ~2-3 minutes)
+docker-compose -f docker/compose/docker-compose.yml up -d
+
+# With ML features (heavy, ~15-20 minutes)
+docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.ml.yml up -d
 
 # Production mode (optimized build)
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.prod.yml up -d
+
+# Microservices architecture (advanced)
+docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.microservices.yml up -d
 
 # View logs (optional)
-docker-compose logs -f
+docker-compose -f docker/compose/docker-compose.yml logs -f
 ```
 
 ### 4. Access the Application
@@ -106,6 +112,7 @@ docker-compose logs -f
 ### Option 1: Docker Development (Recommended)
 
 The default `docker-compose up -d` runs in development mode with:
+
 - Hot reload for frontend changes
 - Volume mounting for source files
 - `node_modules` stays in container for better performance
@@ -138,10 +145,32 @@ npm install
 npm run dev
 ```
 
-### Production Build
+### Build Options
+
+#### Quick Start (Recommended for Development)
 
 ```bash
-# Build and run in production mode
+# Lightweight build (~2-3 minutes)
+docker-compose up -d
+```
+
+**Features**: Basic question generation, file upload, authentication
+**Missing**: AI classification, advanced document processing
+
+#### Full ML Features
+
+```bash
+# Heavy build with ML libraries (~15-20 minutes)
+docker-compose -f docker-compose.yml -f docker-compose.ml.yml up -d --build
+```
+
+**Features**: All features including AI classification, advanced document processing
+**Includes**: Transformers, PyTorch, SpaCy, OCR capabilities
+
+#### Production Build
+
+```bash
+# Optimized production build
 docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 
@@ -150,23 +179,41 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
 question-maker/
 ├── app/
-│   ├── backend/                 # FastAPI backend
+│   ├── backend/                 # FastAPI backend source code
 │   │   ├── main.py             # Main application file
 │   │   ├── models.py           # Database models
-│   │   ├── requirements.txt    # Python dependencies
-│   │   ├── Dockerfile          # Backend container config
 │   │   ├── utils/              # Utility functions
 │   │   └── middleware/         # Authentication middleware
-│   └── frontend/               # React frontend
+│   └── frontend/               # React frontend source code
 │       ├── src/
 │       │   ├── components/     # React components
 │       │   ├── lib/           # Utility functions
 │       │   └── main.tsx       # App entry point
 │       ├── package.json       # Node dependencies
 │       └── vite.config.ts     # Vite configuration
-├── nginx/                      # Nginx configuration
-├── docker-compose.yml          # Docker services
-└── README.md                   # This file
+├── docker/                     # Organized Docker configuration
+│   ├── backend/               # Backend Dockerfiles
+│   │   ├── Dockerfile         # Lightweight (default)
+│   │   ├── Dockerfile.ml      # ML features
+│   │   ├── Dockerfile.api     # API only
+│   │   ├── Dockerfile.ai      # AI service
+│   │   ├── Dockerfile.processor # File processing
+│   │   └── requirements/      # Requirements files
+│   │       ├── base.txt       # Core dependencies
+│   │       ├── api.txt        # API dependencies
+│   │       ├── ai.txt         # AI/ML dependencies
+│   │       ├── processor.txt  # File processing
+│   │       └── ml.txt         # Full ML stack
+│   ├── frontend/              # Frontend Dockerfiles
+│   │   ├── Dockerfile         # Production
+│   │   └── Dockerfile.dev     # Development
+│   └── compose/               # Docker Compose files
+│       ├── docker-compose.yml # Base services
+│       ├── docker-compose.ml.yml # ML features
+│       ├── docker-compose.prod.yml # Production
+│       └── docker-compose.microservices.yml # Microservices
+├── nginx/                     # Nginx configuration
+└── README.md                  # This file
 ```
 
 ## 🐳 Docker Services

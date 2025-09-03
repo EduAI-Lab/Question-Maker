@@ -1,0 +1,11 @@
+# Docker Compose override for ML features
+# Usage: docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.ml.yml up -d
+
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: docker/backend/Dockerfile.ml  # Use ML-enabled Dockerfile
+    environment:
+      # Enable ML features
+      ENABLE_ML_FEATURES: "true"

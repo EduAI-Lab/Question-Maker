@@ -1,3 +1,4 @@
+# Lightweight Backend Container (Default)
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -11,9 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY app/backend/requirements.txt ./requirements.txt
+# Copy requirements
+COPY docker/backend/requirements/base.txt ./requirements.txt
 
-# Install Python deps (torch is heavy; this uses CPU wheels from PyPI)
+# Install Python deps (lightweight version for faster builds)
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Copy backend code

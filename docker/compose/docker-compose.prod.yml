@@ -1,0 +1,16 @@
+# Docker Compose override for production
+# Usage: docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.prod.yml up -d
+
+services:
+  frontend:
+    build:
+      context: ../..
+      dockerfile: docker/frontend/Dockerfile  # Use production Dockerfile
+    volumes: [] # No volumes in production
+    command: ["nginx", "-g", "daemon off;"] # Nginx serves static files
+    ports:
+      - "80" # Expose port 80 for Nginx
+
+  nginx:
+    volumes:
+      - ../../nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro

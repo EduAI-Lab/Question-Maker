@@ -1,0 +1,90 @@
+# Microservices Architecture - Based on Proposed Architecture
+# Usage: docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.microservices.yml up -d
+
+services:
+  # Redis for caching and job queuing
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # AI Service (Heavy ML dependencies)
+  ai-service:
+    build:
+      context: ../..
+      dockerfile: docker/backend/Dockerfile.ai
+    environment:
+      REDIS_URL: redis://redis:6379
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # File Processing Service
+  file-processor:
+    build:
+      context: ../..
+      dockerfile: docker/backend/Dockerfile.processor
+    environment:
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend API (Lightweight)
+  backend:
+    build:
+      context: ../..
+      dockerfile: docker/backend/Dockerfile.api
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/eduquery
+      SECRET_KEY: ${SECRET_KEY:-change-me}
+      REDIS_URL: redis://redis:6379
+      AI_SERVICE_URL: http://ai-service:8001
+      FILE_PROCESSOR_URL: http://file-processor:8002
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+      file-processor:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  redis_data:

@@ -1,0 +1,14 @@
+# Lightweight Backend API Dependencies
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+PyJWT
+passlib[bcrypt]
+python-multipart
+python-dotenv
+psycopg2-binary
+redis
+requests
+aiohttp
+tenacity
