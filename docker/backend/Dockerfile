@@ -13,9 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy requirements
-COPY docker/backend/requirements/base.txt ./requirements.txt
+COPY docker/backend/requirements.txt ./requirements.txt
 
-# Install Python deps (lightweight version for faster builds)
+# Install Python deps
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Copy backend code
