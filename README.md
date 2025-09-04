@@ -9,6 +9,7 @@ An AI-powered question generation platform that helps educators create high-qual
 - **Smart Classification**: Automatic difficulty and Bloom's taxonomy level classification
 - **Class Management**: Organize questions by classes and subjects
 - **File Storage**: Secure file storage with MinIO
+- **Vector Search**: pgvector integration for semantic search and embeddings
 - **Modern UI**: Beautiful React frontend with Tailwind CSS
 
 ## 🛠️ Tech Stack
@@ -16,7 +17,7 @@ An AI-powered question generation platform that helps educators create high-qual
 ### Backend
 
 - **FastAPI** - Modern Python web framework
-- **PostgreSQL** - Primary database
+- **PostgreSQL 15 + pgvector** - Primary database with vector search capabilities
 - **MinIO** - Object storage for files
 - **SQLAlchemy** - ORM for database operations
 - **JWT** - Authentication
@@ -36,7 +37,7 @@ An AI-powered question generation platform that helps educators create high-qual
 
 - **Docker & Docker Compose** - Containerization
 - **Nginx** - Reverse proxy
-- **PostgreSQL 15** - Database
+- **PostgreSQL 15 + pgvector** - Database with vector extensions
 - **MinIO** - Object storage
 
 ## 📋 Prerequisites
@@ -62,18 +63,27 @@ Create a `.env` file in the root directory with the following variables:
 
 ```env
 # Database Configuration
-DATABASE_URL=postgresql://postgres:postgres@db:5432/eduquery
-SECRET_KEY=your-secret-key-here
+POSTGRES_DB=eduquery
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
 
 # MinIO Configuration
-MINIO_ENDPOINT=minio:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=minioadmin
 
-# AI API Keys (Optional - at least one is recommended)
-GROQ_API_KEY=your-groq-api-key
-OPENAI_API_KEY=your-openai-api-key
-DEEPSEEK_API_KEY=your-deepseek-api-key
+# Backend Configuration
+SECRET_KEY=change-me # IMPORTANT: Change this to a strong, random key
+
+# AI API Keys (Optional, but required for AI features)
+GROQ_API_KEY=
+OPENAI_API_KEY=
+DEEPSEEK_API_KEY=
+
+# LMS Integration (Optional)
+CANVAS_API_URL=
+CANVAS_API_KEY=
+MOODLE_API_URL=
+MOODLE_API_KEY=
 ```
 
 **Note**: You can get API keys from:
@@ -85,20 +95,11 @@ DEEPSEEK_API_KEY=your-deepseek-api-key
 ### 3. Start the Application
 
 ```bash
-# Quick start (lightweight, ~2-3 minutes)
-docker-compose -f docker/compose/docker-compose.yml up -d
-
-# With ML features (heavy, ~15-20 minutes)
-docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.ml.yml up -d
-
-# Production mode (optimized build)
-docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.prod.yml up -d
-
-# Microservices architecture (advanced)
-docker-compose -f docker/compose/docker-compose.yml -f docker/compose/docker-compose.microservices.yml up -d
+# Start all services
+docker-compose up -d
 
 # View logs (optional)
-docker-compose -f docker/compose/docker-compose.yml logs -f
+docker-compose logs -f
 ```
 
 ### 4. Access the Application
@@ -109,15 +110,17 @@ docker-compose -f docker/compose/docker-compose.yml logs -f
 
 ## 🔧 Development Setup
 
-### Option 1: Docker Development (Recommended)
+### Docker Development (Recommended)
 
 The default `docker-compose up -d` runs in development mode with:
 
 - Hot reload for frontend changes
 - Volume mounting for source files
 - `node_modules` stays in container for better performance
+- pgvector extension enabled for vector search
+- Automatic database initialization
 
-### Option 2: Local Development
+### Local Development
 
 #### Backend Development
 
@@ -126,7 +129,7 @@ The default `docker-compose up -d` runs in development mode with:
 cd app/backend
 
 # Install Python dependencies
-pip install -r requirements.txt
+pip install -r docker/backend/requirements.txt
 
 # Run the development server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
@@ -145,35 +148,6 @@ npm install
 npm run dev
 ```
 
-### Build Options
-
-#### Quick Start (Recommended for Development)
-
-```bash
-# Lightweight build (~2-3 minutes)
-docker-compose up -d
-```
-
-**Features**: Basic question generation, file upload, authentication
-**Missing**: AI classification, advanced document processing
-
-#### Full ML Features
-
-```bash
-# Heavy build with ML libraries (~15-20 minutes)
-docker-compose -f docker-compose.yml -f docker-compose.ml.yml up -d --build
-```
-
-**Features**: All features including AI classification, advanced document processing
-**Includes**: Transformers, PyTorch, SpaCy, OCR capabilities
-
-#### Production Build
-
-```bash
-# Optimized production build
-docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-```
-
 ## 📁 Project Structure
 
 ```
@@ -182,6 +156,8 @@ question-maker/
 │   ├── backend/                 # FastAPI backend source code
 │   │   ├── main.py             # Main application file
 │   │   ├── models.py           # Database models
+│   │   ├── db/                 # Database initialization
+│   │   │   └── init.sql        # pgvector setup and embeddings table
 │   │   ├── utils/              # Utility functions
 │   │   └── middleware/         # Authentication middleware
 │   └── frontend/               # React frontend source code
@@ -191,41 +167,30 @@ question-maker/
 │       │   └── main.tsx       # App entry point
 │       ├── package.json       # Node dependencies
 │       └── vite.config.ts     # Vite configuration
-├── docker/                     # Organized Docker configuration
-│   ├── backend/               # Backend Dockerfiles
-│   │   ├── Dockerfile         # Lightweight (default)
-│   │   ├── Dockerfile.ml      # ML features
-│   │   ├── Dockerfile.api     # API only
-│   │   ├── Dockerfile.ai      # AI service
-│   │   ├── Dockerfile.processor # File processing
-│   │   └── requirements/      # Requirements files
-│   │       ├── base.txt       # Core dependencies
-│   │       ├── api.txt        # API dependencies
-│   │       ├── ai.txt         # AI/ML dependencies
-│   │       ├── processor.txt  # File processing
-│   │       └── ml.txt         # Full ML stack
-│   ├── frontend/              # Frontend Dockerfiles
-│   │   ├── Dockerfile         # Production
-│   │   └── Dockerfile.dev     # Development
-│   └── compose/               # Docker Compose files
-│       ├── docker-compose.yml # Base services
-│       ├── docker-compose.ml.yml # ML features
-│       ├── docker-compose.prod.yml # Production
-│       └── docker-compose.microservices.yml # Microservices
+├── docker/                     # Docker configuration
+│   ├── backend/               # Backend Dockerfiles and requirements
+│   │   ├── Dockerfile         # Backend container
+│   │   └── requirements.txt   # All Python dependencies
+│   └── frontend/              # Frontend Dockerfiles
+│       ├── Dockerfile         # Production build
+│       └── Dockerfile.dev     # Development build
 ├── nginx/                     # Nginx configuration
-└── README.md                  # This file
+├── docker-compose.yml         # Main Docker Compose file
+├── .env.example              # Environment variables template
+└── README.md                 # This file
 ```
 
 ## 🐳 Docker Services
 
 The application consists of the following services:
 
-### Database (PostgreSQL)
+### Database (PostgreSQL + pgvector)
 
 - **Port**: 5432
 - **Database**: eduquery
 - **User**: postgres
 - **Password**: postgres
+- **Features**: Vector search, embeddings storage, automatic initialization
 
 ### MinIO (Object Storage)
 
@@ -237,7 +202,7 @@ The application consists of the following services:
 ### Backend (FastAPI)
 
 - **Port**: 8000 (internal)
-- **Features**: Question generation, file processing, authentication
+- **Features**: Question generation, file processing, authentication, AI integration
 
 ### Frontend (React + Vite)
 
@@ -271,20 +236,30 @@ The application consists of the following services:
 - `PUT /api/classes/{id}` - Update a class
 - `DELETE /api/classes/{id}` - Delete a class
 
+### Vector Search
+
+- `POST /api/search` - Semantic search using embeddings
+- `GET /api/embeddings` - Get stored embeddings
+
 ## 🛠️ Configuration
 
 ### Environment Variables
 
-| Variable           | Description                  | Default                                           |
-| ------------------ | ---------------------------- | ------------------------------------------------- |
-| `DATABASE_URL`     | PostgreSQL connection string | `postgresql://postgres:postgres@db:5432/eduquery` |
-| `SECRET_KEY`       | JWT secret key               | `change-me`                                       |
-| `MINIO_ENDPOINT`   | MinIO server endpoint        | `minio:9000`                                      |
-| `MINIO_ACCESS_KEY` | MinIO access key             | `minioadmin`                                      |
-| `MINIO_SECRET_KEY` | MinIO secret key             | `minioadmin`                                      |
-| `GROQ_API_KEY`     | Groq API key                 | Optional                                          |
-| `OPENAI_API_KEY`   | OpenAI API key               | Optional                                          |
-| `DEEPSEEK_API_KEY` | DeepSeek API key             | Optional                                          |
+| Variable              | Description              | Default      |
+| --------------------- | ------------------------ | ------------ |
+| `POSTGRES_DB`         | PostgreSQL database name | `eduquery`   |
+| `POSTGRES_USER`       | PostgreSQL username      | `postgres`   |
+| `POSTGRES_PASSWORD`   | PostgreSQL password      | `postgres`   |
+| `SECRET_KEY`          | JWT secret key           | `change-me`  |
+| `MINIO_ROOT_USER`     | MinIO access key         | `minioadmin` |
+| `MINIO_ROOT_PASSWORD` | MinIO secret key         | `minioadmin` |
+| `GROQ_API_KEY`        | Groq API key             | Optional     |
+| `OPENAI_API_KEY`      | OpenAI API key           | Optional     |
+| `DEEPSEEK_API_KEY`    | DeepSeek API key         | Optional     |
+| `CANVAS_API_URL`      | Canvas LMS API URL       | Optional     |
+| `CANVAS_API_KEY`      | Canvas LMS API key       | Optional     |
+| `MOODLE_API_URL`      | Moodle LMS API URL       | Optional     |
+| `MOODLE_API_KEY`      | Moodle LMS API key       | Optional     |
 
 ### AI Model Configuration
 
@@ -298,7 +273,7 @@ The application supports multiple AI providers for question generation:
 
 2. **OpenAI**
 
-   - Model: `o3-mini`
+   - Model: `gpt-4o-mini`
    - High quality responses
    - Paid service
 
@@ -329,6 +304,9 @@ The application supports multiple AI providers for question generation:
 
    # View database logs
    docker-compose logs db
+
+   # Check if pgvector extension is loaded
+   docker-compose exec db psql -U postgres -d eduquery -c "\dx"
    ```
 
 3. **MinIO connection issues**
@@ -348,6 +326,18 @@ The application supports multiple AI providers for question generation:
 
    # Restart frontend service
    docker-compose restart frontend
+   ```
+
+5. **Database initialization issues**
+
+   ```bash
+   # Check if init.sql ran successfully
+   docker-compose exec db psql -U postgres -d eduquery -c "\dt"
+
+   # If embeddings table is missing, restart with fresh database
+   docker-compose down
+   docker volume rm question-maker_postgres_data
+   docker-compose up -d
    ```
 
 ### Reset Everything
@@ -374,6 +364,27 @@ docker-compose up -d
 4. **Generate Questions**: Let AI generate questions from your documents
 5. **Review & Edit**: Review generated questions and make adjustments
 6. **Organize**: Assign questions to classes and add tags for better organization
+7. **Search**: Use semantic search to find similar questions using vector embeddings
+
+## 🏗️ Architecture
+
+This application uses a **monolithic architecture** optimized for development and small to medium teams:
+
+- **Single Backend Container**: All functionality (AI, file processing, authentication) in one service
+- **Simple Deployment**: One docker-compose file for all services
+- **Easy Development**: All code in one place, easier to debug and maintain
+- **Lower Resource Usage**: No inter-service communication overhead
+- **Fast Startup**: All services start together
+
+### Future Scalability
+
+When the application grows, this monolithic architecture can be easily split into microservices:
+
+- File Processing Service
+- AI Service
+- Question Service
+- User Service
+- Storage Service
 
 ## 🤝 Contributing
 
@@ -397,9 +408,16 @@ If you encounter any issues or have questions:
 
 ## 🔮 Roadmap
 
+- [x] Basic question generation
+- [x] Document processing (PDF, DOCX, PPTX)
+- [x] Vector search with pgvector
+- [x] Multiple AI provider support
+- [x] Class management
 - [ ] Question templates and customization
 - [ ] Export questions to various formats (PDF, Word, etc.)
 - [ ] Advanced analytics and reporting
 - [ ] Collaborative features for teams
 - [ ] Mobile app support
-- [ ] Integration with LMS platforms
+- [ ] LMS integration (Canvas, Moodle)
+- [ ] Real-time collaboration
+- [ ] Advanced AI features (AISA, evaluation metrics)
