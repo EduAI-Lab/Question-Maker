@@ -66,12 +66,16 @@ Create a `.env` file in the root directory with the following variables:
 POSTGRES_DB=eduquery
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
+POSTGRES_PORT=5432
 
 # MinIO Configuration
 MINIO_ROOT_USER=minioadmin
 MINIO_ROOT_PASSWORD=minioadmin
+MINIO_PORT=9000
+MINIO_CONSOLE_PORT=9001
 
-# Backend Configuration
+# Application Configuration
+NGINX_PORT=80
 SECRET_KEY=change-me # IMPORTANT: Change this to a strong, random key
 
 # AI API Keys (Optional, but required for AI features)
@@ -214,6 +218,8 @@ The application consists of the following services:
 - **Port**: 80
 - **Features**: Routes requests to frontend/backend
 
+### Port numbers can be changed in local .env file.
+
 ## 🔑 API Endpoints
 
 ### Authentication
@@ -250,9 +256,13 @@ The application consists of the following services:
 | `POSTGRES_DB`         | PostgreSQL database name | `eduquery`   |
 | `POSTGRES_USER`       | PostgreSQL username      | `postgres`   |
 | `POSTGRES_PASSWORD`   | PostgreSQL password      | `postgres`   |
-| `SECRET_KEY`          | JWT secret key           | `change-me`  |
+| `POSTGRES_PORT`       | PostgreSQL port          | `5432`       |
 | `MINIO_ROOT_USER`     | MinIO access key         | `minioadmin` |
 | `MINIO_ROOT_PASSWORD` | MinIO secret key         | `minioadmin` |
+| `MINIO_PORT`          | MinIO API port           | `9000`       |
+| `MINIO_CONSOLE_PORT`  | MinIO console port       | `9001`       |
+| `NGINX_PORT`          | Nginx port               | `80`         |
+| `SECRET_KEY`          | JWT secret key           | `change-me`  |
 | `GROQ_API_KEY`        | Groq API key             | Optional     |
 | `OPENAI_API_KEY`      | OpenAI API key           | Optional     |
 | `DEEPSEEK_API_KEY`    | DeepSeek API key         | Optional     |
@@ -292,8 +302,11 @@ The application supports multiple AI providers for question generation:
    # Check if ports are in use
    netstat -tulpn | grep :80
    netstat -tulpn | grep :5432
+   netstat -tulpn | grep :9000
+   netstat -tulpn | grep :9001
 
-   # Stop conflicting services or change ports in docker-compose.yml
+   # Change ports in .env file instead of docker-compose.yml
+   # Example: POSTGRES_PORT=5433, NGINX_PORT=8080, etc.
    ```
 
 2. **Database connection issues**
