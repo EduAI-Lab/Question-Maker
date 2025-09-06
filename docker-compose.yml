@@ -67,7 +67,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: docker/frontend/Dockerfile.dev
+      dockerfile: docker/frontend/Dockerfile
     volumes:
       # Mount only source files that change frequently
       - ./app/frontend/src:/app/src

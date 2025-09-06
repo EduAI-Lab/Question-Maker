@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 COPY app/frontend/package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 COPY app/frontend/ .
 RUN npm run build

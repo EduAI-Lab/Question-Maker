@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Copy requirements
-COPY docker/backend/requirements.txt ./requirements.txt
+COPY app/backend/requirements.txt ./requirements.txt
 
 # Install Python deps
 RUN pip install --upgrade pip && pip install -r requirements.txt
