@@ -30,3 +30,8 @@ beautifulsoup4>=4.9.3
 pandas>=1.3.0
 tqdm>=4.65.0
 sentencepiece  # Required for BART model tokenization
+pdfplumber
+pdf2image
+pytesseract
+groq
+openai
