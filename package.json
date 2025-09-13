@@ -1,0 +1,18 @@
+{
+  "name": "question-maker",
+  "version": "1.0.0",
+  "description": "AI-powered question generation platform",
+  "scripts": {
+    "dev:up": "docker-compose -f docker-compose.dev.yml up -d",
+    "dev:down": "docker-compose -f docker-compose.dev.yml down",
+    "dev:restart": "docker-compose -f docker-compose.dev.yml down && docker-compose -f docker-compose.dev.yml up -d",
+    "dev:logs": "docker-compose -f docker-compose.dev.yml logs -f",
+    "dev:build": "docker-compose -f docker-compose.dev.yml up -d --build",
+    "prod:up": "docker-compose up -d",
+    "prod:down": "docker-compose down",
+    "setup": "./setup.sh"
+  },
+  "keywords": ["education", "ai", "questions", "react", "nodejs"],
+  "author": "Your Name",
+  "license": "MIT"
+}

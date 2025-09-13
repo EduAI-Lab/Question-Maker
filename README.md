@@ -212,6 +212,21 @@ cd app/backend
 
 ## 🐳 Docker Commands
 
+### Quick Commands (Recommended)
+```bash
+# Development
+npm run dev:up          # Start development containers
+npm run dev:down        # Stop development containers
+npm run dev:restart     # Restart development containers
+npm run dev:logs        # View development logs
+npm run dev:build       # Rebuild and start development containers
+
+# Production
+npm run prod:up         # Start production containers
+npm run prod:down       # Stop production containers
+```
+
+### Full Docker Commands
 ```bash
 # Development
 docker-compose -f docker-compose.dev.yml up -d
