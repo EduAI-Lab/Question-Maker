@@ -1,0 +1,52 @@
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the project root directory (3 levels up from this file)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, '../../../');
+
+// Load environment variables from project root
+dotenv.config({ path: path.join(projectRoot, '.env') });
+
+export const config = {
+  // Server
+  port: process.env.PORT || 8000,
+  nodeEnv: process.env.NODE_ENV || 'development',
+  
+  // Database
+  databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/eduquery',
+  
+  // Security
+  jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 12,
+  
+  // CORS
+  corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173'],
+  
+  // API Keys
+  groqApiKey: process.env.GROQ_API_KEY || '',
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
+  deepseekApiKey: process.env.DEEPSEEK_API_KEY || '',
+  
+  // File Upload
+  maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // 10MB
+  allowedFileTypes: process.env.ALLOWED_FILE_TYPES?.split(',') || [
+    'application/pdf',
+    'text/plain',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ],
+  
+  // AI Settings
+  defaultNumQuestions: parseInt(process.env.DEFAULT_NUM_QUESTIONS) || 15,
+  maxQuestions: parseInt(process.env.MAX_QUESTIONS) || 50,
+  
+  // Rate Limiting
+  rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX) || 100
+};
+
+export default config;
