@@ -25,7 +25,7 @@ router.post('/register', async (req, res, next) => {
       });
     }
 
-    const result = await registerUser(email, password);
+    const result = await registerUser({ email, password });
 
     res.status(201).json({
       success: true,
@@ -51,7 +51,7 @@ router.post('/login', async (req, res, next) => {
       });
     }
 
-    const result = await loginUser(email, password);
+    const result = await loginUser({ email, password });
 
     res.json({
       success: true,

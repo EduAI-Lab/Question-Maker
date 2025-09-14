@@ -32,8 +32,8 @@ async function registerUser(userData) {
   // Generate JWT token
   const token = jwt.sign(
     { userId: user.id, email: user.email },
-    config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiresIn }
   );
 
   return {
@@ -71,8 +71,8 @@ async function loginUser(credentials) {
   // Generate JWT token
   const token = jwt.sign(
     { userId: user.id, email: user.email },
-    config.jwt.secret,
-    { expiresIn: config.jwt.expiresIn }
+    config.jwtSecret,
+    { expiresIn: config.jwtExpiresIn }
   );
 
   return {
@@ -91,7 +91,7 @@ async function loginUser(credentials) {
  * @returns {Promise<Object>} Decoded token payload
  */
 function verifyToken(token) {
-  return jwt.verify(token, config.jwt.secret);
+  return jwt.verify(token, config.jwtSecret);
 }
 
 /**
