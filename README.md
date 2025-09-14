@@ -142,7 +142,7 @@ APP_VERSION=1.0.0
 # BACKEND CONFIGURATION
 # ===========================================
 PORT=8000
-DATABASE_URL=postgresql://postgres:password@localhost:5432/eduquery
+DATABASE_URL=postgresql://postgres:password@postgres:5432/eduquery
 JWT_SECRET=your-super-secret-jwt-key
 JWT_EXPIRES_IN=24h
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000

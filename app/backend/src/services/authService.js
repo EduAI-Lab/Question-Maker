@@ -1,7 +1,7 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const { User } = require('../models');
-const config = require('../config/settings');
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { User } from '../models/index.js';
+import { config } from '../config/settings.js';
 
 /**
  * Register a new user
@@ -94,8 +94,27 @@ function verifyToken(token) {
   return jwt.verify(token, config.jwt.secret);
 }
 
-module.exports = {
+/**
+ * Get user by ID
+ * @param {number} userId - User ID
+ * @returns {Promise<Object>} User data (without password)
+ */
+async function getUserById(userId) {
+  const user = await User.findByPk(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    createdAt: user.createdAt,
+  };
+}
+
+export {
   registerUser,
   loginUser,
   verifyToken,
+  getUserById,
 };
