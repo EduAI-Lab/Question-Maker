@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Text, Badge, Flex } from '@chakra-ui/react';
+import { Card, CardContent } from './ui/card';
+import { Badge } from './ui/badge';
 
 interface QuestionCardProps {
   content: string;
@@ -8,41 +8,30 @@ interface QuestionCardProps {
 }
 
 const difficultyColors = {
-  easy: 'green',
-  medium: 'yellow',
-  hard: 'red'
+  easy: 'bg-green-100 text-green-800',
+  medium: 'bg-yellow-100 text-yellow-800',
+  hard: 'bg-red-100 text-red-800'
 };
 
-const QuestionCard: React.FC<QuestionCardProps> = ({ content, difficulty, createdAt }) => {
+const QuestionCard = ({ content, difficulty, createdAt }: QuestionCardProps) => {
   return (
-    <Box
-      borderWidth="1px"
-      borderRadius="lg"
-      p={4}
-      mb={4}
-      position="relative"
-    >
-      <Flex justify="space-between" align="center" mb={2}>
-        <Text fontSize="lg" fontWeight="medium">
-          {content}
-        </Text>
-        <Badge
-          colorScheme={difficultyColors[difficulty]}
-          position="absolute"
-          top={2}
-          right={2}
-          px={2}
-          py={1}
-          borderRadius="full"
-          textTransform="capitalize"
-        >
-          {difficulty}
-        </Badge>
-      </Flex>
-      <Text fontSize="sm" color="gray.500">
-        Created: {new Date(createdAt).toLocaleDateString()}
-      </Text>
-    </Box>
+    <Card className="mb-4 relative">
+      <CardContent className="p-4">
+        <div className="flex justify-between items-center mb-2">
+          <p className="text-lg font-medium">
+            {content}
+          </p>
+          <Badge
+            className={`absolute top-2 right-2 px-2 py-1 rounded-full capitalize ${difficultyColors[difficulty]}`}
+          >
+            {difficulty}
+          </Badge>
+        </div>
+        <p className="text-sm text-gray-500">
+          Created: {new Date(createdAt).toLocaleDateString()}
+        </p>
+      </CardContent>
+    </Card>
   );
 };
 

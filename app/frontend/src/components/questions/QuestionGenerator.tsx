@@ -52,7 +52,7 @@ export const QuestionGenerator = () => {
         difficultyDistribution
       });
 
-      if (result.success) {
+      if (result.success && result.data) {
         setGeneratedQuestions(result.data);
         toast({
           title: "Success",
@@ -86,7 +86,7 @@ export const QuestionGenerator = () => {
         setPrompt('');
         toast({
           title: "Success",
-          description: `${result.data.length} questions saved successfully!`
+          description: `${result.data?.length || 0} questions saved successfully!`
         });
       } else {
         toast({

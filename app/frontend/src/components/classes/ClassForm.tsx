@@ -27,7 +27,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof ClassCreate, string>>>({});
-  const { createClass, updateClass } = useClasses();
+  const { createClass } = useClasses();
   const { toast } = useToast();
 
   const validateForm = (): boolean => {
@@ -49,7 +49,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -102,7 +102,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('name', e.target.value)}
                 placeholder="e.g., Introduction to Computer Science"
                 className={errors.name ? 'border-destructive' : ''}
               />
@@ -116,7 +116,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
               <Input
                 id="subject"
                 value={formData.subject}
-                onChange={(e) => handleChange('subject', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('subject', e.target.value)}
                 placeholder="e.g., Computer Science"
                 className={errors.subject ? 'border-destructive' : ''}
               />
@@ -130,7 +130,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
               <Input
                 id="courseCode"
                 value={formData.courseCode}
-                onChange={(e) => handleChange('courseCode', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('courseCode', e.target.value)}
                 placeholder="e.g., CS101"
               />
             </div>
@@ -140,7 +140,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
               <Input
                 id="department"
                 value={formData.department}
-                onChange={(e) => handleChange('department', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('department', e.target.value)}
                 placeholder="e.g., Computer Science Department"
               />
             </div>
@@ -150,7 +150,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
               <Input
                 id="semester"
                 value={formData.semester}
-                onChange={(e) => handleChange('semester', e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('semester', e.target.value)}
                 placeholder="e.g., Fall 2024"
               />
             </div>
@@ -161,7 +161,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
                 id="year"
                 type="number"
                 value={formData.year || ''}
-                onChange={(e) => handleChange('year', e.target.value ? parseInt(e.target.value) : undefined)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('year', e.target.value ? parseInt(e.target.value) : undefined)}
                 placeholder="e.g., 2024"
                 min="1900"
                 max="2100"
@@ -178,7 +178,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => handleChange('description', e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
               placeholder="Brief description of the class..."
               className="min-h-[100px]"
             />

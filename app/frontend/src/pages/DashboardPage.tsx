@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { LogOut, Moon, Sun, Plus } from 'lucide-react';
+import { LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../components/theme-provider';
 import { QuestionList } from '../components/questions/QuestionList';
@@ -15,13 +15,29 @@ import { ClassForm } from '../components/classes/ClassForm';
 export const DashboardPage = () => {
   const [activeTab, setActiveTab] = useState('questions');
   const [showClassForm, setShowClassForm] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploading] = useState(false);
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const { theme, setTheme } = useTheme();
 
-  const handleFilesSelected = (files: File[]) => {
+  const handleFilesSelected = (files: File[]): void => {
     console.log('Files selected:', files);
     // TODO: Implement file upload logic
+  };
+
+  const handleClassCreate = (data: any) => {
+    console.log('Creating class:', data);
+    // TODO: Implement class creation logic
+    setShowClassForm(false);
+  };
+
+  const handleClassEdit = (classItem: any) => {
+    console.log('Editing class:', classItem);
+    // TODO: Implement class editing logic
+  };
+
+  const handleClassDelete = (id: number) => {
+    console.log('Deleting class:', id);
+    // TODO: Implement class deletion logic
   };
 
   // Show loading while authentication is being checked
@@ -104,33 +120,28 @@ export const DashboardPage = () => {
             <Card>
               <CardHeader>
                 <CardTitle>Upload Files</CardTitle>
-                <CardContent className="pt-6">
-                  <FileUploadZone 
-                    onFilesSelected={handleFilesSelected}
-                    isUploading={isUploading}
-                  />
-                </CardContent>
               </CardHeader>
+              <CardContent>
+                <FileUploadZone 
+                  onFilesSelected={handleFilesSelected}
+                  isUploading={isUploading}
+                />
+              </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="classes">
             {showClassForm ? (
               <ClassForm
-                onSubmit={() => setShowClassForm(false)}
+                onSubmit={handleClassCreate}
                 onCancel={() => setShowClassForm(false)}
               />
             ) : (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-2xl font-bold">Classes</h2>
-                  <Button onClick={() => setShowClassForm(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Class
-                  </Button>
-                </div>
-                <ClassList />
-              </div>
+              <ClassList
+                onEdit={handleClassEdit}
+                onDelete={handleClassDelete}
+                onCreate={() => setShowClassForm(true)}
+              />
             )}
           </TabsContent>
 

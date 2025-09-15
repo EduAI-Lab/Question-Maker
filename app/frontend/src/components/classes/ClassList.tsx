@@ -4,7 +4,6 @@ import { Badge } from '../ui/badge';
 import { Edit, Trash2, Plus } from 'lucide-react';
 import { Class } from '../../types/class';
 import { useClasses } from '../../hooks/useClasses';
-import { useTheme } from '../theme-provider';
 import { useToast } from '../ui/use-toast';
 
 interface ClassListProps {
@@ -15,7 +14,6 @@ interface ClassListProps {
 
 export const ClassList = ({ onEdit, onDelete, onCreate }: ClassListProps) => {
   const { classes, isLoading, deleteClass } = useClasses();
-  const { theme } = useTheme();
   const { toast } = useToast();
 
   const handleDelete = async (id: number) => {

@@ -1,11 +1,8 @@
 import { useState } from 'react';
-import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Card, CardContent } from '../ui/card';
 import { ScrollArea } from '../ui/scroll-area';
-import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Trash2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useQuestions } from '../../hooks/useQuestions';
 import { useTheme } from '../theme-provider';
 import { QuestionCard } from './QuestionCard';

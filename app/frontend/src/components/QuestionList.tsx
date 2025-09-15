@@ -1,18 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import {
-  VStack,
-  HStack,
-  Heading,
-  Text,
-  Select,
-  Box,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatGroup,
-  Badge,
-  Flex
-} from '@chakra-ui/react';
+import { useState, useMemo, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Badge } from './ui/badge';
 import QuestionCard from './QuestionCard';
 
 interface Question {
@@ -20,24 +9,24 @@ interface Question {
   content: string;
   difficulty: 'easy' | 'medium' | 'hard';
   createdAt: string;
+  tags?: string[];
 }
 
 interface QuestionListProps {
   questions: Question[];
+  onDelete?: (id: number) => void;
 }
 
-// Constants for localStorage keys
-const DIFFICULTY_FILTER_KEY = 'questionList_difficultyFilter';
-const SORT_BY_KEY = 'questionList_sortBy';
+const DIFFICULTY_FILTER_KEY = 'question-difficulty-filter';
+const SORT_BY_KEY = 'question-sort-by';
 
-const QuestionList: React.FC<QuestionListProps> = ({ questions }) => {
-  // Initialize state with values from localStorage or defaults
-  const [difficultyFilter, setDifficultyFilter] = useState<string>(() => {
+const QuestionList = ({ questions }: QuestionListProps) => {
+  const [difficultyFilter, setDifficultyFilter] = useState(() => {
     const saved = localStorage.getItem(DIFFICULTY_FILTER_KEY);
     return saved || 'all';
   });
-  
-  const [sortBy, setSortBy] = useState<string>(() => {
+
+  const [sortBy, setSortBy] = useState(() => {
     const saved = localStorage.getItem(SORT_BY_KEY);
     return saved || 'newest';
   });
@@ -51,16 +40,6 @@ const QuestionList: React.FC<QuestionListProps> = ({ questions }) => {
     localStorage.setItem(SORT_BY_KEY, sortBy);
   }, [sortBy]);
 
-  // Handle filter change
-  const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setDifficultyFilter(e.target.value);
-  };
-
-  // Handle sort change
-  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortBy(e.target.value);
-  };
-
   // Calculate statistics
   const stats = useMemo(() => {
     const total = questions.length;
@@ -68,15 +47,7 @@ const QuestionList: React.FC<QuestionListProps> = ({ questions }) => {
     const mediumCount = questions.filter(q => q.difficulty === 'medium').length;
     const hardCount = questions.filter(q => q.difficulty === 'hard').length;
 
-    return {
-      total,
-      easy: easyCount,
-      medium: mediumCount,
-      hard: hardCount,
-      easyPercent: total ? Math.round((easyCount / total) * 100) : 0,
-      mediumPercent: total ? Math.round((mediumCount / total) * 100) : 0,
-      hardPercent: total ? Math.round((hardCount / total) * 100) : 0
-    };
+    return { total, easyCount, mediumCount, hardCount };
   }, [questions]);
 
   // Filter and sort questions
@@ -111,87 +82,106 @@ const QuestionList: React.FC<QuestionListProps> = ({ questions }) => {
 
   if (!questions.length) {
     return (
-      <Text color="gray.500" textAlign="center" mt={4}>
+      <p className="text-gray-500 text-center mt-4">
         No questions available
-      </Text>
+      </p>
     );
   }
 
   return (
-    <VStack spacing={6} align="stretch" width="100%">
+    <div className="space-y-6 w-full">
       {/* Statistics Section */}
-      <Box borderWidth="1px" borderRadius="lg" p={4} bg="white">
-        <Heading size="sm" mb={4}>Question Statistics</Heading>
-        <StatGroup>
-          <Stat>
-            <StatLabel>Total Questions</StatLabel>
-            <StatNumber>{stats.total}</StatNumber>
-          </Stat>
-          <Stat>
-            <StatLabel>Easy</StatLabel>
-            <StatNumber color="green.500">{stats.easyPercent}%</StatNumber>
-            <Text fontSize="sm">({stats.easy} questions)</Text>
-          </Stat>
-          <Stat>
-            <StatLabel>Medium</StatLabel>
-            <StatNumber color="yellow.500">{stats.mediumPercent}%</StatNumber>
-            <Text fontSize="sm">({stats.medium} questions)</Text>
-          </Stat>
-          <Stat>
-            <StatLabel>Hard</StatLabel>
-            <StatNumber color="red.500">{stats.hardPercent}%</StatNumber>
-            <Text fontSize="sm">({stats.hard} questions)</Text>
-          </Stat>
-        </StatGroup>
-      </Box>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Question Statistics</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Total Questions</p>
+              <p className="text-2xl font-bold">{stats.total}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Easy</p>
+              <p className="text-2xl font-bold text-green-600">{stats.easyCount}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Medium</p>
+              <p className="text-2xl font-bold text-yellow-600">{stats.mediumCount}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Hard</p>
+              <p className="text-2xl font-bold text-red-600">{stats.hardCount}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filters and Sorting */}
-      <HStack spacing={4} justify="space-between">
-        <Box>
-          <Select
-            value={difficultyFilter}
-            onChange={handleFilterChange}
-            width="200px"
-          >
-            <option value="all">All Difficulties</option>
-            <option value="easy">Easy</option>
-            <option value="medium">Medium</option>
-            <option value="hard">Hard</option>
-          </Select>
-        </Box>
-        <Box>
-          <Select
-            value={sortBy}
-            onChange={handleSortChange}
-            width="200px"
-          >
-            <option value="newest">Newest First</option>
-            <option value="oldest">Oldest First</option>
-            <option value="easiest">Easiest First</option>
-            <option value="hardest">Hardest First</option>
-          </Select>
-        </Box>
-      </HStack>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filters & Sorting</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2">Filter by Difficulty</label>
+              <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All difficulties" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Difficulties</SelectItem>
+                  <SelectItem value="easy">Easy</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium mb-2">Sort by</label>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest First</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="easiest">Easiest First</SelectItem>
+                  <SelectItem value="hardest">Hardest First</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Questions List */}
-      <VStack spacing={4} align="stretch">
-        <Flex justify="space-between" align="center">
-          <Heading size="md">Your Questions</Heading>
-          <Text color="gray.500" fontSize="sm">
-            Showing {filteredAndSortedQuestions.length} of {questions.length} questions
-          </Text>
-        </Flex>
-        {filteredAndSortedQuestions.map((question) => (
-          <QuestionCard
-            key={question.id}
-            content={question.content}
-            difficulty={question.difficulty}
-            createdAt={question.createdAt}
-          />
-        ))}
-      </VStack>
-    </VStack>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-semibold">
+            Questions ({filteredAndSortedQuestions.length})
+          </h3>
+          {difficultyFilter !== 'all' && (
+            <Badge variant="secondary">
+              Filtered by: {difficultyFilter}
+            </Badge>
+          )}
+        </div>
+        
+        <div className="space-y-4">
+          {filteredAndSortedQuestions.map((question) => (
+            <QuestionCard
+              key={question.id}
+              content={question.content}
+              difficulty={question.difficulty}
+              createdAt={question.createdAt}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 };
 
-export default QuestionList; 
+export default QuestionList;

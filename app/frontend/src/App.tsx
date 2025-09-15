@@ -6,7 +6,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 
 function App() {
-  return (
+      return (
     <ThemeProvider defaultTheme="light" storageKey="eduquery-theme">
       <AuthProvider>
         <Router>
@@ -16,12 +16,12 @@ function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
             </Routes>
-            <Toaster />
-          </div>
+      <Toaster />
+    </div>
         </Router>
       </AuthProvider>
     </ThemeProvider>
   );
 }
 
-export default App;
+export default App; 
