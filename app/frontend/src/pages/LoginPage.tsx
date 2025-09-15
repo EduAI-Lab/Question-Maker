@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { AlertCircle, Loader2, Moon, Sun } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../components/theme-provider';
 import { FloatingLetters } from '../components/FloatingLetters';
 
