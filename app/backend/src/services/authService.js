@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/index.js';
+import { User } from '../schema/index.js';
 import { config } from '../config/settings.js';
 
 /**

@@ -1,5 +1,5 @@
-import { Question } from '../models/Question.js';
-import { Class } from '../models/Class.js';
+import { Question } from '../schema/Question.js';
+import { Class } from '../schema/Class.js';
 
 export const createQuestion = async (userId, questionData) => {
   try {
