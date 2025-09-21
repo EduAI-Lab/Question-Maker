@@ -102,7 +102,7 @@ eduquery-ai/
 1. **Environment Setup**
    ```bash
    # Copy and configure the environment file
-   cp env.example .env
+   cp .env.example .env
    # Edit .env with your configuration
    ```
 
