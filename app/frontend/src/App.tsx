@@ -4,6 +4,7 @@ import { ThemeProvider } from './components/theme-provider';
 import { AuthProvider } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { LandingPage } from './pages/LandingPage';
 
 function App() {
       return (
@@ -14,7 +15,8 @@ function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/landing" element={<LandingPage />} />
+              <Route path="/" element={<Navigate to="/landing" replace />} />
             </Routes>
       <Toaster />
     </div>
