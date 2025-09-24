@@ -41,18 +41,18 @@ export const TopNavigation = ({
                 if (course) onCourseChange(course);
               }}
             >
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select Course" />
+              <SelectTrigger className="w-80 min-w-80">
+                <SelectValue placeholder="Select Course" className="text-base font-bold" />
               </SelectTrigger>
               <SelectContent>
                 {courses.map((course) => (
-                  <SelectItem key={course.id} value={course.id.toString()}>
+                  <SelectItem key={course.id} value={course.id.toString()} className="text-base font-semibold">
                     {course.code} - {course.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <ChevronDown className="h-4 w-4 text-gray-500" />
+            <ChevronDown className="h-5 w-5 text-gray-500" />
           </div>
 
           {/* Tabs */}
