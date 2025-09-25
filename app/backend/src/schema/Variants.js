@@ -1,0 +1,79 @@
+import { DataTypes } from 'sequelize';
+import { sequelize } from '../config/database.js';
+
+export const Variants = sequelize.define('Variants', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  questionText: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+    field: 'question_text',
+    validate: {
+      notEmpty: true
+    }
+  },
+  difficulty: {
+    type: DataTypes.ENUM('easy', 'medium', 'hard'),
+    allowNull: false,
+    defaultValue: 'medium'
+  },
+  questionMetadataId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    field: 'question_metadata_id',
+    references: {
+      model: 'question_metadata',
+      key: 'id'
+    }
+  },
+  assessmentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'assessment_id',
+    references: {
+      model: 'assessments',
+      key: 'id'
+    }
+  },
+  secondaryTopicsId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'secondary_topics_id',
+    references: {
+      model: 'topics',
+      key: 'id'
+    }
+  },
+  referenceId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'reference_id',
+    references: {
+      model: 'variants',
+      key: 'id'
+    }
+  },
+  answer: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  createdAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW,
+    field: 'created_at'
+  },
+  updatedAt: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    defaultValue: DataTypes.NOW,
+    field: 'updated_at'
+  }
+}, {
+  tableName: 'variants',
+  timestamps: true,
+  underscored: true
+});

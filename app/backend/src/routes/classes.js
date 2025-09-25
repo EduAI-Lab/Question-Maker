@@ -1,5 +1,5 @@
 import express from 'express';
-import { Class } from '../models/Class.js';
+import { Course } from '../schema/Course.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -18,21 +18,16 @@ router.post('/', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const classData = await Class.create({
+    const courseData = await Course.create({
       userId: req.user.id,
       name,
-      subject,
-      courseCode,
-      semester,
-      year,
-      description,
-      department
+      code: courseCode
     });
 
     res.status(201).json({
       success: true,
-      message: 'Class created successfully',
-      data: classData
+      message: 'Course created successfully',
+      data: courseData
     });
   } catch (error) {
     next(error);
@@ -44,14 +39,14 @@ router.post('/', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
-    const classes = await Class.findAll({
+    const courses = await Course.findAll({
       where: { userId: req.user.id },
       order: [['createdAt', 'DESC']]
     });
 
     res.json({
       success: true,
-      data: classes
+      data: courses
     });
   } catch (error) {
     next(error);
@@ -63,20 +58,20 @@ router.get('/', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const classData = await Class.findOne({
+    const courseData = await Course.findOne({
       where: { id: req.params.id, userId: req.user.id }
     });
 
-    if (!classData) {
+    if (!courseData) {
       return res.status(404).json({
         success: false,
-        error: 'Class not found'
+        error: 'Course not found'
       });
     }
 
     res.json({
       success: true,
-      data: classData
+      data: courseData
     });
   } catch (error) {
     next(error);
@@ -90,31 +85,26 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { name, subject, courseCode, semester, year, description, department } = req.body;
 
-    const classData = await Class.findOne({
+    const courseData = await Course.findOne({
       where: { id: req.params.id, userId: req.user.id }
     });
 
-    if (!classData) {
+    if (!courseData) {
       return res.status(404).json({
         success: false,
-        error: 'Class not found'
+        error: 'Course not found'
       });
     }
 
-    await classData.update({
+    await courseData.update({
       name,
-      subject,
-      courseCode,
-      semester,
-      year,
-      description,
-      department
+      code: courseCode
     });
 
     res.json({
       success: true,
-      message: 'Class updated successfully',
-      data: classData
+      message: 'Course updated successfully',
+      data: courseData
     });
   } catch (error) {
     next(error);
@@ -126,22 +116,22 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const classData = await Class.findOne({
+    const courseData = await Course.findOne({
       where: { id: req.params.id, userId: req.user.id }
     });
 
-    if (!classData) {
+    if (!courseData) {
       return res.status(404).json({
         success: false,
-        error: 'Class not found'
+        error: 'Course not found'
       });
     }
 
-    await classData.destroy();
+    await courseData.destroy();
 
     res.json({
       success: true,
-      message: 'Class deleted successfully'
+      message: 'Course deleted successfully'
     });
   } catch (error) {
     next(error);

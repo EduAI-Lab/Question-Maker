@@ -1,20 +1,15 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-export const Class = sequelize.define('Class', {
+export const Assessments = sequelize.define('Assessments', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  userId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    field: 'user_id',
-    references: {
-      model: 'users',
-      key: 'id'
-    }
+  type: {
+    type: DataTypes.ENUM('Assignment', 'Lab', 'Quiz', 'Mid', 'Final'),
+    allowNull: false
   },
   name: {
     type: DataTypes.STRING,
@@ -23,33 +18,12 @@ export const Class = sequelize.define('Class', {
       notEmpty: true
     }
   },
-  subject: {
+  semester: {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
       notEmpty: true
     }
-  },
-  courseCode: {
-    type: DataTypes.STRING,
-    allowNull: true,
-    field: 'course_code'
-  },
-  semester: {
-    type: DataTypes.STRING,
-    allowNull: true
-  },
-  year: {
-    type: DataTypes.INTEGER,
-    allowNull: true
-  },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  department: {
-    type: DataTypes.STRING,
-    allowNull: true
   },
   createdAt: {
     type: DataTypes.DATE,
@@ -64,8 +38,7 @@ export const Class = sequelize.define('Class', {
     field: 'updated_at'
   }
 }, {
-  tableName: 'classes',
+  tableName: 'assessments',
   timestamps: true,
   underscored: true
 });
-

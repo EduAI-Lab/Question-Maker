@@ -1,5 +1,13 @@
 import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
+import { 
+  User, 
+  Course, 
+  Topics, 
+  Question_Metadata, 
+  Assessments, 
+  Variants 
+} from '../schema/index.js';
 
 dotenv.config();
 
@@ -19,10 +27,11 @@ export const connectDatabase = async () => {
     await sequelize.authenticate();
     console.log('✅ Database connection established successfully');
     
-    // Sync models in development
+    // Force recreate database schema in development
     if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ alter: true });
-      console.log('🔄 Database models synchronized');
+      console.log('🔄 Recreating database schema...');
+      await sequelize.sync({ force: true });
+      console.log('✅ Database schema recreated successfully');
     }
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);

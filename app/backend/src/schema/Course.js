@@ -1,11 +1,25 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-export const Draft = sequelize.define('Draft', {
+export const Course = sequelize.define('Course', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    validate: {
+      notEmpty: true
+    }
+  },
+  code: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    validate: {
+      notEmpty: true
+    }
   },
   userId: {
     type: DataTypes.INTEGER,
@@ -15,30 +29,6 @@ export const Draft = sequelize.define('Draft', {
       model: 'users',
       key: 'id'
     }
-  },
-  classId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    field: 'class_id',
-    references: {
-      model: 'classes',
-      key: 'id'
-    }
-  },
-  content: {
-    type: DataTypes.TEXT,
-    allowNull: false
-  },
-  status: {
-    type: DataTypes.ENUM('draft', 'published', 'archived'),
-    allowNull: false,
-    defaultValue: 'draft'
-  },
-  lastEdited: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'last_edited'
   },
   createdAt: {
     type: DataTypes.DATE,
@@ -53,8 +43,7 @@ export const Draft = sequelize.define('Draft', {
     field: 'updated_at'
   }
 }, {
-  tableName: 'drafts',
+  tableName: 'courses',
   timestamps: true,
   underscored: true
 });
-

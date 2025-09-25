@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/index.js';
+import { User } from '../schema/index.js';
 import { config } from '../config/settings.js';
 
 /**
@@ -40,7 +40,7 @@ async function registerUser(userData) {
     user: {
       id: user.id,
       email: user.email,
-      createdAt: user.createdAt,
+      createdDate: user.createdDate,
     },
     token,
   };
@@ -79,7 +79,7 @@ async function loginUser(credentials) {
     user: {
       id: user.id,
       email: user.email,
-      createdAt: user.createdAt,
+      createdDate: user.createdDate,
     },
     token,
   };
@@ -108,7 +108,7 @@ async function getUserById(userId) {
   return {
     id: user.id,
     email: user.email,
-    createdAt: user.createdAt,
+    createdDate: user.createdDate,
   };
 }
 

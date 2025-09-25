@@ -1,47 +1,42 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-export const Question = sequelize.define('Question', {
+export const Question_Metadata = sequelize.define('Question_Metadata', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  userId: {
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  type: {
+    type: DataTypes.ENUM('MCQ', 'SA'),
+    allowNull: false
+  },
+  courseId: {
     type: DataTypes.INTEGER,
     allowNull: false,
-    field: 'user_id',
+    field: 'course_id',
     references: {
-      model: 'users',
+      model: 'courses',
       key: 'id'
     }
   },
-  classId: {
+  primaryTopicId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    field: 'primary_topic_id',
+    references: {
+      model: 'topics',
+      key: 'id'
+    }
+  },
+  questionOrder: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    field: 'class_id',
-    references: {
-      model: 'classes',
-      key: 'id'
-    }
-  },
-  content: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-    validate: {
-      notEmpty: true
-    }
-  },
-  difficulty: {
-    type: DataTypes.ENUM('easy', 'medium', 'hard'),
-    allowNull: false,
-    defaultValue: 'medium'
-  },
-  bloomLevel: {
-    type: DataTypes.ENUM('remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'),
-    allowNull: false,
-    defaultValue: 'understand',
-    field: 'bloom_level'
+    field: 'question_order'
   },
   createdAt: {
     type: DataTypes.DATE,
@@ -56,8 +51,7 @@ export const Question = sequelize.define('Question', {
     field: 'updated_at'
   }
 }, {
-  tableName: 'questions',
+  tableName: 'question_metadata',
   timestamps: true,
   underscored: true
 });
-

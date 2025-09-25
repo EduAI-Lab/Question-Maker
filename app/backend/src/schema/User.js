@@ -20,21 +20,14 @@ export const User = sequelize.define('User', {
     allowNull: false,
     field: 'password_hash'
   },
-  createdAt: {
+  createdDate: {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: DataTypes.NOW,
-    field: 'created_at'
-  },
-  updatedAt: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    defaultValue: DataTypes.NOW,
-    field: 'updated_at'
+    field: 'created_date'
   }
 }, {
   tableName: 'users',
   timestamps: true,
   underscored: true
 });
-
