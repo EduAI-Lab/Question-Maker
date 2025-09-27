@@ -1,16 +1,16 @@
 import { Question_Metadata, Variants } from '../schema/index.js';
 import { Course } from '../schema/Course.js';
+import { Op } from 'sequelize';
 
 export const createQuestion = async (userId, questionData) => {
   try {
-    const { content, difficulty = 'medium', bloomLevel = 'understand', classId } = questionData;
+    const { content, difficulty = 'medium', bloomLevel = 'understand', classId, primaryTopicId } = questionData;
 
-    const question = await Question.create({
-      userId,
-      content,
-      difficulty,
-      bloomLevel,
-      classId: classId || null
+    const question = await Question_Metadata.create({
+      courseId: classId || null,
+      primaryTopicId: primaryTopicId || 1, // Default to topic 1, should be provided
+      type: 'MCQ', // Default type, can be made configurable
+      description: content
     });
 
     return question;
@@ -23,23 +23,21 @@ export const getQuestionsByUser = async (userId, options = {}) => {
   try {
     const { classId, difficulty, search, limit = 50, offset = 0 } = options;
     
-    const whereClause = { userId };
+    // Build where clause for Question_Metadata
+    const whereClause = {};
     
     if (classId) {
-      whereClause.classId = classId;
-    }
-    
-    if (difficulty && difficulty !== 'all') {
-      whereClause.difficulty = difficulty;
+      whereClause.courseId = classId;
     }
 
-    const questions = await Question.findAll({
+    const questions = await Question_Metadata.findAll({
       where: whereClause,
       include: [
         {
-          model: Class,
-          as: 'class',
-          attributes: ['id', 'name', 'subject']
+          model: Course,
+          as: 'course',
+          attributes: ['id', 'name', 'code'],
+          where: { userId: userId } // Filter by user through course relationship
         }
       ],
       order: [['createdAt', 'DESC']],
@@ -51,7 +49,7 @@ export const getQuestionsByUser = async (userId, options = {}) => {
     let filteredQuestions = questions;
     if (search) {
       filteredQuestions = questions.filter(q => 
-        q.content.toLowerCase().includes(search.toLowerCase())
+        q.description.toLowerCase().includes(search.toLowerCase())
       );
     }
 
@@ -63,13 +61,14 @@ export const getQuestionsByUser = async (userId, options = {}) => {
 
 export const getQuestionById = async (questionId, userId) => {
   try {
-    const question = await Question.findOne({
-      where: { id: questionId, userId },
+    const question = await Question_Metadata.findOne({
+      where: { id: questionId },
       include: [
         {
-          model: Class,
-          as: 'class',
-          attributes: ['id', 'name', 'subject']
+          model: Course,
+          as: 'course',
+          attributes: ['id', 'name', 'code'],
+          where: { userId: userId } // Ensure user owns the course
         }
       ]
     });
@@ -86,8 +85,15 @@ export const getQuestionById = async (questionId, userId) => {
 
 export const updateQuestion = async (questionId, userId, updateData) => {
   try {
-    const question = await Question.findOne({
-      where: { id: questionId, userId }
+    const question = await Question_Metadata.findOne({
+      where: { id: questionId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId: userId } // Ensure user owns the course
+        }
+      ]
     });
 
     if (!question) {
@@ -103,8 +109,15 @@ export const updateQuestion = async (questionId, userId, updateData) => {
 
 export const deleteQuestion = async (questionId, userId) => {
   try {
-    const question = await Question.findOne({
-      where: { id: questionId, userId }
+    const question = await Question_Metadata.findOne({
+      where: { id: questionId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId: userId } // Ensure user owns the course
+        }
+      ]
     });
 
     if (!question) {
@@ -120,13 +133,12 @@ export const deleteQuestion = async (questionId, userId) => {
 
 export const createMultipleQuestions = async (userId, questionsData) => {
   try {
-    const questions = await Question.bulkCreate(
+    const questions = await Question_Metadata.bulkCreate(
       questionsData.map(q => ({
-        userId,
-        content: q.content,
-        difficulty: q.difficulty || 'medium',
-        bloomLevel: q.bloom_level || 'understand',
-        classId: q.classId || null
+        courseId: q.classId || null,
+        primaryTopicId: q.primaryTopicId || 1, // Default to topic 1
+        type: 'MCQ',
+        description: q.content
       }))
     );
 
@@ -138,30 +150,35 @@ export const createMultipleQuestions = async (userId, questionsData) => {
 
 export const getQuestionStats = async (userId) => {
   try {
-    const totalQuestions = await Question.count({ where: { userId } });
-    
-    const difficultyStats = await Question.findAll({
-      where: { userId },
-      attributes: [
-        'difficulty',
-        [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']
-      ],
-      group: ['difficulty']
+    // Count questions for this user through course relationship
+    const totalQuestions = await Question_Metadata.count({
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId: userId }
+        }
+      ]
     });
-
-    const bloomLevelStats = await Question.findAll({
-      where: { userId },
+    
+    const typeStats = await Question_Metadata.findAll({
       attributes: [
-        'bloomLevel',
-        [Question.sequelize.fn('COUNT', Question.sequelize.col('id')), 'count']
+        'type',
+        [Question_Metadata.sequelize.fn('COUNT', Question_Metadata.sequelize.col('id')), 'count']
       ],
-      group: ['bloomLevel']
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId: userId }
+        }
+      ],
+      group: ['type']
     });
 
     return {
       totalQuestions,
-      difficultyStats,
-      bloomLevelStats
+      typeStats
     };
   } catch (error) {
     throw error;
