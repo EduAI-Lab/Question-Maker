@@ -185,3 +185,67 @@ export const getQuestionStats = async (userId) => {
   }
 };
 
+export const updateQuestionOrder = async (questionId, assessmentId, orderNumber, userId) => {
+  try {
+    const question = await Question_Metadata.findOne({
+      where: { id: questionId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId: userId }
+        }
+      ]
+    });
+
+    if (!question) {
+      throw new Error('Question not found');
+    }
+
+    // Get current questionOrder or initialize empty object
+    const currentOrder = question.questionOrder || {};
+    
+    // Update the order for the specific assessment
+    currentOrder[assessmentId] = orderNumber;
+    
+    // Update the question with new order
+    await question.update({ questionOrder: currentOrder });
+    
+    return question;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const removeQuestionFromAssessment = async (questionId, assessmentId, userId) => {
+  try {
+    const question = await Question_Metadata.findOne({
+      where: { id: questionId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId: userId }
+        }
+      ]
+    });
+
+    if (!question) {
+      throw new Error('Question not found');
+    }
+
+    // Get current questionOrder or initialize empty object
+    const currentOrder = question.questionOrder || {};
+    
+    // Remove the assessment from the order
+    delete currentOrder[assessmentId];
+    
+    // Update the question with new order
+    await question.update({ questionOrder: currentOrder });
+    
+    return question;
+  } catch (error) {
+    throw error;
+  }
+};
+

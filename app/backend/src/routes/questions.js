@@ -6,7 +6,9 @@ import {
   updateQuestion, 
   deleteQuestion, 
   createMultipleQuestions,
-  getQuestionStats 
+  getQuestionStats,
+  updateQuestionOrder,
+  removeQuestionFromAssessment
 } from '../services/questionService.js';
 import { generateQuestions, AI_PROVIDERS } from '../services/aiService.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -198,6 +200,58 @@ router.post('/approve', authenticateToken, async (req, res, next) => {
       success: true,
       message: `${savedQuestions.length} questions saved successfully`,
       data: savedQuestions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   PUT /api/questions/:id/order
+// @desc    Update question order in an assessment
+// @access  Private
+router.put('/:id/order', authenticateToken, async (req, res, next) => {
+  try {
+    const { assessmentId, orderNumber } = req.body;
+
+    if (!assessmentId || orderNumber === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Assessment ID and order number are required'
+      });
+    }
+
+    const question = await updateQuestionOrder(
+      req.params.id, 
+      assessmentId, 
+      orderNumber, 
+      req.user.id
+    );
+
+    res.json({
+      success: true,
+      message: 'Question order updated successfully',
+      data: question
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   DELETE /api/questions/:id/order/:assessmentId
+// @desc    Remove question from assessment order
+// @access  Private
+router.delete('/:id/order/:assessmentId', authenticateToken, async (req, res, next) => {
+  try {
+    const question = await removeQuestionFromAssessment(
+      req.params.id, 
+      req.params.assessmentId, 
+      req.user.id
+    );
+
+    res.json({
+      success: true,
+      message: 'Question removed from assessment order',
+      data: question
     });
   } catch (error) {
     next(error);
