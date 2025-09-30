@@ -34,9 +34,10 @@ export const Question_Metadata = sequelize.define('Question_Metadata', {
     }
   },
   questionOrder: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.JSON,
     allowNull: true,
-    field: 'question_order'
+    field: 'question_order',
+    comment: 'Dictionary mapping assessment IDs to order numbers: {assessmentId: orderNumber}'
   },
   createdAt: {
     type: DataTypes.DATE,
