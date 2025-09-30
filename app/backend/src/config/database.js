@@ -26,10 +26,8 @@ export const connectDatabase = async () => {
   try {
     await sequelize.authenticate();
     
-    // Force recreate database schema in development
-    if (process.env.NODE_ENV === 'development') {
-      await sequelize.sync({ force: true });
-    }
+    // Sync database schema (create tables if they don't exist)
+    await sequelize.sync();
   } catch (error) {
     throw error;
   }
