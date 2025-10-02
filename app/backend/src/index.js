@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js';
 import questionRoutes from './routes/questions.js';
 import classRoutes from './routes/classes.js';
 import uploadRoutes from './routes/upload.js';
+import assessmentRoutes from './routes/assessments.js';
 import { connectDatabase } from './config/database.js';
 import { config } from './config/settings.js';
 
@@ -57,6 +58,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/assessments', assessmentRoutes);
 
 // Error handling middleware
 app.use(notFound);

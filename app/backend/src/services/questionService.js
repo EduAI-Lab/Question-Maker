@@ -4,13 +4,22 @@ import { Op } from 'sequelize';
 
 export const createQuestion = async (userId, questionData) => {
   try {
-    const { content, difficulty = 'medium', bloomLevel = 'understand', classId, primaryTopicId } = questionData;
+    const { 
+      content, 
+      difficulty = 'medium', 
+      bloomLevel = 'understand', 
+      classId, 
+      primaryTopicId,
+      type = 'MCQ',
+      questionOrder = {}
+    } = questionData;
 
     const question = await Question_Metadata.create({
       courseId: classId || null,
       primaryTopicId: primaryTopicId || 1, // Default to topic 1, should be provided
-      type: 'MCQ', // Default type, can be made configurable
-      description: content
+      type: type,
+      description: content,
+      questionOrder: questionOrder
     });
 
     return question;
@@ -38,6 +47,11 @@ export const getQuestionsByUser = async (userId, options = {}) => {
           as: 'course',
           attributes: ['id', 'name', 'code'],
           where: { userId: userId } // Filter by user through course relationship
+        },
+        {
+          model: Variants,
+          as: 'variants',
+          attributes: ['id', 'questionText', 'difficulty', 'answer', 'assessmentId', 'secondaryTopicsId']
         }
       ],
       order: [['createdAt', 'DESC']],
@@ -69,6 +83,11 @@ export const getQuestionById = async (questionId, userId) => {
           as: 'course',
           attributes: ['id', 'name', 'code'],
           where: { userId: userId } // Ensure user owns the course
+        },
+        {
+          model: Variants,
+          as: 'variants',
+          attributes: ['id', 'questionText', 'difficulty', 'answer', 'assessmentId', 'secondaryTopicsId']
         }
       ]
     });
@@ -137,8 +156,9 @@ export const createMultipleQuestions = async (userId, questionsData) => {
       questionsData.map(q => ({
         courseId: q.classId || null,
         primaryTopicId: q.primaryTopicId || 1, // Default to topic 1
-        type: 'MCQ',
-        description: q.content
+        type: q.type || 'MCQ',
+        description: q.content,
+        questionOrder: q.questionOrder || {}
       }))
     );
 
@@ -244,6 +264,130 @@ export const removeQuestionFromAssessment = async (questionId, assessmentId, use
     await question.update({ questionOrder: currentOrder });
     
     return question;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Variant Management Functions
+export const createVariant = async (questionId, variantData, userId) => {
+  try {
+    // Verify user owns the question
+    const question = await Question_Metadata.findOne({
+      where: { id: questionId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId: userId }
+        }
+      ]
+    });
+
+    if (!question) {
+      throw new Error('Question not found');
+    }
+
+    const variant = await Variants.create({
+      questionMetadataId: questionId,
+      questionText: variantData.questionText,
+      difficulty: variantData.difficulty || 'medium',
+      assessmentId: variantData.assessmentId || null,
+      secondaryTopicsId: variantData.secondaryTopicsId || null,
+      answer: variantData.answer || null,
+      referenceId: variantData.referenceId || null
+    });
+
+    return variant;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateVariant = async (variantId, variantData, userId) => {
+  try {
+    const variant = await Variants.findOne({
+      where: { id: variantId },
+      include: [
+        {
+          model: Question_Metadata,
+          as: 'questionMetadata',
+          include: [
+            {
+              model: Course,
+              as: 'course',
+              where: { userId: userId }
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!variant) {
+      throw new Error('Variant not found');
+    }
+
+    await variant.update(variantData);
+    return variant;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const deleteVariant = async (variantId, userId) => {
+  try {
+    const variant = await Variants.findOne({
+      where: { id: variantId },
+      include: [
+        {
+          model: Question_Metadata,
+          as: 'questionMetadata',
+          include: [
+            {
+              model: Course,
+              as: 'course',
+              where: { userId: userId }
+            }
+          ]
+        }
+      ]
+    });
+
+    if (!variant) {
+      throw new Error('Variant not found');
+    }
+
+    await variant.destroy();
+    return true;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getVariantsByQuestion = async (questionId, userId) => {
+  try {
+    // Verify user owns the question
+    const question = await Question_Metadata.findOne({
+      where: { id: questionId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId: userId }
+        }
+      ]
+    });
+
+    if (!question) {
+      throw new Error('Question not found');
+    }
+
+    const variants = await Variants.findAll({
+      where: { questionMetadataId: questionId },
+      order: [['createdAt', 'ASC']]
+    });
+
+    return variants;
   } catch (error) {
     throw error;
   }

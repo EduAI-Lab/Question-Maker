@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { config } from '../config/settings.js';
+import { Question_Metadata, Variants } from '../schema/index.js';
 
 const AI_PROVIDERS = {
   GROQ: 'groq',
@@ -184,6 +185,51 @@ export const generateQuestions = async (prompt, provider, params) => {
         bloom_level: 'understand'
       }];
     }
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const generateAndSaveQuestions = async (prompt, provider, params, userId, classId, primaryTopicId = 1) => {
+  try {
+    // Generate questions using AI
+    const generatedQuestions = await generateQuestions(prompt, provider, params);
+    
+    // Create Question_Metadata records
+    const questionMetadata = await Question_Metadata.bulkCreate(
+      generatedQuestions.map(q => ({
+        courseId: classId,
+        primaryTopicId: primaryTopicId,
+        type: 'MCQ', // Default type
+        description: q.content,
+        questionOrder: {}
+      }))
+    );
+
+    // Create Variants for each question
+    const variants = [];
+    for (let i = 0; i < questionMetadata.length; i++) {
+      const questionMeta = questionMetadata[i];
+      const generatedQ = generatedQuestions[i];
+      
+      const variant = await Variants.create({
+        questionMetadataId: questionMeta.id,
+        questionText: generatedQ.content,
+        difficulty: generatedQ.difficulty,
+        answer: null, // AI doesn't generate answers yet
+        assessmentId: null,
+        secondaryTopicsId: null,
+        referenceId: null
+      });
+      
+      variants.push(variant);
+    }
+
+    return {
+      questions: questionMetadata,
+      variants: variants,
+      generatedCount: generatedQuestions.length
+    };
   } catch (error) {
     throw error;
   }
