@@ -5,7 +5,7 @@ import { Textarea } from '../ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../ui/card';
 import { Label } from '../ui/label';
 import { ClassCreate } from '../../types/class';
-import { useClasses } from '../../hooks/useClasses';
+import { useCourses } from '../../hooks/useCourses';
 import { useToast } from '../ui/use-toast';
 
 interface ClassFormProps {
@@ -27,7 +27,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof ClassCreate, string>>>({});
-  const { createClass } = useClasses();
+  const { createCourse } = useCourses();
   const { toast } = useToast();
 
   const validateForm = (): boolean => {
@@ -57,7 +57,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
     }
 
     try {
-      const result = await createClass(formData);
+      const result = await createCourse(formData);
       if (result.success) {
         toast({
           title: "Success",
