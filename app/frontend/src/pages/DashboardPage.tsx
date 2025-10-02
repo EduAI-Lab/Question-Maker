@@ -15,6 +15,7 @@ import { ClassForm } from '../components/classes/ClassForm';
 export const DashboardPage = () => {
   const [activeTab, setActiveTab] = useState('questions');
   const [showClassForm, setShowClassForm] = useState(false);
+  const [editingClass, setEditingClass] = useState<any>(null);
   const [isUploading] = useState(false);
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const { theme, setTheme } = useTheme();
@@ -28,11 +29,12 @@ export const DashboardPage = () => {
     console.log('Creating class:', data);
     // TODO: Implement class creation logic
     setShowClassForm(false);
+    setEditingClass(null);
   };
 
   const handleClassEdit = (classItem: any) => {
-    console.log('Editing class:', classItem);
-    // TODO: Implement class editing logic
+    setEditingClass(classItem);
+    setShowClassForm(true);
   };
 
   const handleClassDelete = (id: number) => {
@@ -134,7 +136,12 @@ export const DashboardPage = () => {
             {showClassForm ? (
               <ClassForm
                 onSubmit={handleClassCreate}
-                onCancel={() => setShowClassForm(false)}
+                onCancel={() => {
+                  setShowClassForm(false);
+                  setEditingClass(null);
+                }}
+                initialData={editingClass}
+                isEditing={!!editingClass}
               />
             ) : (
               <ClassList

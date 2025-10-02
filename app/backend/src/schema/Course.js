@@ -16,10 +16,27 @@ export const Course = sequelize.define('Course', {
   },
   code: {
     type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      notEmpty: true
-    }
+    allowNull: true
+  },
+  subject: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  semester: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  year: {
+    type: DataTypes.INTEGER,
+    allowNull: true
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  department: {
+    type: DataTypes.STRING,
+    allowNull: true
   },
   userId: {
     type: DataTypes.INTEGER,

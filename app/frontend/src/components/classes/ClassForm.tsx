@@ -13,9 +13,10 @@ interface ClassFormProps {
   onCancel: () => void;
   initialData?: Partial<ClassCreate>;
   isLoading?: boolean;
+  isEditing?: boolean;
 }
 
-export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }: ClassFormProps) => {
+export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false, isEditing = false }: ClassFormProps) => {
   const [formData, setFormData] = useState<ClassCreate>({
     name: initialData?.name || '',
     subject: initialData?.subject || '',
@@ -27,7 +28,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof ClassCreate, string>>>({});
-  const { createCourse } = useCourses();
+  const { createCourse, updateCourse } = useCourses();
   const { toast } = useToast();
 
   const validateForm = (): boolean => {
@@ -57,18 +58,24 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
     }
 
     try {
-      const result = await createCourse(formData);
+      let result;
+      if (isEditing && initialData?.id) {
+        result = await updateCourse(initialData.id, formData);
+      } else {
+        result = await createCourse(formData);
+      }
+      
       if (result.success) {
         toast({
           title: "Success",
-          description: "Class created successfully"
+          description: isEditing ? "Course updated successfully" : "Course created successfully"
         });
         onSubmit(formData);
       } else {
         toast({
           variant: "destructive",
           title: "Error",
-          description: result.error || "Failed to create class"
+          description: result.error || (isEditing ? "Failed to update course" : "Failed to create course")
         });
       }
     } catch (error) {
@@ -90,15 +97,15 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Create New Class</CardTitle>
-        <CardDescription>Add a new class to organize your questions</CardDescription>
+        <CardTitle>{isEditing ? 'Edit Course' : 'Create New Course'}</CardTitle>
+        <CardDescription>{isEditing ? 'Update course information' : 'Add a new course to organize your questions'}</CardDescription>
       </CardHeader>
       
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Class Name *</Label>
+              <Label htmlFor="name">Course Name *</Label>
               <Input
                 id="name"
                 value={formData.name}
@@ -190,7 +197,7 @@ export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false }
             Cancel
           </Button>
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'Creating...' : 'Create Class'}
+            {isLoading ? (isEditing ? 'Updating...' : 'Creating...') : (isEditing ? 'Update Course' : 'Create Course')}
           </Button>
         </CardFooter>
       </form>
