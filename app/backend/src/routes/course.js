@@ -119,7 +119,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
         {
           model: Topics,
           as: 'topics',
-          attributes: ['id', 'name', 'description']
+          attributes: ['id', 'name']
         }
       ];
     }
@@ -241,7 +241,7 @@ router.get('/:id/topics', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.post('/:id/topics', authenticateToken, async (req, res, next) => {
   try {
-    const { name, description } = req.body;
+    const { name } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({
@@ -264,8 +264,7 @@ router.post('/:id/topics', authenticateToken, async (req, res, next) => {
 
     const topic = await Topics.create({
       courseId: req.params.id,
-      name: name.trim(),
-      description: description || null
+      name: name.trim()
     });
 
     res.status(201).json({
