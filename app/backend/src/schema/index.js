@@ -23,9 +23,6 @@ Question_Metadata.belongsTo(Course, { foreignKey: 'courseId', as: 'course' });
 Topics.hasMany(Question_Metadata, { foreignKey: 'primaryTopicId', as: 'primaryQuestions' });
 Question_Metadata.belongsTo(Topics, { foreignKey: 'primaryTopicId', as: 'primaryTopic' });
 
-Topics.hasMany(Variants, { foreignKey: 'secondaryTopicsId', as: 'secondaryVariants' });
-Variants.belongsTo(Topics, { foreignKey: 'secondaryTopicsId', as: 'secondaryTopic' });
-
 // Question_Metadata associations
 Question_Metadata.hasMany(Variants, { foreignKey: 'questionMetadataId', as: 'variants' });
 Variants.belongsTo(Question_Metadata, { foreignKey: 'questionMetadataId', as: 'questionMetadata' });

@@ -2,6 +2,31 @@ import { Question_Metadata, Variants } from '../schema/index.js';
 import { Course } from '../schema/Course.js';
 import { Op } from 'sequelize';
 
+const normalizeSecondaryTopics = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => Number(item))
+      .filter((item) => Number.isInteger(item));
+  }
+
+  if (value === undefined || value === null || value === '') {
+    return [];
+  }
+
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? [value] : [];
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => Number(item.trim()))
+      .filter((item) => Number.isInteger(item));
+  }
+
+  return [];
+};
+
 export const createQuestion = async (userId, questionData) => {
   try {
     const { 
@@ -288,12 +313,14 @@ export const createVariant = async (questionId, variantData, userId) => {
       throw new Error('Question not found');
     }
 
+    const secondaryTopics = normalizeSecondaryTopics(variantData.secondaryTopicsId);
+
     const variant = await Variants.create({
       questionMetadataId: questionId,
       questionText: variantData.questionText,
       difficulty: variantData.difficulty || 'medium',
       assessmentId: variantData.assessmentId || null,
-      secondaryTopicsId: variantData.secondaryTopicsId || null,
+      secondaryTopicsId: secondaryTopics,
       answer: variantData.answer || null,
       referenceId: variantData.referenceId || null
     });
@@ -327,7 +354,14 @@ export const updateVariant = async (variantId, variantData, userId) => {
       throw new Error('Variant not found');
     }
 
-    await variant.update(variantData);
+    const normalizedData = {
+      ...variantData,
+      ...(variantData.secondaryTopicsId !== undefined && {
+        secondaryTopicsId: normalizeSecondaryTopics(variantData.secondaryTopicsId)
+      })
+    };
+
+    await variant.update(normalizedData);
     return variant;
   } catch (error) {
     throw error;

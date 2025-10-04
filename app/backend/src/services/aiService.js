@@ -218,7 +218,7 @@ export const generateAndSaveQuestions = async (prompt, provider, params, userId,
         difficulty: generatedQ.difficulty,
         answer: null, // AI doesn't generate answers yet
         assessmentId: null,
-        secondaryTopicsId: null,
+        secondaryTopicsId: [],
         referenceId: null
       });
       

@@ -39,13 +39,10 @@ export const Variants = sequelize.define('Variants', {
     }
   },
   secondaryTopicsId: {
-    type: DataTypes.INTEGER,
+    type: DataTypes.ARRAY(DataTypes.INTEGER),
     allowNull: true,
-    field: 'secondary_topics_id',
-    references: {
-      model: 'topics',
-      key: 'id'
-    }
+    defaultValue: [],
+    field: 'secondary_topics_id'
   },
   referenceId: {
     type: DataTypes.INTEGER,
