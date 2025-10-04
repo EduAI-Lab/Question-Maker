@@ -5,9 +5,10 @@ import { AuthProvider } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { LandingPage } from './pages/LandingPage';
+import { ApiTestPage } from './pages/ApiTestPage';
 
 function App() {
-      return (
+  return (
     <ThemeProvider defaultTheme="light" storageKey="eduquery-theme">
       <AuthProvider>
         <Router>
@@ -16,14 +17,15 @@ function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/landing" element={<LandingPage />} />
+              <Route path="/api-test" element={<ApiTestPage />} />
               <Route path="/" element={<Navigate to="/landing" replace />} />
             </Routes>
-      <Toaster />
-    </div>
+            <Toaster />
+          </div>
         </Router>
       </AuthProvider>
     </ThemeProvider>
   );
 }
 
-export default App; 
+export default App;
