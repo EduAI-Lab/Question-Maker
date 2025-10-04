@@ -1,18 +1,14 @@
 import express from 'express';
-import { 
-  createQuestion, 
-  getQuestionsByUser, 
-  getQuestionById, 
-  updateQuestion, 
-  deleteQuestion, 
+import {
+  createQuestion,
+  getQuestionsByUser,
+  getQuestionById,
+  updateQuestion,
+  deleteQuestion,
   createMultipleQuestions,
   getQuestionStats,
   updateQuestionOrder,
-  removeQuestionFromAssessment,
-  createVariant,
-  updateVariant,
-  deleteVariant,
-  getVariantsByQuestion
+  removeQuestionFromAssessment
 } from '../services/questionService.js';
 import { generateQuestions, AI_PROVIDERS } from '../services/aiService.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -24,22 +20,48 @@ const router = express.Router();
 // @access  Private
 router.post('/', authenticateToken, async (req, res, next) => {
   try {
-    const { content, difficulty, bloomLevel, classId, type, primaryTopicId, questionOrder } = req.body;
+    const rawDescription = req.body.description ?? req.body.content;
+    const rawCourseId = req.body.courseId ?? req.body.classId;
+    const rawPrimaryTopicId = req.body.primaryTopicId;
+    const type = req.body.type || 'MCQ';
+    const questionOrder = req.body.questionOrder;
 
-    if (!content || !content.trim()) {
+    const allowedTypes = ['MCQ', 'SA'];
+    if (type && !allowedTypes.includes(type)) {
       return res.status(400).json({
         success: false,
-        error: 'Question content is required'
+        error: `Invalid question type. Allowed values: ${allowedTypes.join(', ')}`
+      });
+    }
+
+    if (!rawDescription || !rawDescription.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Question description is required'
+      });
+    }
+
+    const courseId = Number(rawCourseId);
+    if (!Number.isInteger(courseId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid courseId is required'
+      });
+    }
+
+    const primaryTopicId = Number(rawPrimaryTopicId);
+    if (!Number.isInteger(primaryTopicId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid primaryTopicId is required'
       });
     }
 
     const question = await createQuestion(req.user.id, {
-      content: content.trim(),
-      difficulty,
-      bloomLevel,
-      classId,
-      type,
+      description: rawDescription.trim(),
+      courseId,
       primaryTopicId,
+      type,
       questionOrder
     });
 
@@ -58,11 +80,12 @@ router.post('/', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
-    const { classId, difficulty, search, limit, offset } = req.query;
+    const { courseId, classId, search, limit, offset } = req.query;
+    const requestedCourseId = courseId ?? classId;
+    const normalizedCourseId = requestedCourseId === undefined || requestedCourseId === '' ? undefined : requestedCourseId;
 
     const questions = await getQuestionsByUser(req.user.id, {
-      classId,
-      difficulty,
+      courseId: normalizedCourseId,
       search,
       limit,
       offset
@@ -114,17 +137,66 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const { content, difficulty, bloomLevel, classId, type, primaryTopicId, questionOrder } = req.body;
+    const { description, content, courseId, classId, type, primaryTopicId, questionOrder } = req.body;
 
-    const question = await updateQuestion(req.params.id, req.user.id, {
-      content,
-      difficulty,
-      bloomLevel,
-      classId,
-      type,
-      primaryTopicId,
-      questionOrder
-    });
+    const updates = {};
+
+    if (description !== undefined || content !== undefined) {
+      const value = (description ?? content ?? '').trim();
+      if (!value) {
+        return res.status(400).json({
+          success: false,
+          error: 'Question description cannot be empty'
+        });
+      }
+      updates.description = value;
+    }
+
+    if (courseId !== undefined || classId !== undefined) {
+      const resolvedCourseId = Number(courseId ?? classId);
+      if (!Number.isInteger(resolvedCourseId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid courseId is required'
+        });
+      }
+      updates.courseId = resolvedCourseId;
+    }
+
+    if (primaryTopicId !== undefined) {
+      const resolvedTopicId = Number(primaryTopicId);
+      if (!Number.isInteger(resolvedTopicId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid primaryTopicId is required'
+        });
+      }
+      updates.primaryTopicId = resolvedTopicId;
+    }
+
+    if (type !== undefined) {
+      const allowedTypes = ['MCQ', 'SA'];
+      if (!allowedTypes.includes(type)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid question type. Allowed values: ${allowedTypes.join(', ')}`
+        });
+      }
+      updates.type = type;
+    }
+
+    if (questionOrder !== undefined) {
+      updates.questionOrder = questionOrder;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields provided to update'
+      });
+    }
+
+    const question = await updateQuestion(req.params.id, req.user.id, updates);
 
     res.json({
       success: true,
@@ -192,7 +264,7 @@ router.post('/generate', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.post('/approve', authenticateToken, async (req, res, next) => {
   try {
-    const { questions, classId } = req.body;
+    const { questions, courseId, classId } = req.body;
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({
@@ -201,10 +273,29 @@ router.post('/approve', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const savedQuestions = await createMultipleQuestions(req.user.id, questions.map(q => ({
-      ...q,
-      classId
-    })));
+    const normalizedQuestions = questions.map((q) => {
+      const candidateCourseId = q.courseId ?? q.classId ?? courseId ?? classId;
+      return {
+        description: q.description ?? q.content,
+        courseId: candidateCourseId === '' ? undefined : candidateCourseId,
+        primaryTopicId: q.primaryTopicId ?? 1,
+        type: q.type,
+        questionOrder: q.questionOrder
+      };
+    });
+
+    const invalid = normalizedQuestions.find(
+      (q) => !q.description || q.courseId === undefined || q.courseId === null
+    );
+
+    if (invalid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Each question must include description, courseId, and primaryTopicId'
+      });
+    }
+
+    const savedQuestions = await createMultipleQuestions(req.user.id, normalizedQuestions);
 
     res.status(201).json({
       success: true,
@@ -268,98 +359,4 @@ router.delete('/:id/order/:assessmentId', authenticateToken, async (req, res, ne
   }
 });
 
-// Variant Management Routes
-
-// @route   POST /api/questions/:id/variants
-// @desc    Create a new variant for a question
-// @access  Private
-router.post('/:id/variants', authenticateToken, async (req, res, next) => {
-  try {
-    const { questionText, difficulty, assessmentId, secondaryTopicsId, answer, referenceId } = req.body;
-
-    if (!questionText || !questionText.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Question text is required'
-      });
-    }
-
-    const variant = await createVariant(req.params.id, {
-      questionText: questionText.trim(),
-      difficulty,
-      assessmentId,
-      secondaryTopicsId,
-      answer,
-      referenceId
-    }, req.user.id);
-
-    res.status(201).json({
-      success: true,
-      message: 'Variant created successfully',
-      data: variant
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// @route   GET /api/questions/:id/variants
-// @desc    Get all variants for a question
-// @access  Private
-router.get('/:id/variants', authenticateToken, async (req, res, next) => {
-  try {
-    const variants = await getVariantsByQuestion(req.params.id, req.user.id);
-
-    res.json({
-      success: true,
-      data: variants
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// @route   PUT /api/questions/variants/:variantId
-// @desc    Update a variant
-// @access  Private
-router.put('/variants/:variantId', authenticateToken, async (req, res, next) => {
-  try {
-    const { questionText, difficulty, assessmentId, secondaryTopicsId, answer, referenceId } = req.body;
-
-    const variant = await updateVariant(req.params.variantId, {
-      questionText,
-      difficulty,
-      assessmentId,
-      secondaryTopicsId,
-      answer,
-      referenceId
-    }, req.user.id);
-
-    res.json({
-      success: true,
-      message: 'Variant updated successfully',
-      data: variant
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// @route   DELETE /api/questions/variants/:variantId
-// @desc    Delete a variant
-// @access  Private
-router.delete('/variants/:variantId', authenticateToken, async (req, res, next) => {
-  try {
-    await deleteVariant(req.params.variantId, req.user.id);
-
-    res.json({
-      success: true,
-      message: 'Variant deleted successfully'
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
 export default router;
-

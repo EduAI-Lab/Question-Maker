@@ -29,22 +29,46 @@ const normalizeSecondaryTopics = (value) => {
 
 export const createQuestion = async (userId, questionData) => {
   try {
-    const { 
-      content, 
-      difficulty = 'medium', 
-      bloomLevel = 'understand', 
-      classId, 
+    const {
+      description,
+      courseId,
       primaryTopicId,
       type = 'MCQ',
       questionOrder = {}
     } = questionData;
 
+    if (!description || !description.trim()) {
+      throw new Error('Question description is required');
+    }
+
+    const parsedCourseId = Number(courseId);
+    if (!Number.isInteger(parsedCourseId)) {
+      throw new Error('Valid courseId is required');
+    }
+
+    const parsedPrimaryTopicId = Number(primaryTopicId);
+    if (!Number.isInteger(parsedPrimaryTopicId)) {
+      throw new Error('Valid primaryTopicId is required');
+    }
+
+    const course = await Course.findOne({
+      where: { id: parsedCourseId, userId },
+      attributes: ['id']
+    });
+
+    if (!course) {
+      throw new Error('Course not found');
+    }
+
+    const allowedTypes = ['MCQ', 'SA'];
+    const normalizedType = allowedTypes.includes(type) ? type : 'MCQ';
+
     const question = await Question_Metadata.create({
-      courseId: classId || null,
-      primaryTopicId: primaryTopicId || 1, // Default to topic 1, should be provided
-      type: type,
-      description: content,
-      questionOrder: questionOrder
+      courseId: parsedCourseId,
+      primaryTopicId: parsedPrimaryTopicId,
+      type: normalizedType,
+      description: description.trim(),
+      questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {}
     });
 
     return question;
@@ -55,13 +79,16 @@ export const createQuestion = async (userId, questionData) => {
 
 export const getQuestionsByUser = async (userId, options = {}) => {
   try {
-    const { classId, difficulty, search, limit = 50, offset = 0 } = options;
+    const { courseId, search, limit = 50, offset = 0 } = options;
     
     // Build where clause for Question_Metadata
     const whereClause = {};
     
-    if (classId) {
-      whereClause.courseId = classId;
+    if (courseId) {
+      const parsedCourseId = Number(courseId);
+      if (Number.isInteger(parsedCourseId)) {
+        whereClause.courseId = parsedCourseId;
+      }
     }
 
     const questions = await Question_Metadata.findAll({
@@ -144,7 +171,53 @@ export const updateQuestion = async (questionId, userId, updateData) => {
       throw new Error('Question not found');
     }
 
-    await question.update(updateData);
+    const updates = { ...updateData };
+
+    if (updates.description !== undefined && updates.description !== null) {
+      if (!updates.description.toString().trim()) {
+        throw new Error('Question description cannot be empty');
+      }
+      updates.description = updates.description.toString().trim();
+    }
+
+    if (updates.courseId !== undefined) {
+      const parsedCourseId = Number(updates.courseId);
+      if (!Number.isInteger(parsedCourseId)) {
+        throw new Error('Valid courseId is required');
+      }
+
+      const course = await Course.findOne({
+        where: { id: parsedCourseId, userId },
+        attributes: ['id']
+      });
+
+      if (!course) {
+        throw new Error('Course not found');
+      }
+
+      updates.courseId = parsedCourseId;
+    }
+
+    if (updates.primaryTopicId !== undefined) {
+      const parsedPrimaryTopicId = Number(updates.primaryTopicId);
+      if (!Number.isInteger(parsedPrimaryTopicId)) {
+        throw new Error('Valid primaryTopicId is required');
+      }
+      updates.primaryTopicId = parsedPrimaryTopicId;
+    }
+
+    if (updates.type !== undefined) {
+      const allowedTypes = ['MCQ', 'SA'];
+      if (!allowedTypes.includes(updates.type)) {
+        throw new Error(`Invalid question type. Allowed values: ${allowedTypes.join(', ')}`);
+      }
+    }
+
+    if (updates.questionOrder !== undefined && typeof updates.questionOrder !== 'object') {
+      throw new Error('questionOrder must be an object');
+    }
+
+    await question.update(updates);
     return question;
   } catch (error) {
     throw error;
@@ -177,17 +250,27 @@ export const deleteQuestion = async (questionId, userId) => {
 
 export const createMultipleQuestions = async (userId, questionsData) => {
   try {
-    const questions = await Question_Metadata.bulkCreate(
-      questionsData.map(q => ({
-        courseId: q.classId || null,
-        primaryTopicId: q.primaryTopicId || 1, // Default to topic 1
-        type: q.type || 'MCQ',
-        description: q.content,
-        questionOrder: q.questionOrder || {}
-      }))
-    );
+    const createdQuestions = [];
 
-    return questions;
+    for (const q of questionsData) {
+      const description = q.description ?? q.content;
+      const courseId = Number(q.courseId ?? q.classId);
+      const primaryTopicId = Number(q.primaryTopicId ?? 1);
+      const type = ['MCQ', 'SA'].includes(q.type) ? q.type : 'MCQ';
+      const questionOrder = q.questionOrder || {};
+
+      const question = await createQuestion(userId, {
+        description,
+        courseId,
+        primaryTopicId,
+        type,
+        questionOrder
+      });
+
+      createdQuestions.push(question);
+    }
+
+    return createdQuestions;
   } catch (error) {
     throw error;
   }
@@ -426,4 +509,3 @@ export const getVariantsByQuestion = async (questionId, userId) => {
     throw error;
   }
 };
-
