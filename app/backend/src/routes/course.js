@@ -9,24 +9,19 @@ const router = express.Router();
 // @access  Private
 router.post('/', authenticateToken, async (req, res, next) => {
   try {
-    const { name, subject, courseCode, semester, year, description, department } = req.body;
+    const { name, courseCode } = req.body;
 
-    if (!name || !subject) {
+    if (!name || !name.trim()) {
       return res.status(400).json({
         success: false,
-        error: 'Name and subject are required'
+        error: 'Course name is required'
       });
     }
 
     const courseData = await Course.create({
       userId: req.user.id,
-      name,
-      code: courseCode,
-      subject,
-      semester,
-      year,
-      description,
-      department
+      name: name.trim(),
+      code: courseCode || null
     });
 
     res.status(201).json({
@@ -155,7 +150,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const { name, subject, courseCode, semester, year, description, department } = req.body;
+    const { name, courseCode } = req.body;
 
     const courseData = await Course.findOne({
       where: { id: req.params.id, userId: req.user.id }
@@ -169,13 +164,8 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
     }
 
     await courseData.update({
-      name,
-      code: courseCode,
-      subject,
-      semester,
-      year,
-      description,
-      department
+      ...(name !== undefined && { name: name?.trim() || courseData.name }),
+      ...(courseCode !== undefined && { code: courseCode || null })
     });
 
     res.json({
