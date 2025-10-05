@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { generateQuestions, AI_PROVIDERS } from '../services/aiService.js';
+import { generateQuestions, generateAndSaveQuestions, AI_PROVIDERS } from '../services/aiService.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { config } from '../config/settings.js';
 
@@ -44,13 +44,27 @@ const extractTextFromFile = (file) => {
 // @access  Private
 router.post('/', authenticateToken, upload.array('files', 5), async (req, res, next) => {
   try {
-    const { provider = AI_PROVIDERS.GROQ, numQuestions = 15, difficultyDistribution } = req.body;
+    const { 
+      provider = AI_PROVIDERS.GROQ, 
+      numQuestions = 15, 
+      difficultyDistribution,
+      classId,
+      primaryTopicId = 1,
+      saveToDatabase = true
+    } = req.body;
     const files = req.files;
 
     if (!files || files.length === 0) {
       return res.status(400).json({
         success: false,
         error: 'No files uploaded'
+      });
+    }
+
+    if (saveToDatabase && !classId) {
+      return res.status(400).json({
+        success: false,
+        error: 'classId is required when saveToDatabase is true'
       });
     }
 
@@ -80,12 +94,33 @@ router.post('/', authenticateToken, upload.array('files', 5), async (req, res, n
           }
         };
 
-        const questions = await generateQuestions(fileText, provider, params);
-        
-        generatedQuestions.push({
-          filename: file.originalname,
-          questions
-        });
+        let result;
+        if (saveToDatabase) {
+          // Generate and save to database with new schema
+          result = await generateAndSaveQuestions(
+            fileText, 
+            provider, 
+            params, 
+            req.user.id, 
+            classId, 
+            primaryTopicId
+          );
+          
+          generatedQuestions.push({
+            filename: file.originalname,
+            questions: result.questions,
+            variants: result.variants,
+            generatedCount: result.generatedCount
+          });
+        } else {
+          // Just generate questions in memory (old behavior)
+          const questions = await generateQuestions(fileText, provider, params);
+          
+          generatedQuestions.push({
+            filename: file.originalname,
+            questions
+          });
+        }
 
       } catch (error) {
         failedFiles.push({
@@ -105,10 +140,11 @@ router.post('/', authenticateToken, upload.array('files', 5), async (req, res, n
 
     res.json({
       success: true,
-      message: 'Files processed successfully',
+      message: saveToDatabase ? 'Files processed and questions saved to database successfully' : 'Files processed successfully',
       data: {
         generatedQuestions,
-        failedFiles: failedFiles.length > 0 ? failedFiles : undefined
+        failedFiles: failedFiles.length > 0 ? failedFiles : undefined,
+        savedToDatabase: saveToDatabase
       }
     });
 

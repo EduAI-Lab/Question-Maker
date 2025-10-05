@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Edit, Trash2, Plus } from 'lucide-react';
 import { Class } from '../../types/class';
-import { useClasses } from '../../hooks/useClasses';
+import { useCourses } from '../../hooks/useCourses';
 import { useToast } from '../ui/use-toast';
 
 interface ClassListProps {
@@ -13,12 +13,12 @@ interface ClassListProps {
 }
 
 export const ClassList = ({ onEdit, onDelete, onCreate }: ClassListProps) => {
-  const { classes, isLoading, deleteClass } = useClasses();
+  const { courses, isLoading, deleteCourse } = useCourses();
   const { toast } = useToast();
 
   const handleDelete = async (id: number) => {
     try {
-      const result = await deleteClass(id);
+      const result = await deleteCourse(id);
       if (result.success) {
         toast({
           title: "Success",
@@ -46,7 +46,7 @@ export const ClassList = ({ onEdit, onDelete, onCreate }: ClassListProps) => {
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading classes...</p>
+          <p>Loading courses...</p>
         </div>
       </div>
     );
@@ -54,18 +54,18 @@ export const ClassList = ({ onEdit, onDelete, onCreate }: ClassListProps) => {
 
   return (
     <div className="space-y-4">
-      {classes.length === 0 ? (
+      {courses.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-center">
-              <h3 className="text-lg font-semibold mb-2">No classes yet</h3>
+              <h3 className="text-lg font-semibold mb-2">No courses yet</h3>
               <p className="text-muted-foreground mb-4">
-                Create your first class to organize your questions
+                Create your first course to organize your questions
               </p>
               {onCreate && (
                 <Button onClick={onCreate}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Create Class
+                  Create Course
                 </Button>
               )}
             </div>
@@ -73,7 +73,7 @@ export const ClassList = ({ onEdit, onDelete, onCreate }: ClassListProps) => {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {classes.map((classItem) => (
+          {courses.map((classItem) => (
             <Card key={classItem.id} className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">

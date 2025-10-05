@@ -1,24 +1,27 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-export const User = sequelize.define('User', {
+export const Topics = sequelize.define('Topics', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  email: {
+  name: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
     validate: {
-      isEmail: true
+      notEmpty: true
     }
   },
-  passwordHash: {
-    type: DataTypes.STRING,
+  courseId: {
+    type: DataTypes.INTEGER,
     allowNull: false,
-    field: 'password_hash'
+    field: 'course_id',
+    references: {
+      model: 'courses',
+      key: 'id'
+    }
   },
   createdAt: {
     type: DataTypes.DATE,
@@ -33,8 +36,7 @@ export const User = sequelize.define('User', {
     field: 'updated_at'
   }
 }, {
-  tableName: 'users',
+  tableName: 'topics',
   timestamps: true,
   underscored: true
 });
-

@@ -1,12 +1,14 @@
 import express from 'express';
-import { 
-  createQuestion, 
-  getQuestionsByUser, 
-  getQuestionById, 
-  updateQuestion, 
-  deleteQuestion, 
+import {
+  createQuestion,
+  getQuestionsByUser,
+  getQuestionById,
+  updateQuestion,
+  deleteQuestion,
   createMultipleQuestions,
-  getQuestionStats 
+  getQuestionStats,
+  updateQuestionOrder,
+  removeQuestionFromAssessment
 } from '../services/questionService.js';
 import { generateQuestions, AI_PROVIDERS } from '../services/aiService.js';
 import { authenticateToken } from '../middleware/auth.js';
@@ -18,20 +20,49 @@ const router = express.Router();
 // @access  Private
 router.post('/', authenticateToken, async (req, res, next) => {
   try {
-    const { content, difficulty, bloomLevel, classId } = req.body;
+    const rawDescription = req.body.description ?? req.body.content;
+    const rawCourseId = req.body.courseId ?? req.body.classId;
+    const rawPrimaryTopicId = req.body.primaryTopicId;
+    const type = req.body.type || 'MCQ';
+    const questionOrder = req.body.questionOrder;
 
-    if (!content || !content.trim()) {
+    const allowedTypes = ['MCQ', 'SA'];
+    if (type && !allowedTypes.includes(type)) {
       return res.status(400).json({
         success: false,
-        error: 'Question content is required'
+        error: `Invalid question type. Allowed values: ${allowedTypes.join(', ')}`
+      });
+    }
+
+    if (!rawDescription || !rawDescription.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Question description is required'
+      });
+    }
+
+    const courseId = Number(rawCourseId);
+    if (!Number.isInteger(courseId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid courseId is required'
+      });
+    }
+
+    const primaryTopicId = Number(rawPrimaryTopicId);
+    if (!Number.isInteger(primaryTopicId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid primaryTopicId is required'
       });
     }
 
     const question = await createQuestion(req.user.id, {
-      content: content.trim(),
-      difficulty,
-      bloomLevel,
-      classId
+      description: rawDescription.trim(),
+      courseId,
+      primaryTopicId,
+      type,
+      questionOrder
     });
 
     res.status(201).json({
@@ -49,11 +80,12 @@ router.post('/', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
-    const { classId, difficulty, search, limit, offset } = req.query;
+    const { courseId, classId, search, limit, offset } = req.query;
+    const requestedCourseId = courseId ?? classId;
+    const normalizedCourseId = requestedCourseId === undefined || requestedCourseId === '' ? undefined : requestedCourseId;
 
     const questions = await getQuestionsByUser(req.user.id, {
-      classId,
-      difficulty,
+      courseId: normalizedCourseId,
       search,
       limit,
       offset
@@ -105,14 +137,66 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const { content, difficulty, bloomLevel, classId } = req.body;
+    const { description, content, courseId, classId, type, primaryTopicId, questionOrder } = req.body;
 
-    const question = await updateQuestion(req.params.id, req.user.id, {
-      content,
-      difficulty,
-      bloomLevel,
-      classId
-    });
+    const updates = {};
+
+    if (description !== undefined || content !== undefined) {
+      const value = (description ?? content ?? '').trim();
+      if (!value) {
+        return res.status(400).json({
+          success: false,
+          error: 'Question description cannot be empty'
+        });
+      }
+      updates.description = value;
+    }
+
+    if (courseId !== undefined || classId !== undefined) {
+      const resolvedCourseId = Number(courseId ?? classId);
+      if (!Number.isInteger(resolvedCourseId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid courseId is required'
+        });
+      }
+      updates.courseId = resolvedCourseId;
+    }
+
+    if (primaryTopicId !== undefined) {
+      const resolvedTopicId = Number(primaryTopicId);
+      if (!Number.isInteger(resolvedTopicId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid primaryTopicId is required'
+        });
+      }
+      updates.primaryTopicId = resolvedTopicId;
+    }
+
+    if (type !== undefined) {
+      const allowedTypes = ['MCQ', 'SA'];
+      if (!allowedTypes.includes(type)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid question type. Allowed values: ${allowedTypes.join(', ')}`
+        });
+      }
+      updates.type = type;
+    }
+
+    if (questionOrder !== undefined) {
+      updates.questionOrder = questionOrder;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No valid fields provided to update'
+      });
+    }
+
+    const question = await updateQuestion(req.params.id, req.user.id, updates);
 
     res.json({
       success: true,
@@ -180,7 +264,7 @@ router.post('/generate', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.post('/approve', authenticateToken, async (req, res, next) => {
   try {
-    const { questions, classId } = req.body;
+    const { questions, courseId, classId } = req.body;
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({
@@ -189,10 +273,29 @@ router.post('/approve', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const savedQuestions = await createMultipleQuestions(req.user.id, questions.map(q => ({
-      ...q,
-      classId
-    })));
+    const normalizedQuestions = questions.map((q) => {
+      const candidateCourseId = q.courseId ?? q.classId ?? courseId ?? classId;
+      return {
+        description: q.description ?? q.content,
+        courseId: candidateCourseId === '' ? undefined : candidateCourseId,
+        primaryTopicId: q.primaryTopicId ?? 1,
+        type: q.type,
+        questionOrder: q.questionOrder
+      };
+    });
+
+    const invalid = normalizedQuestions.find(
+      (q) => !q.description || q.courseId === undefined || q.courseId === null
+    );
+
+    if (invalid) {
+      return res.status(400).json({
+        success: false,
+        error: 'Each question must include description, courseId, and primaryTopicId'
+      });
+    }
+
+    const savedQuestions = await createMultipleQuestions(req.user.id, normalizedQuestions);
 
     res.status(201).json({
       success: true,
@@ -204,5 +307,56 @@ router.post('/approve', authenticateToken, async (req, res, next) => {
   }
 });
 
-export default router;
+// @route   PUT /api/questions/:id/order
+// @desc    Update question order in an assessment
+// @access  Private
+router.put('/:id/order', authenticateToken, async (req, res, next) => {
+  try {
+    const { assessmentId, orderNumber } = req.body;
 
+    if (!assessmentId || orderNumber === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Assessment ID and order number are required'
+      });
+    }
+
+    const question = await updateQuestionOrder(
+      req.params.id, 
+      assessmentId, 
+      orderNumber, 
+      req.user.id
+    );
+
+    res.json({
+      success: true,
+      message: 'Question order updated successfully',
+      data: question
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   DELETE /api/questions/:id/order/:assessmentId
+// @desc    Remove question from assessment order
+// @access  Private
+router.delete('/:id/order/:assessmentId', authenticateToken, async (req, res, next) => {
+  try {
+    const question = await removeQuestionFromAssessment(
+      req.params.id, 
+      req.params.assessmentId, 
+      req.user.id
+    );
+
+    res.json({
+      success: true,
+      message: 'Question removed from assessment order',
+      data: question
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+export default router;
