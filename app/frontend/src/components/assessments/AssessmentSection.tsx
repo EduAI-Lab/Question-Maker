@@ -6,6 +6,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Edit, Download, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { Assessment, Course } from '../../types/assessment';
 import { Question } from '../../types/question';
+import GenerateAssessmentModal from './GenerateAssessmentModal';
 
 interface AssessmentSectionProps {
   assessments: Assessment[];
@@ -25,6 +26,7 @@ export const AssessmentSection = ({
   onReorderQuestions
 }: AssessmentSectionProps) => {
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
+  const [openGenerateModalForId, setOpenGenerateModalForId] = useState<number | null>(null);
 
   const getAssessmentTypeColor = (type: string) => {
     switch (type) {
@@ -124,6 +126,14 @@ export const AssessmentSection = ({
                       <Download className="h-4 w-4" />
                       <span>Export</span>
                     </Button>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setOpenGenerateModalForId(assessment.id)}
+                      className="flex items-center space-x-1"
+                    >
+                      <span>Variants</span>
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -197,6 +207,14 @@ export const AssessmentSection = ({
             <span>Create Your First Assessment</span>
           </Button>
         </div>
+      )}
+
+      {!!openGenerateModalForId && (
+        <GenerateAssessmentModal
+          open={true}
+          onClose={() => setOpenGenerateModalForId(null)}
+          courseId={assessments.find(a => a.id === openGenerateModalForId)?.courseId || 0}
+        />
       )}
     </div>
   );
