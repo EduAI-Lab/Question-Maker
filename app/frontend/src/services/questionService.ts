@@ -5,7 +5,8 @@ import {
   QuestionMetadata,
   QuestionGenerationParams,
   QuestionStats,
-  QuestionVariant
+  QuestionVariant,
+  QuestionDifficulty
 } from '../types/question';
 
 const mapVariant = (variant: any): QuestionVariant => ({
@@ -16,6 +17,7 @@ const mapVariant = (variant: any): QuestionVariant => ({
   assessmentId: variant.assessmentId ?? null,
   secondaryTopicsId: Array.isArray(variant.secondaryTopicsId) ? variant.secondaryTopicsId : [],
   referenceId: variant.referenceId ?? null,
+  baseReferenceId: variant.referenceId ?? variant.id ?? null,
   createdAt: variant.createdAt,
   updatedAt: variant.updatedAt
 });
@@ -84,6 +86,22 @@ export const questionService = {
 
   async deleteQuestion(id: number): Promise<void> {
     await api.delete(`/api/questions/${id}`);
+  },
+
+  async createVariant(questionId: number, payload: {
+    questionText: string;
+    difficulty?: QuestionDifficulty;
+    assessmentId?: number;
+    secondaryTopicsId?: number[];
+    answer?: string | null;
+    referenceId?: number;
+  }): Promise<QuestionVariant> {
+    const response = await api.post(`/api/questions/${questionId}/variants`, payload);
+    return mapVariant(response.data.data);
+  },
+
+  async deleteVariant(variantId: number): Promise<void> {
+    await api.delete(`/api/questions/variants/${variantId}`);
   },
 
   async generateQuestions(params: QuestionGenerationParams): Promise<QuestionMetadata[]> {

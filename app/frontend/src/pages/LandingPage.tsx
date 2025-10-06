@@ -1,23 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
 import { mockAssessments } from '../data/mockData';
 import { Course } from '../types/class';
-import { Question, Assessment } from '../types/question';
+import { Question, Assessment, QuestionVariantEntry } from '../types/question';
 import { useCourses } from '../hooks/useCourses';
 import { questionService } from '../services/questionService';
+import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 
 export const LandingPage = () => {
   const { courses, isLoading: isCoursesLoading } = useCourses();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
   const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>(mockAssessments);
+  const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
+  const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
 
   useEffect(() => {
     if (courses.length === 0) {
@@ -31,10 +34,25 @@ export const LandingPage = () => {
     }
   }, [courses, selectedCourse]);
 
-  // Filter questions by selected course
-  const filteredQuestions = selectedCourse
-    ? questions.filter(q => q.courseId === selectedCourse.id)
-    : questions;
+  const filteredQuestions = useMemo(() => {
+    if (!selectedCourse) return questions;
+    return questions.filter((question) => question.courseId === selectedCourse.id);
+  }, [questions, selectedCourse]);
+
+  const variantEntries: QuestionVariantEntry[] = useMemo(() => {
+    return filteredQuestions.flatMap((question) =>
+      (question.variants || []).map((variant) => ({
+        questionId: question.id,
+        questionDescription: question.description,
+        questionType: question.type,
+        primaryTopicId: question.primaryTopicId,
+        courseId: question.courseId,
+        courseName: question.course?.name,
+        courseCode: question.course?.code,
+        variant
+      }))
+    );
+  }, [filteredQuestions]);
 
   const emptyStateMessage = selectedCourse
     ? questionsError || 'No questions found for this course yet. Try adding or uploading questions.'
@@ -42,45 +60,84 @@ export const LandingPage = () => {
       ? 'No courses available yet. Create a course to get started.'
       : 'Select a course to view its questions.';
 
-  // Filter assessments by selected course
-  const filteredAssessments = selectedCourse
-    ? assessments.filter(a => a.courseId === selectedCourse.id)
-    : assessments;
+  const filteredAssessments = useMemo(() => {
+    if (!selectedCourse) return assessments;
+    return assessments.filter((assessment) => assessment.courseId === selectedCourse.id);
+  }, [assessments, selectedCourse]);
 
-  const handleViewQuestion = (question: Question) => {
-    setSelectedQuestion(question);
+  const handleViewVariant = (entry: QuestionVariantEntry) => {
+    setSelectedVariant(entry);
   };
 
-  const handleCloseQuestionDetail = () => {
-    setSelectedQuestion(null);
+  const handleCloseDetail = () => {
+    setSelectedVariant(null);
   };
 
-  const handleEditQuestion = (question: Question) => {
-    console.log('Edit question:', question);
-    // TODO: Implement edit functionality
-    setSelectedQuestion(null);
+  const handleEditVariant = (entry: QuestionVariantEntry) => {
+    console.log('Edit variant:', entry);
+    setSelectedVariant(null);
   };
 
-  const handleCreateVariant = (question: Question) => {
-    console.log('Create variant for question:', question);
-    // TODO: Implement variant creation
-    setSelectedQuestion(null);
+  const handleCreateVariant = (entry: QuestionVariantEntry) => {
+    setPresetVariant(entry);
+    setIsAddQuestionOpen(true);
+    setSelectedVariant(null);
   };
 
-  const handleDeleteQuestion = async (question: Question) => {
+  const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
     try {
-      await questionService.deleteQuestion(question.id);
-      setQuestions(prev => prev.filter(q => q.id !== question.id));
+      await questionService.deleteVariant(entry.variant.id);
+      const updatedQuestion = await questionService.getQuestion(entry.questionId);
+      setQuestions((prev) => {
+        const index = prev.findIndex((question) => question.id === entry.questionId);
+        if (index === -1) return prev;
+        const next = [...prev];
+        if (updatedQuestion.variants && updatedQuestion.variants.length > 0) {
+          next[index] = updatedQuestion;
+        } else {
+          next.splice(index, 1);
+        }
+        return next;
+      });
     } catch (error) {
-      console.error('Failed to delete question', error);
+      console.error('Failed to delete variant', error);
     } finally {
-      setSelectedQuestion(null);
+      setSelectedVariant(null);
     }
   };
 
   const handleAddQuestion = () => {
-    console.log('Add new question');
-    // TODO: Implement add question functionality
+    setPresetVariant(null);
+    setIsAddQuestionOpen(true);
+  };
+
+  const handleQuestionCreated = (question: Question) => {
+    setQuestions((prev) => {
+      const index = prev.findIndex((item) => item.id === question.id);
+      if (index >= 0) {
+        const next = [...prev];
+        next[index] = question;
+        return next;
+      }
+      return [question, ...prev];
+    });
+
+    const latestVariant = question.variants?.[question.variants.length - 1];
+    if (latestVariant) {
+      setSelectedVariant({
+        questionId: question.id,
+        questionDescription: question.description,
+        questionType: question.type,
+        primaryTopicId: question.primaryTopicId,
+        courseId: question.courseId,
+        courseName: question.course?.name,
+        courseCode: question.course?.code,
+        variant: latestVariant
+      });
+    }
+
+    setPresetVariant(null);
+    setIsAddQuestionOpen(false);
   };
 
   const handleUploadQuestions = () => {
@@ -90,23 +147,20 @@ export const LandingPage = () => {
 
   const handleEditAssessment = (assessment: Assessment) => {
     console.log('Edit assessment:', assessment);
-    // TODO: Implement edit assessment functionality
   };
 
   const handleExportAssessment = (assessment: Assessment) => {
     console.log('Export assessment:', assessment);
-    // TODO: Implement export functionality
   };
 
   const handleAddAssessment = () => {
     console.log('Add new assessment');
-    // TODO: Implement add assessment functionality
   };
 
   const handleReorderQuestions = (assessmentId: number, questionIds: number[]) => {
-    setAssessments(prev => 
-      prev.map(assessment => 
-        assessment.id === assessmentId 
+    setAssessments((prev) =>
+      prev.map((assessment) =>
+        assessment.id === assessmentId
           ? { ...assessment, questions: questionIds }
           : assessment
       )
@@ -117,7 +171,7 @@ export const LandingPage = () => {
     const fetchQuestions = async () => {
       if (!selectedCourse) {
         setQuestions([]);
-        setSelectedQuestion(null);
+      setSelectedVariant(null);
         return;
       }
 
@@ -140,7 +194,6 @@ export const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation */}
       <TopNavigation
         selectedCourse={selectedCourse}
         onCourseChange={setSelectedCourse}
@@ -150,18 +203,19 @@ export const LandingPage = () => {
         isLoadingCourses={isCoursesLoading}
       />
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === 'questions' ? (
           <QuestionBank
-            questions={filteredQuestions}
-            onViewQuestion={handleViewQuestion}
+            variants={variantEntries}
+            onViewVariant={handleViewVariant}
             onCreateVariant={handleCreateVariant}
             onAddQuestion={handleAddQuestion}
             onUploadQuestions={handleUploadQuestions}
             isLoading={isQuestionsLoading}
             courseName={selectedCourse?.name}
             emptyMessage={emptyStateMessage}
+            disableAdd={!selectedCourse}
+            disableUpload={!selectedCourse}
           />
         ) : (
           <AssessmentSection
@@ -175,16 +229,27 @@ export const LandingPage = () => {
         )}
       </div>
 
-      {/* Question Detail Modal */}
-      {selectedQuestion && (
+      {selectedVariant && (
         <QuestionDetailView
-          question={selectedQuestion}
-          onClose={handleCloseQuestionDetail}
-          onEdit={handleEditQuestion}
+          entry={selectedVariant}
+          onClose={handleCloseDetail}
+          onEdit={handleEditVariant}
           onCreateVariant={handleCreateVariant}
-          onDelete={handleDeleteQuestion}
+          onDeleteVariant={handleDeleteVariant}
         />
       )}
+
+      <AddQuestionDialog
+        open={isAddQuestionOpen}
+        onClose={() => {
+          setIsAddQuestionOpen(false);
+          setPresetVariant(null);
+        }}
+        courseId={selectedCourse?.id ?? null}
+        variants={variantEntries}
+        onQuestionCreated={handleQuestionCreated}
+        presetVariant={presetVariant}
+      />
     </div>
   );
 };

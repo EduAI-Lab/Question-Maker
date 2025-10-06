@@ -10,8 +10,20 @@ export interface QuestionVariant {
   assessmentId: number | null;
   secondaryTopicsId: number[];
   referenceId: number | null;
+  baseReferenceId?: number | null;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface QuestionVariantEntry {
+  questionId: number;
+  questionDescription: string;
+  questionType: QuestionType;
+  primaryTopicId: number;
+  courseId: number;
+  courseName?: string;
+  courseCode?: string | null;
+  variant: QuestionVariant;
 }
 
 export interface Question {

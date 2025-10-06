@@ -6,13 +6,17 @@ interface QuestionBankHeaderProps {
   onAddQuestion: () => void;
   onUploadQuestions: () => void;
   courseName?: string;
+  disableAdd?: boolean;
+  disableUpload?: boolean;
 }
 
 export const QuestionBankHeader = ({
   questionCount,
   onAddQuestion,
   onUploadQuestions,
-  courseName
+  courseName,
+  disableAdd = false,
+  disableUpload = false
 }: QuestionBankHeaderProps) => {
   return (
     <div className="space-y-4">
@@ -25,11 +29,20 @@ export const QuestionBankHeader = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={onUploadQuestions} className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={onUploadQuestions}
+            className="flex items-center space-x-2"
+            disabled={disableUpload}
+          >
             <Upload className="h-4 w-4" />
             <span>Upload Questions</span>
           </Button>
-          <Button onClick={onAddQuestion} className="flex items-center space-x-2">
+          <Button
+            onClick={onAddQuestion}
+            className="flex items-center space-x-2"
+            disabled={disableAdd}
+          >
             <Plus className="h-4 w-4" />
             <span>Add Question</span>
           </Button>
