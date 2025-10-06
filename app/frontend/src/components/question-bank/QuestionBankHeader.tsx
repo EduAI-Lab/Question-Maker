@@ -1,19 +1,18 @@
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { Plus, Upload } from 'lucide-react';
 
 interface QuestionBankHeaderProps {
   questionCount: number;
-  difficultyFilter: string;
   onAddQuestion: () => void;
   onUploadQuestions: () => void;
+  courseName?: string;
 }
 
 export const QuestionBankHeader = ({
   questionCount,
-  difficultyFilter,
   onAddQuestion,
-  onUploadQuestions
+  onUploadQuestions,
+  courseName
 }: QuestionBankHeaderProps) => {
   return (
     <div className="space-y-4">
@@ -21,7 +20,9 @@ export const QuestionBankHeader = ({
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Question Bank</h2>
-          <p className="text-sm text-gray-600">Lab / Midterm / Quiz</p>
+          <p className="text-sm text-gray-600">
+            {courseName ? `Active Course: ${courseName}` : 'Select a course to view questions'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={onUploadQuestions} className="flex items-center space-x-2">
@@ -40,11 +41,6 @@ export const QuestionBankHeader = ({
         <h3 className="text-lg font-semibold">
           Questions ({questionCount})
         </h3>
-        {difficultyFilter !== 'all' && (
-          <Badge variant="secondary">
-            Filtered by: {difficultyFilter}
-          </Badge>
-        )}
       </div>
     </div>
   );

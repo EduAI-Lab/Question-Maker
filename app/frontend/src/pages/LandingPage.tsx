@@ -1,35 +1,46 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { mockQuestions, mockAssessments } from '../data/mockData';
+import { mockAssessments } from '../data/mockData';
 import { Course } from '../types/class';
 import { Question, Assessment } from '../types/question';
 import { useCourses } from '../hooks/useCourses';
+import { questionService } from '../services/questionService';
 
 export const LandingPage = () => {
   const { courses, isLoading: isCoursesLoading } = useCourses();
-  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
-  const [questions, setQuestions] = useState<Question[]>(mockQuestions);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>(mockAssessments);
 
-  const selectedCourse = useMemo(() => {
-    return courses.find(course => course.id === selectedCourseId) || null;
-  }, [courses, selectedCourseId]);
-
   useEffect(() => {
-    if (courses.length > 0 && selectedCourseId === null) {
-      setSelectedCourseId(courses[0].id);
+    if (courses.length === 0) {
+      setSelectedCourse(null);
+      setQuestions([]);
+      return;
     }
-  }, [courses, selectedCourseId]);
+
+    if (!selectedCourse || !courses.some(course => course.id === selectedCourse.id)) {
+      setSelectedCourse(courses[0]);
+    }
+  }, [courses, selectedCourse]);
 
   // Filter questions by selected course
-  const filteredQuestions = selectedCourse 
-    ? questions.filter(q => q.classId === selectedCourse.id)
+  const filteredQuestions = selectedCourse
+    ? questions.filter(q => q.courseId === selectedCourse.id)
     : questions;
+
+  const emptyStateMessage = selectedCourse
+    ? questionsError || 'No questions found for this course yet. Try adding or uploading questions.'
+    : courses.length === 0
+      ? 'No courses available yet. Create a course to get started.'
+      : 'Select a course to view its questions.';
 
   // Filter assessments by selected course
   const filteredAssessments = selectedCourse
@@ -56,9 +67,15 @@ export const LandingPage = () => {
     setSelectedQuestion(null);
   };
 
-  const handleDeleteQuestion = (question: Question) => {
-    setQuestions(prev => prev.filter(q => q.id !== question.id));
-    setSelectedQuestion(null);
+  const handleDeleteQuestion = async (question: Question) => {
+    try {
+      await questionService.deleteQuestion(question.id);
+      setQuestions(prev => prev.filter(q => q.id !== question.id));
+    } catch (error) {
+      console.error('Failed to delete question', error);
+    } finally {
+      setSelectedQuestion(null);
+    }
   };
 
   const handleAddQuestion = () => {
@@ -96,12 +113,37 @@ export const LandingPage = () => {
     );
   };
 
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      if (!selectedCourse) {
+        setQuestions([]);
+        setSelectedQuestion(null);
+        return;
+      }
+
+      setIsQuestionsLoading(true);
+      setQuestionsError(null);
+
+      try {
+        const data = await questionService.getQuestions({ courseId: selectedCourse.id });
+        setQuestions(data);
+      } catch (error: any) {
+        setQuestions([]);
+        setQuestionsError(error?.response?.data?.error || 'Failed to load questions');
+      } finally {
+        setIsQuestionsLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [selectedCourse]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
       <TopNavigation
         selectedCourse={selectedCourse}
-        onCourseChange={(course) => setSelectedCourseId(course.id)}
+        onCourseChange={setSelectedCourse}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         courses={courses}
@@ -117,6 +159,9 @@ export const LandingPage = () => {
             onCreateVariant={handleCreateVariant}
             onAddQuestion={handleAddQuestion}
             onUploadQuestions={handleUploadQuestions}
+            isLoading={isQuestionsLoading}
+            courseName={selectedCourse?.name}
+            emptyMessage={emptyStateMessage}
           />
         ) : (
           <AssessmentSection

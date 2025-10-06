@@ -1,7 +1,7 @@
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Eye, Copy } from 'lucide-react';
+import { Eye, Copy, Layers } from 'lucide-react';
 import { Question } from '../../types/question';
 
 interface QuestionCardProps {
@@ -17,15 +17,6 @@ export const QuestionCard = ({
   onViewQuestion,
   onCreateVariant
 }: QuestionCardProps) => {
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'hard': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-6">
@@ -36,20 +27,24 @@ export const QuestionCard = ({
               <span className="text-sm font-medium text-gray-500">
                 Q{questionNumber}
               </span>
-              <Badge className={getDifficultyColor(question.difficulty)}>
-                {question.difficulty}
+              <Badge variant="secondary" className="uppercase">
+                {question.type}
               </Badge>
-              {question.class && (
+              {question.course && (
                 <Badge variant="outline">
-                  {question.class.name}
+                  {question.course.name}
                 </Badge>
               )}
+              <Badge variant="outline" className="flex items-center gap-1">
+                <Layers className="h-3 w-3" />
+                {question.variants?.length ?? 0} variants
+              </Badge>
             </div>
             
             {/* Question Content */}
             <div className="mb-4">
               <p className="text-gray-900 line-clamp-2 leading-relaxed">
-                {question.content}
+                {question.description || question.content || '—'}
               </p>
             </div>
             

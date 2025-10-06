@@ -8,8 +8,7 @@ export const useQuestions = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchQuestions = useCallback(async (options: {
-    classId?: number;
-    difficulty?: string;
+    courseId?: number;
     search?: string;
     limit?: number;
     offset?: number;
@@ -82,9 +81,9 @@ export const useQuestions = () => {
     }
   }, []);
 
-  const approveQuestions = useCallback(async (questions: QuestionMetadata[], classId?: number) => {
+  const approveQuestions = useCallback(async (questions: QuestionMetadata[], courseId?: number) => {
     try {
-      const data = await questionService.approveQuestions(questions, classId);
+      const data = await questionService.approveQuestions(questions, courseId);
       setQuestions(prev => [...data, ...prev]);
       return { success: true, data };
     } catch (err: any) {
@@ -111,4 +110,3 @@ export const useQuestions = () => {
     approveQuestions
   };
 };
-

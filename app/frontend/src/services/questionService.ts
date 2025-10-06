@@ -1,37 +1,85 @@
 import api from './api';
-import { 
-  Question, 
-  QuestionCreate, 
-  QuestionMetadata, 
-  QuestionGenerationParams, 
-  QuestionStats 
+import {
+  Question,
+  QuestionCreate,
+  QuestionMetadata,
+  QuestionGenerationParams,
+  QuestionStats,
+  QuestionVariant
 } from '../types/question';
+
+const mapVariant = (variant: any): QuestionVariant => ({
+  id: variant.id,
+  questionText: variant.questionText,
+  difficulty: variant.difficulty ?? 'medium',
+  answer: variant.answer ?? null,
+  assessmentId: variant.assessmentId ?? null,
+  secondaryTopicsId: Array.isArray(variant.secondaryTopicsId) ? variant.secondaryTopicsId : [],
+  referenceId: variant.referenceId ?? null,
+  createdAt: variant.createdAt,
+  updatedAt: variant.updatedAt
+});
+
+const mapQuestion = (item: any): Question => ({
+  id: item.id,
+  description: item.description,
+  type: item.type,
+  courseId: item.courseId,
+  primaryTopicId: item.primaryTopicId,
+  questionOrder: item.questionOrder || null,
+  createdAt: item.createdAt,
+  updatedAt: item.updatedAt,
+  course: item.course
+    ? {
+        id: item.course.id,
+        name: item.course.name,
+        code: item.course.code
+      }
+    : undefined,
+  variants: Array.isArray(item.variants) ? item.variants.map(mapVariant) : [],
+  content: item.description,
+  difficulty: item.variants && item.variants[0] ? item.variants[0].difficulty : 'medium',
+  bloomLevel: 'understand',
+  classId: item.courseId,
+  class: item.course
+    ? {
+        id: item.course.id,
+        name: item.course.name,
+        subject: item.course.code || ''
+      }
+    : undefined
+});
 
 export const questionService = {
   async getQuestions(options: {
-    classId?: number;
-    difficulty?: string;
+    courseId?: number;
     search?: string;
     limit?: number;
     offset?: number;
   } = {}): Promise<Question[]> {
-    const response = await api.get('/api/questions', { params: options });
-    return response.data.data;
+    const params: Record<string, unknown> = {};
+    if (options.courseId !== undefined) params.courseId = options.courseId;
+    if (options.search !== undefined) params.search = options.search;
+    if (options.limit !== undefined) params.limit = options.limit;
+    if (options.offset !== undefined) params.offset = options.offset;
+
+    const response = await api.get('/api/questions', { params });
+    return (response.data.data || []).map(mapQuestion);
   },
 
   async getQuestion(id: number): Promise<Question> {
     const response = await api.get(`/api/questions/${id}`);
-    return response.data.data;
+    return mapQuestion(response.data.data);
   },
 
   async createQuestion(question: QuestionCreate): Promise<Question> {
     const response = await api.post('/api/questions', question);
-    return response.data.data;
+    return mapQuestion(response.data.data);
   },
 
   async updateQuestion(id: number, question: Partial<QuestionCreate>): Promise<Question> {
     const response = await api.put(`/api/questions/${id}`, question);
-    return response.data.data;
+    return mapQuestion(response.data.data);
   },
 
   async deleteQuestion(id: number): Promise<void> {
@@ -43,9 +91,9 @@ export const questionService = {
     return response.data.data;
   },
 
-  async approveQuestions(questions: QuestionMetadata[], classId?: number): Promise<Question[]> {
-    const response = await api.post('/api/questions/approve', { questions, classId });
-    return response.data.data;
+  async approveQuestions(questions: QuestionMetadata[], courseId?: number): Promise<Question[]> {
+    const response = await api.post('/api/questions/approve', { questions, courseId });
+    return (response.data.data || []).map(mapQuestion);
   },
 
   async getQuestionStats(): Promise<QuestionStats> {
@@ -53,4 +101,3 @@ export const questionService = {
     return response.data.data;
   }
 };
-

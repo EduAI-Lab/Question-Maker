@@ -3,6 +3,7 @@ import { Question } from '../../types/question';
 import { QuestionCard } from './QuestionCard';
 import { SearchAndFilters } from './SearchAndFilters';
 import { QuestionBankHeader } from './QuestionBankHeader';
+import { Loader2 } from 'lucide-react';
 
 interface QuestionBankProps {
   questions: Question[];
@@ -10,6 +11,9 @@ interface QuestionBankProps {
   onCreateVariant: (question: Question) => void;
   onAddQuestion: () => void;
   onUploadQuestions: () => void;
+  isLoading?: boolean;
+  courseName?: string;
+  emptyMessage?: string;
 }
 
 export const QuestionBank = ({
@@ -17,11 +21,13 @@ export const QuestionBank = ({
   onViewQuestion,
   onCreateVariant,
   onAddQuestion,
-  onUploadQuestions
+  onUploadQuestions,
+  isLoading = false,
+  courseName,
+  emptyMessage
 }: QuestionBankProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [difficultyFilter, setDifficultyFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'type'>('newest');
 
   // Filter and sort questions
   const filteredQuestions = useMemo(() => {
@@ -30,13 +36,10 @@ export const QuestionBank = ({
     // Apply search filter
     if (searchTerm) {
       filtered = filtered.filter(q =>
-        q.content.toLowerCase().includes(searchTerm.toLowerCase())
+        (q.description || q.content || '')
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase())
       );
-    }
-
-    // Apply difficulty filter
-    if (difficultyFilter !== 'all') {
-      filtered = filtered.filter(q => q.difficulty === difficultyFilter);
     }
 
     // Apply sorting
@@ -47,21 +50,20 @@ export const QuestionBank = ({
       case 'oldest':
         filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
         break;
-      case 'difficulty':
-        const difficultyOrder = { easy: 0, medium: 1, hard: 2 };
-        filtered.sort((a, b) => difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty]);
+      case 'type':
+        filtered.sort((a, b) => a.type.localeCompare(b.type));
         break;
     }
 
     return filtered;
-  }, [questions, searchTerm, difficultyFilter, sortBy]);
+  }, [questions, searchTerm, sortBy]);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <QuestionBankHeader
         questionCount={filteredQuestions.length}
-        difficultyFilter={difficultyFilter}
+        courseName={courseName}
         onAddQuestion={onAddQuestion}
         onUploadQuestions={onUploadQuestions}
       />
@@ -70,13 +72,16 @@ export const QuestionBank = ({
       <SearchAndFilters
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        difficultyFilter={difficultyFilter}
-        onDifficultyChange={setDifficultyFilter}
         sortBy={sortBy}
-        onSortChange={setSortBy}
+        onSortChange={(value) => setSortBy(value)}
       />
 
       {/* Questions List */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading questions...
+        </div>
+      ) : (
       <div className="space-y-3">
         {filteredQuestions.map((question, index) => (
           <QuestionCard
@@ -90,10 +95,11 @@ export const QuestionBank = ({
 
         {filteredQuestions.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-gray-500">No questions found matching your criteria.</p>
+            <p className="text-gray-500">{emptyMessage || 'No questions available for this course yet.'}</p>
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };
