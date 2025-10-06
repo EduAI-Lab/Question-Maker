@@ -7,6 +7,106 @@ const AI_PROVIDERS = {
   DEEPSEEK: 'deepseek'
 };
 
+const MAX_OCR_CHUNK_LENGTH = 4000;
+
+const normalizeOcrText = (text = '') => {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/[\u00a0\t]+/g, ' ')
+    .replace(/-\n/g, '')
+    .replace(/\s+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
+const splitOcrTextIntoChunks = (text, maxLength = MAX_OCR_CHUNK_LENGTH) => {
+  if (!text) return [];
+
+  const segments = text.split(/(?=\b(?:Question|Problem|Exercise|Task|Section|Part)\b)/gi);
+  const chunks = [];
+  let current = '';
+
+  const pushCurrent = () => {
+    if (current.trim()) {
+      chunks.push(current.trim());
+      current = '';
+    }
+  };
+
+  for (const segment of segments) {
+    const trimmed = segment.trim();
+    if (!trimmed) continue;
+
+    if (!current) {
+      current = trimmed;
+      continue;
+    }
+
+    if ((current + '\n' + trimmed).length > maxLength) {
+      pushCurrent();
+      current = trimmed;
+    } else {
+      current = `${current}\n${trimmed}`;
+    }
+  }
+
+  pushCurrent();
+
+  if (chunks.length === 0) {
+    const safeText = text.slice(0, maxLength);
+    return safeText ? [safeText] : [];
+  }
+
+  return chunks;
+};
+
+const extractJsonArray = (raw) => {
+  if (!raw) return [];
+
+  const firstBracket = raw.indexOf('[');
+  const lastBracket = raw.lastIndexOf(']');
+
+  if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+    const jsonSlice = raw.slice(firstBracket, lastBracket + 1);
+    try {
+      const parsed = JSON.parse(jsonSlice);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      // fall through
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && Array.isArray(parsed.questions)) return parsed.questions;
+  } catch {
+    // noop
+  }
+
+  return [];
+};
+
+const callOpenAIChat = async ({ messages, temperature = 0.7, maxTokens = 2000, model = 'gpt-3.5-turbo' }) => {
+  if (!config.openaiApiKey) {
+    throw new Error('OpenAI API key is not configured.');
+  }
+
+  const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+    model,
+    messages,
+    temperature,
+    max_tokens: maxTokens
+  }, {
+    headers: {
+      'Authorization': `Bearer ${config.openaiApiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  return response.data.choices[0].message.content;
+};
+
 const callGroqAPI = async (prompt, params) => {
   try {
     const response = await axios.post('https://api.groq.com/openai/v1/chat/completions', {
@@ -56,8 +156,7 @@ const callGroqAPI = async (prompt, params) => {
 
 const callOpenAIAPI = async (prompt, params) => {
   try {
-    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-      model: 'gpt-3.5-turbo',
+    const content = await callOpenAIChat({
       messages: [
         {
           role: 'user',
@@ -82,18 +181,80 @@ const callOpenAIAPI = async (prompt, params) => {
         }
       ],
       temperature: 0.7,
-      max_tokens: 4000
-    }, {
-      headers: {
-        'Authorization': `Bearer ${config.openaiApiKey}`,
-        'Content-Type': 'application/json'
-      }
+      maxTokens: 4000
     });
 
-    return response.data.choices[0].message.content;
+    return content;
   } catch (error) {
     throw new Error(`OpenAI API error: ${error.message}`);
   }
+};
+
+const extractQuestionsWithOpenAI = async (text) => {
+  const cleaned = normalizeOcrText(text);
+  const chunks = splitOcrTextIntoChunks(cleaned);
+
+  const aggregated = [];
+  const seen = new Set();
+
+  for (const chunk of chunks) {
+    try {
+      const prompt = `You will be given OCR text from an assignment or worksheet. Extract each distinct question (including any lettered subparts that belong to the question) and any mandatory instructions that must accompany it.
+
+Requirements:
+- Return ONLY a JSON array. Each element must have the shape {"question": string, "instructions": string}.
+- The "question" field must contain the self-contained question text.
+- The "instructions" field should contain short preparatory notes (e.g. "Show all work", "Use traceroute") or be an empty string if none.
+- Keep numbering that exists in the text (e.g. "1.", "Question 2") inside the question field.
+- Do not fabricate content; only use what is present in the excerpt.
+
+OCR excerpt:
+"""${chunk}"""`;
+
+      const content = await callOpenAIChat({
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a precise assistant that extracts questions from study materials and returns strict JSON.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.1,
+        maxTokens: 1500
+      });
+
+      const parsed = extractJsonArray(content);
+
+      for (const item of parsed) {
+        if (!item || typeof item !== 'object') continue;
+        const questionText = (item.question || item.content || '').toString().trim();
+        if (!questionText) continue;
+
+        const instructions = (item.instructions || item.instruction || '').toString().trim();
+        const dedupeKey = questionText.toLowerCase();
+
+        if (!seen.has(dedupeKey)) {
+          aggregated.push({
+            question: questionText,
+            instructions
+          });
+          seen.add(dedupeKey);
+        }
+      }
+    } catch (error) {
+      // Skip the chunk if the API call fails; continue with others
+      throw new Error(`Failed to extract questions from text chunk: ${error.message}`);
+    }
+  }
+
+  if (aggregated.length === 0) {
+    throw new Error('No questions could be extracted from the provided text.');
+  }
+
+  return aggregated;
 };
 
 const callDeepSeekAPI = async (prompt, params) => {
@@ -140,7 +301,7 @@ const callDeepSeekAPI = async (prompt, params) => {
 export const generateQuestions = async (prompt, provider, params) => {
   try {
     let response;
-    
+
     switch (provider) {
       case AI_PROVIDERS.GROQ:
         response = await callGroqAPI(prompt, params);
@@ -191,3 +352,19 @@ export const generateQuestions = async (prompt, provider, params) => {
 
 export { AI_PROVIDERS };
 
+export const extractQuestionsFromText = async (text, provider = AI_PROVIDERS.OPENAI) => {
+  if (!text || !text.trim()) {
+    throw new Error('No text provided for extraction');
+  }
+
+  switch (provider) {
+    case AI_PROVIDERS.OPENAI:
+      return extractQuestionsWithOpenAI(text);
+    case AI_PROVIDERS.GROQ:
+    case AI_PROVIDERS.DEEPSEEK:
+      // Fallback to OpenAI for now until bespoke prompts are created for other providers
+      return extractQuestionsWithOpenAI(text);
+    default:
+      throw new Error(`Unsupported AI provider: ${provider}`);
+  }
+};

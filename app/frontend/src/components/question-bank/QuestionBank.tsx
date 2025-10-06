@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Question } from '../../types/question';
+import type { Question, SavedExtractedQuestion } from '../../types/question';
 import { QuestionCard } from './QuestionCard';
 import { SearchAndFilters } from './SearchAndFilters';
 import { QuestionBankHeader } from './QuestionBankHeader';
@@ -8,14 +8,16 @@ interface QuestionBankProps {
   questions: Question[];
   onViewQuestion: (question: Question) => void;
   onCreateVariant: (question: Question) => void;
-  onAddQuestion: () => void;
+  onAddQuestion?: (saved: SavedExtractedQuestion[]) => void;
+  courseId?: number;
 }
 
 export const QuestionBank = ({
   questions,
   onViewQuestion,
   onCreateVariant,
-  onAddQuestion
+  onAddQuestion,
+  courseId
 }: QuestionBankProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('all');
@@ -60,6 +62,7 @@ export const QuestionBank = ({
       <QuestionBankHeader
         questionCount={filteredQuestions.length}
         difficultyFilter={difficultyFilter}
+        courseId={courseId}
         onAddQuestion={onAddQuestion}
       />
 

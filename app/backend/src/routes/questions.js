@@ -6,9 +6,10 @@ import {
   updateQuestion, 
   deleteQuestion, 
   createMultipleQuestions,
-  getQuestionStats 
+  getQuestionStats,
+  saveExtractedQuestions
 } from '../services/questionService.js';
-import { generateQuestions, AI_PROVIDERS } from '../services/aiService.js';
+import { generateQuestions, AI_PROVIDERS, extractQuestionsFromText } from '../services/aiService.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -78,6 +79,71 @@ router.get('/stats', authenticateToken, async (req, res, next) => {
     res.json({
       success: true,
       data: stats
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   POST /api/questions/extract
+// @desc    Extract questions from raw text (e.g., OCR output)
+// @access  Private
+router.post('/extract', authenticateToken, async (req, res, next) => {
+  try {
+    const { text, provider = AI_PROVIDERS.OPENAI } = req.body;
+
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Text is required to extract questions'
+      });
+    }
+
+    const extracted = await extractQuestionsFromText(text, provider);
+
+    res.json({
+      success: true,
+      data: extracted
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   POST /api/questions/extract/save
+// @desc    Persist questions generated from OCR extraction
+// @access  Private
+router.post('/extract/save', authenticateToken, async (req, res, next) => {
+  try {
+    const {
+      courseId,
+      topicId,
+      topicName,
+      type,
+      defaultDifficulty,
+      questions
+    } = req.body;
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Questions array is required'
+      });
+    }
+
+    const saved = await saveExtractedQuestions(req.user.id, {
+      courseId,
+      topicId,
+      topicName,
+      type,
+      defaultDifficulty,
+      questions
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `${saved.length} questions saved successfully`,
+      data: saved
     });
   } catch (error) {
     next(error);
@@ -205,4 +271,3 @@ router.post('/approve', authenticateToken, async (req, res, next) => {
 });
 
 export default router;
-

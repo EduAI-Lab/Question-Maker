@@ -4,8 +4,8 @@ import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
 import { mockCourses, mockQuestions, mockAssessments } from '../data/mockData';
-import { Course } from '../types/assessment';
-import { Question, Assessment } from '../types/question';
+import { Course, Assessment } from '../types/assessment';
+import { Question, SavedExtractedQuestion } from '../types/question';
 
 export const LandingPage = () => {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(mockCourses[0]);
@@ -49,9 +49,31 @@ export const LandingPage = () => {
     setSelectedQuestion(null);
   };
 
-  const handleAddQuestion = () => {
-    console.log('Add new question');
-    // TODO: Implement add question functionality
+  const handleAddQuestion = (saved: SavedExtractedQuestion[] = []) => {
+    if (!saved.length) {
+      return;
+    }
+
+    const defaultUserId = questions[0]?.userId ?? 0;
+
+    const newQuestions: Question[] = saved.map(({ metadata, variant }) => ({
+      id: variant.id,
+      content: variant.questionText,
+      difficulty: variant.difficulty,
+      bloomLevel: 'understand',
+      createdAt: variant.createdAt,
+      userId: defaultUserId,
+      classId: metadata.courseId,
+      class: selectedCourse
+        ? {
+            id: selectedCourse.id,
+            name: selectedCourse.name,
+            subject: selectedCourse.subject
+          }
+        : undefined
+    }));
+
+    setQuestions(prev => [...newQuestions, ...prev]);
   };
 
   const handleEditAssessment = (assessment: Assessment) => {
@@ -97,6 +119,7 @@ export const LandingPage = () => {
             questions={filteredQuestions}
             onViewQuestion={handleViewQuestion}
             onCreateVariant={handleCreateVariant}
+            courseId={selectedCourse?.id}
             onAddQuestion={handleAddQuestion}
           />
         ) : (

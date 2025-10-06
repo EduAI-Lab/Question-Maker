@@ -4,7 +4,9 @@ import {
   QuestionCreate, 
   QuestionMetadata, 
   QuestionGenerationParams, 
-  QuestionStats 
+  QuestionStats,
+  ExtractedQuestion,
+  SavedExtractedQuestion
 } from '../types/question';
 
 export const questionService = {
@@ -51,6 +53,22 @@ export const questionService = {
   async getQuestionStats(): Promise<QuestionStats> {
     const response = await api.get('/api/questions/stats');
     return response.data.data;
+  },
+
+  async extractQuestionsFromText(text: string, provider = 'openai'): Promise<ExtractedQuestion[]> {
+    const response = await api.post('/api/questions/extract', { text, provider });
+    return response.data.data;
+  },
+
+  async saveExtractedQuestions(payload: {
+    courseId: number;
+    topicId?: number;
+    topicName?: string;
+    type?: 'MCQ' | 'SA';
+    defaultDifficulty?: 'easy' | 'medium' | 'hard';
+    questions: ExtractedQuestion[];
+  }): Promise<SavedExtractedQuestion[]> {
+    const response = await api.post('/api/questions/extract/save', payload);
+    return response.data.data;
   }
 };
-

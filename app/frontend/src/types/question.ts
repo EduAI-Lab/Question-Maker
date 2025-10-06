@@ -29,6 +29,37 @@ export interface QuestionMetadata {
   bloom_level: BloomLevel;
 }
 
+export interface ExtractedQuestion {
+  question: string;
+  instructions?: string;
+  difficulty?: QuestionDifficulty;
+}
+
+export interface SavedExtractedQuestion {
+  metadata: {
+    id: number;
+    description: string | null;
+    type: 'MCQ' | 'SA';
+    courseId: number;
+    primaryTopicId: number;
+    questionOrder: number | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+  variant: {
+    id: number;
+    questionText: string;
+    difficulty: QuestionDifficulty;
+    questionMetadataId: number;
+    assessmentId: number | null;
+    secondaryTopicsId: number | null;
+    referenceId: number | null;
+    answer: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+
 export interface QuestionGenerationParams {
   prompt: string;
   provider: 'groq' | 'openai' | 'deepseek';
@@ -51,4 +82,3 @@ export interface QuestionStats {
     count: number;
   }>;
 }
-
