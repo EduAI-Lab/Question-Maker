@@ -1,18 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { mockCourses, mockQuestions, mockAssessments } from '../data/mockData';
-import { Course } from '../types/assessment';
+import { mockQuestions, mockAssessments } from '../data/mockData';
+import { Course } from '../types/class';
 import { Question, Assessment } from '../types/question';
+import { useCourses } from '../hooks/useCourses';
 
 export const LandingPage = () => {
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(mockCourses[0]);
+  const { courses, isLoading: isCoursesLoading } = useCourses();
+  const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [questions, setQuestions] = useState<Question[]>(mockQuestions);
   const [assessments, setAssessments] = useState<Assessment[]>(mockAssessments);
+
+  const selectedCourse = useMemo(() => {
+    return courses.find(course => course.id === selectedCourseId) || null;
+  }, [courses, selectedCourseId]);
+
+  useEffect(() => {
+    if (courses.length > 0 && selectedCourseId === null) {
+      setSelectedCourseId(courses[0].id);
+    }
+  }, [courses, selectedCourseId]);
 
   // Filter questions by selected course
   const filteredQuestions = selectedCourse 
@@ -54,6 +66,11 @@ export const LandingPage = () => {
     // TODO: Implement add question functionality
   };
 
+  const handleUploadQuestions = () => {
+    console.log('Upload questions');
+    // TODO: Implement upload questions functionality
+  };
+
   const handleEditAssessment = (assessment: Assessment) => {
     console.log('Edit assessment:', assessment);
     // TODO: Implement edit assessment functionality
@@ -84,10 +101,11 @@ export const LandingPage = () => {
       {/* Top Navigation */}
       <TopNavigation
         selectedCourse={selectedCourse}
-        onCourseChange={setSelectedCourse}
+        onCourseChange={(course) => setSelectedCourseId(course.id)}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        courses={mockCourses}
+        courses={courses}
+        isLoadingCourses={isCoursesLoading}
       />
 
       {/* Main Content */}
@@ -98,6 +116,7 @@ export const LandingPage = () => {
             onViewQuestion={handleViewQuestion}
             onCreateVariant={handleCreateVariant}
             onAddQuestion={handleAddQuestion}
+            onUploadQuestions={handleUploadQuestions}
           />
         ) : (
           <AssessmentSection

@@ -19,12 +19,7 @@ interface ClassFormProps {
 export const ClassForm = ({ onSubmit, onCancel, initialData, isLoading = false, isEditing = false }: ClassFormProps) => {
   const [formData, setFormData] = useState<ClassCreate>({
     name: initialData?.name || '',
-    subject: initialData?.subject || '',
-    courseCode: initialData?.courseCode || '',
-    semester: initialData?.semester || '',
-    year: initialData?.year || undefined,
-    description: initialData?.description || '',
-    department: initialData?.department || ''
+    code: initialData?.code || ''
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof ClassCreate, string>>>({});

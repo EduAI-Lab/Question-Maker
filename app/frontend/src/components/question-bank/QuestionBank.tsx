@@ -9,13 +9,15 @@ interface QuestionBankProps {
   onViewQuestion: (question: Question) => void;
   onCreateVariant: (question: Question) => void;
   onAddQuestion: () => void;
+  onUploadQuestions: () => void;
 }
 
 export const QuestionBank = ({
   questions,
   onViewQuestion,
   onCreateVariant,
-  onAddQuestion
+  onAddQuestion,
+  onUploadQuestions
 }: QuestionBankProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('all');
@@ -61,6 +63,7 @@ export const QuestionBank = ({
         questionCount={filteredQuestions.length}
         difficultyFilter={difficultyFilter}
         onAddQuestion={onAddQuestion}
+        onUploadQuestions={onUploadQuestions}
       />
 
       {/* Search and Filters */}
