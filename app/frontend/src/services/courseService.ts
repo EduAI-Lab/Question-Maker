@@ -24,5 +24,10 @@ export const courseService = {
 
   async deleteCourse(id: number): Promise<void> {
     await api.delete(`/api/course/${id}`);
+  },
+
+  async getCourseTopics(id: number): Promise<Array<{ id: number; name: string }>> {
+    const response = await api.get(`/api/course/${id}/topics`);
+    return response.data.data;
   }
 };
