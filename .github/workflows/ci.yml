@@ -1,0 +1,144 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install root dependencies
+      run: npm ci
+      
+    - name: Install backend dependencies
+      run: |
+        cd app/backend
+        npm ci
+        
+    - name: Install frontend dependencies
+      run: |
+        cd app/frontend
+        npm ci
+        
+    - name: Run ESLint (Backend)
+      run: |
+        cd app/backend
+        npm run lint
+        
+    - name: Run ESLint (Frontend)
+      run: |
+        cd app/frontend
+        npm run lint
+        
+    - name: Check Prettier formatting (Backend)
+      run: |
+        cd app/backend
+        npm run format:check
+        
+    - name: Check Prettier formatting (Frontend)
+      run: |
+        cd app/frontend
+        npm run format:check
+        
+    - name: Run Backend Tests
+      run: |
+        cd app/backend
+        npm test
+        
+    - name: Run Frontend Tests
+      run: |
+        cd app/frontend
+        npm test
+        
+    - name: Generate Test Coverage Reports
+      run: |
+        cd app/backend
+        npm run test:coverage
+        cd ../frontend
+        npm run test:coverage
+        
+    - name: Upload Backend Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./app/backend/coverage/lcov.info
+        flags: backend
+        name: backend-coverage
+        
+    - name: Upload Frontend Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./app/frontend/coverage/lcov.info
+        flags: frontend
+        name: frontend-coverage
+
+  build-and-test-docker:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Backend Docker image
+      run: |
+        cd app/backend
+        docker build -t question-maker-backend:test .
+        
+    - name: Build Frontend Docker image
+      run: |
+        cd app/frontend
+        docker build -t question-maker-frontend:test .
+        
+    - name: Test Docker Compose
+      run: |
+        docker-compose -f docker-compose.dev.yml config
+        docker-compose config
+
+  security-audit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        cd app/backend
+        npm ci
+        cd ../frontend
+        npm ci
+        
+    - name: Run security audit (Backend)
+      run: |
+        cd app/backend
+        npm audit --audit-level=moderate
+        
+    - name: Run security audit (Frontend)
+      run: |
+        cd app/frontend
+        npm audit --audit-level=moderate
