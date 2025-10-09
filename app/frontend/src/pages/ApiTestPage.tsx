@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -7,6 +7,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 import api from '../services/api';
+import eduaiService from '../services/eduaiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/use-toast';
 
@@ -68,6 +69,28 @@ export const ApiTestPage = () => {
     referenceId: ''
   });
   const [variantResult, setVariantResult] = useState<ResultState>(defaultResult);
+
+  // EduAI form states
+  const [eduaiChatForm, setEduaiChatForm] = useState({
+    courseCode: '',
+    message: '',
+    model: 'google:gemini-2.5-flash'
+  });
+  const [eduaiChatResult, setEduaiChatResult] = useState<ResultState>(defaultResult);
+
+  const [eduaiQuestionForm, setEduaiQuestionForm] = useState({
+    courseCode: '',
+    prompt: '',
+    model: 'google:gemini-2.5-flash',
+    numQuestions: '5',
+    difficultyEasy: '1',
+    difficultyMedium: '2',
+    difficultyHard: '2'
+  });
+  const [eduaiQuestionResult, setEduaiQuestionResult] = useState<ResultState>(defaultResult);
+
+  const [eduaiStatusResult, setEduaiStatusResult] = useState<ResultState>(defaultResult);
+  const [eduaiTestResult, setEduaiTestResult] = useState<ResultState>(defaultResult);
 
   const handleApiCall = async (
     request: () => Promise<any>,
@@ -620,6 +643,255 @@ export const ApiTestPage = () => {
                 Create Variant
               </Button>
               <div>{renderResult(variantResult)}</div>
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* EduAI Integration Tests */}
+        <section>
+          <Card>
+            <CardHeader>
+              <CardTitle>EduAI Integration Tests</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* EduAI Status Check */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Service Status</h3>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    handleApiCall(
+                      () => eduaiService.getStatus(),
+                      (data) => setEduaiStatusResult({ status: 'success', payload: data }),
+                      (message) => setEduaiStatusResult({ status: 'error', message })
+                    )
+                  }
+                >
+                  Check EduAI Status
+                </Button>
+                <div>{renderResult(eduaiStatusResult)}</div>
+              </div>
+
+              {/* EduAI Connection Test */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Connection Test</h3>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    handleApiCall(
+                      () => eduaiService.testConnection(),
+                      (data) => setEduaiTestResult({ status: 'success', payload: data }),
+                      (message) => setEduaiTestResult({ status: 'error', message })
+                    )
+                  }
+                >
+                  Test EduAI Connection
+                </Button>
+                <div>{renderResult(eduaiTestResult)}</div>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="grid gap-6 md:grid-cols-2">
+          {/* EduAI Chat Test */}
+          <Card>
+            <CardHeader>
+              <CardTitle>EduAI Chat</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="eduai-course-code">Course Code</Label>
+                <Input
+                  id="eduai-course-code"
+                  placeholder="e.g. CS101"
+                  value={eduaiChatForm.courseCode}
+                  onChange={(event) => setEduaiChatForm((prev) => ({ ...prev, courseCode: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Model</Label>
+                <Select
+                  value={eduaiChatForm.model}
+                  onValueChange={(value) => setEduaiChatForm((prev) => ({ ...prev, model: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="google:gemini-2.5-flash">Google Gemini 2.5 Flash</SelectItem>
+                    <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B</SelectItem>
+                    <SelectItem value="openai:gpt-4">OpenAI GPT-4</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="eduai-message">Message</Label>
+                <Textarea
+                  id="eduai-message"
+                  placeholder="Ask a question about the course material..."
+                  value={eduaiChatForm.message}
+                  onChange={(event) => setEduaiChatForm((prev) => ({ ...prev, message: event.target.value }))}
+                />
+              </div>
+              <Button
+                onClick={() => {
+                  if (!eduaiChatForm.courseCode.trim() || !eduaiChatForm.message.trim()) {
+                    toast({
+                      variant: 'destructive',
+                      title: 'Missing required fields',
+                      description: 'Course code and message are required.'
+                    });
+                    return;
+                  }
+
+                  handleApiCall(
+                    () => eduaiService.chat({
+                      messages: [{ role: 'user', content: eduaiChatForm.message }],
+                      courseCode: eduaiChatForm.courseCode,
+                      model: eduaiChatForm.model
+                    }),
+                    (data) => {
+                      setEduaiChatResult({ status: 'success', payload: data });
+                      toast({ title: 'Chat request sent' });
+                    },
+                    (message) => setEduaiChatResult({ status: 'error', message })
+                  );
+                }}
+              >
+                Send Chat Message
+              </Button>
+              <div>{renderResult(eduaiChatResult)}</div>
+            </CardContent>
+          </Card>
+
+          {/* EduAI Question Generation Test */}
+          <Card>
+            <CardHeader>
+              <CardTitle>EduAI Question Generation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1">
+                <Label htmlFor="eduai-q-course-code">Course Code</Label>
+                <Input
+                  id="eduai-q-course-code"
+                  placeholder="e.g. CS101"
+                  value={eduaiQuestionForm.courseCode}
+                  onChange={(event) => setEduaiQuestionForm((prev) => ({ ...prev, courseCode: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Model</Label>
+                <Select
+                  value={eduaiQuestionForm.model}
+                  onValueChange={(value) => setEduaiQuestionForm((prev) => ({ ...prev, model: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="google:gemini-2.5-flash">Google Gemini 2.5 Flash</SelectItem>
+                    <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B</SelectItem>
+                    <SelectItem value="openai:gpt-4">OpenAI GPT-4</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="eduai-prompt">Topic/Prompt</Label>
+                <Textarea
+                  id="eduai-prompt"
+                  placeholder="e.g. Data structures and algorithms, Machine learning basics..."
+                  value={eduaiQuestionForm.prompt}
+                  onChange={(event) => setEduaiQuestionForm((prev) => ({ ...prev, prompt: event.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label htmlFor="eduai-num-questions">Number of Questions</Label>
+                  <Input
+                    id="eduai-num-questions"
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={eduaiQuestionForm.numQuestions}
+                    onChange={(event) => setEduaiQuestionForm((prev) => ({ ...prev, numQuestions: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="eduai-easy">Easy</Label>
+                  <Input
+                    id="eduai-easy"
+                    type="number"
+                    min="0"
+                    value={eduaiQuestionForm.difficultyEasy}
+                    onChange={(event) => setEduaiQuestionForm((prev) => ({ ...prev, difficultyEasy: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="eduai-medium">Medium</Label>
+                  <Input
+                    id="eduai-medium"
+                    type="number"
+                    min="0"
+                    value={eduaiQuestionForm.difficultyMedium}
+                    onChange={(event) => setEduaiQuestionForm((prev) => ({ ...prev, difficultyMedium: event.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="eduai-hard">Hard</Label>
+                <Input
+                  id="eduai-hard"
+                  type="number"
+                  min="0"
+                  value={eduaiQuestionForm.difficultyHard}
+                  onChange={(event) => setEduaiQuestionForm((prev) => ({ ...prev, difficultyHard: event.target.value }))}
+                />
+              </div>
+              <Button
+                onClick={() => {
+                  if (!eduaiQuestionForm.courseCode.trim() || !eduaiQuestionForm.prompt.trim()) {
+                    toast({
+                      variant: 'destructive',
+                      title: 'Missing required fields',
+                      description: 'Course code and prompt are required.'
+                    });
+                    return;
+                  }
+
+                  const numQuestions = parseInt(eduaiQuestionForm.numQuestions);
+                  const easy = parseInt(eduaiQuestionForm.difficultyEasy);
+                  const medium = parseInt(eduaiQuestionForm.difficultyMedium);
+                  const hard = parseInt(eduaiQuestionForm.difficultyHard);
+
+                  if (easy + medium + hard !== numQuestions) {
+                    toast({
+                      variant: 'destructive',
+                      title: 'Invalid difficulty distribution',
+                      description: 'Sum of difficulty levels must equal number of questions.'
+                    });
+                    return;
+                  }
+
+                  handleApiCall(
+                    () => eduaiService.generateQuestions({
+                      prompt: eduaiQuestionForm.prompt,
+                      courseCode: eduaiQuestionForm.courseCode,
+                      model: eduaiQuestionForm.model,
+                      numQuestions,
+                      difficultyDistribution: { easy, medium, hard }
+                    }),
+                    (data) => {
+                      setEduaiQuestionResult({ status: 'success', payload: data });
+                      toast({ title: 'Questions generated' });
+                    },
+                    (message) => setEduaiQuestionResult({ status: 'error', message })
+                  );
+                }}
+              >
+                Generate Questions
+              </Button>
+              <div>{renderResult(eduaiQuestionResult)}</div>
             </CardContent>
           </Card>
         </section>
