@@ -6,8 +6,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { LogOut, Moon, Sun } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../components/theme-provider';
-import { QuestionList } from '../components/questions/QuestionList';
-import { QuestionGenerator } from '../components/questions/QuestionGenerator';
 import { FileUploadZone } from '../components/FileUploadZone';
 import { ClassList } from '../components/classes/ClassList';
 import { ClassForm } from '../components/classes/ClassForm';
@@ -111,11 +109,25 @@ export const DashboardPage = () => {
           </TabsList>
 
           <TabsContent value="questions">
-            <QuestionList />
+            <Card>
+              <CardHeader>
+                <CardTitle>Questions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>Question management coming soon...</p>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="generate">
-            <QuestionGenerator />
+            <Card>
+              <CardHeader>
+                <CardTitle>Generate Questions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>Question generation coming soon...</p>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="upload">
