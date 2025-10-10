@@ -27,7 +27,7 @@ export const LoginPage = () => {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/landing" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -139,4 +139,3 @@ export const LoginPage = () => {
     </div>
   );
 };
-
