@@ -20,6 +20,13 @@ export const QuestionDetailView = ({
   onDeleteVariant
 }: QuestionDetailViewProps) => {
   const { variant } = entry;
+  const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
+  const secondaryTopicsDisplay =
+    entry.secondaryTopicNames && entry.secondaryTopicNames.length > 0
+      ? entry.secondaryTopicNames.join(', ')
+      : variant.secondaryTopicsId && variant.secondaryTopicsId.length > 0
+        ? variant.secondaryTopicsId.map((id) => `Topic ${id}`).join(', ')
+        : 'None';
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -30,7 +37,7 @@ export const QuestionDetailView = ({
               <CardTitle className="text-xl">Variant #{variant.id}</CardTitle>
               <Badge variant="secondary" className="uppercase">{entry.questionType}</Badge>
               <Badge variant="outline" className="capitalize">{variant.difficulty ?? 'medium'}</Badge>
-              {entry.courseName && <Badge variant="outline">{entry.courseName}</Badge>}
+              <Badge variant="outline">{primaryTopicLabel}</Badge>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-4 w-4" />
@@ -53,8 +60,8 @@ export const QuestionDetailView = ({
                   {entry.questionDescription}
                 </p>
                 <p>
-                  <span className="font-medium">Primary Topic ID:</span>{' '}
-                  {entry.primaryTopicId}
+                  <span className="font-medium">Primary Topic:</span>{' '}
+                  {entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`}
                 </p>
                 <p>
                   <span className="font-medium">Course:</span>{' '}
@@ -75,9 +82,7 @@ export const QuestionDetailView = ({
               <div>
                 <span className="font-medium">Secondary Topics:</span>
                 <p>
-                  {variant.secondaryTopicsId && variant.secondaryTopicsId.length > 0
-                    ? variant.secondaryTopicsId.join(', ')
-                    : 'None'}
+                  {secondaryTopicsDisplay}
                 </p>
               </div>
               <div>

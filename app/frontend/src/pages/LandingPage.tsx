@@ -6,8 +6,10 @@ import { QuestionDetailView } from '../components/question-detail/QuestionDetail
 import { mockAssessments } from '../data/mockData';
 import { Course } from '../types/class';
 import { Question, Assessment, QuestionVariantEntry } from '../types/question';
+import { Topic } from '../types/topic';
 import { useCourses } from '../hooks/useCourses';
 import { questionService } from '../services/questionService';
+import { courseService } from '../services/courseService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 
 export const LandingPage = () => {
@@ -21,6 +23,7 @@ export const LandingPage = () => {
   const [assessments, setAssessments] = useState<Assessment[]>(mockAssessments);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
+  const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
 
   useEffect(() => {
     if (courses.length === 0) {
@@ -34,25 +37,55 @@ export const LandingPage = () => {
     }
   }, [courses, selectedCourse]);
 
+  useEffect(() => {
+    const fetchTopicsForCourse = async (courseId: number) => {
+      try {
+        const topics = await courseService.getCourseTopics(courseId);
+        setTopicsByCourse((prev) => ({
+          ...prev,
+          [courseId]: topics
+        }));
+      } catch (error) {
+        console.error('Failed to load topics for course', courseId, error);
+      }
+    };
+
+    if (selectedCourse && !topicsByCourse[selectedCourse.id]) {
+      fetchTopicsForCourse(selectedCourse.id);
+    }
+  }, [selectedCourse, topicsByCourse]);
+
   const filteredQuestions = useMemo(() => {
     if (!selectedCourse) return questions;
     return questions.filter((question) => question.courseId === selectedCourse.id);
   }, [questions, selectedCourse]);
 
   const variantEntries: QuestionVariantEntry[] = useMemo(() => {
-    return filteredQuestions.flatMap((question) =>
-      (question.variants || []).map((variant) => ({
-        questionId: question.id,
-        questionDescription: question.description,
-        questionType: question.type,
-        primaryTopicId: question.primaryTopicId,
-        courseId: question.courseId,
-        courseName: question.course?.name,
-        courseCode: question.course?.code,
-        variant
-      }))
-    );
-  }, [filteredQuestions]);
+    return filteredQuestions.flatMap((question) => {
+      const topics = topicsByCourse[question.courseId] ?? [];
+      const topicNameMap = new Map(topics.map((topic) => [topic.id, topic.name]));
+      const resolveTopicName = (topicId: number) => topicNameMap.get(topicId) ?? `Topic ${topicId}`;
+
+      return (question.variants || []).map((variant) => {
+        const secondaryTopicNames = Array.isArray(variant.secondaryTopicsId)
+          ? variant.secondaryTopicsId.map((topicId) => resolveTopicName(topicId))
+          : [];
+
+        return {
+          questionId: question.id,
+          questionDescription: question.description,
+          questionType: question.type,
+          primaryTopicId: question.primaryTopicId,
+          primaryTopicName: topicNameMap.get(question.primaryTopicId),
+          courseId: question.courseId,
+          courseName: question.course?.name,
+          courseCode: question.course?.code,
+          secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+          variant
+        };
+      });
+    });
+  }, [filteredQuestions, topicsByCourse]);
 
   const emptyStateMessage = selectedCourse
     ? questionsError || 'No questions found for this course yet. Try adding or uploading questions.'
@@ -112,6 +145,9 @@ export const LandingPage = () => {
   };
 
   const handleQuestionCreated = (question: Question) => {
+    const topicsForCourse = topicsByCourse[question.courseId] ?? [];
+    const topicNameMap = new Map(topicsForCourse.map((topic) => [topic.id, topic.name]));
+
     setQuestions((prev) => {
       const index = prev.findIndex((item) => item.id === question.id);
       if (index >= 0) {
@@ -124,14 +160,21 @@ export const LandingPage = () => {
 
     const latestVariant = question.variants?.[question.variants.length - 1];
     if (latestVariant) {
+      const resolveTopicName = (topicId: number) => topicNameMap.get(topicId) ?? `Topic ${topicId}`;
+      const secondaryTopicNames = Array.isArray(latestVariant.secondaryTopicsId)
+        ? latestVariant.secondaryTopicsId.map((topicId) => resolveTopicName(topicId))
+        : [];
+
       setSelectedVariant({
         questionId: question.id,
         questionDescription: question.description,
         questionType: question.type,
         primaryTopicId: question.primaryTopicId,
+        primaryTopicName: topicNameMap.get(question.primaryTopicId),
         courseId: question.courseId,
         courseName: question.course?.name,
         courseCode: question.course?.code,
+        secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
         variant: latestVariant
       });
     }
@@ -171,7 +214,7 @@ export const LandingPage = () => {
     const fetchQuestions = async () => {
       if (!selectedCourse) {
         setQuestions([]);
-      setSelectedVariant(null);
+        setSelectedVariant(null);
         return;
       }
 
@@ -191,6 +234,58 @@ export const LandingPage = () => {
 
     fetchQuestions();
   }, [selectedCourse]);
+
+  useEffect(() => {
+    if (!selectedVariant) {
+      return;
+    }
+
+    const updated = variantEntries.find(
+      (entry) =>
+        entry.questionId === selectedVariant.questionId &&
+        entry.variant.id === selectedVariant.variant.id
+    );
+
+    if (!updated) {
+      return;
+    }
+
+    const prevSecondary = selectedVariant.secondaryTopicNames?.join('|') ?? '';
+    const nextSecondary = updated.secondaryTopicNames?.join('|') ?? '';
+
+    if (
+      updated.primaryTopicName !== selectedVariant.primaryTopicName ||
+      nextSecondary !== prevSecondary
+    ) {
+      setSelectedVariant(updated);
+    }
+  }, [variantEntries, selectedVariant]);
+
+  useEffect(() => {
+    if (!presetVariant) {
+      return;
+    }
+
+    const updated = variantEntries.find(
+      (entry) =>
+        entry.questionId === presetVariant.questionId &&
+        entry.variant.id === presetVariant.variant.id
+    );
+
+    if (!updated) {
+      return;
+    }
+
+    const prevSecondary = presetVariant.secondaryTopicNames?.join('|') ?? '';
+    const nextSecondary = updated.secondaryTopicNames?.join('|') ?? '';
+
+    if (
+      updated.primaryTopicName !== presetVariant.primaryTopicName ||
+      nextSecondary !== prevSecondary
+    ) {
+      setPresetVariant(updated);
+    }
+  }, [variantEntries, presetVariant]);
 
   return (
     <div className="min-h-screen bg-gray-50">

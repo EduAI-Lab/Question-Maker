@@ -1,7 +1,7 @@
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Eye, Copy, Layers } from 'lucide-react';
+import { Eye, Copy } from 'lucide-react';
 import { QuestionVariantEntry } from '../../types/question';
 
 interface QuestionCardProps {
@@ -12,6 +12,8 @@ interface QuestionCardProps {
 }
 
 export const QuestionCard = ({ entry, questionNumber, onView, onCreateVariant }: QuestionCardProps) => {
+    const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
+
     return (
         <Card className="hover:shadow-md transition-shadow">
             <CardContent className="px-6 pt-6 pb-6">
@@ -25,9 +27,7 @@ export const QuestionCard = ({ entry, questionNumber, onView, onCreateVariant }:
                             <Badge variant="outline" className="capitalize">
                                 {entry.variant.difficulty ?? 'medium'}
                             </Badge>
-                            {entry.courseName && (
-                                <Badge variant="outline">{entry.courseName}</Badge>
-                            )}
+                            <Badge variant="outline">{primaryTopicLabel}</Badge>
                         </div>
 
                         <div className="mb-3 space-y-2">

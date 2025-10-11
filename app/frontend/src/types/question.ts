@@ -20,9 +20,11 @@ export interface QuestionVariantEntry {
   questionDescription: string;
   questionType: QuestionType;
   primaryTopicId: number;
+  primaryTopicName?: string;
   courseId: number;
   courseName?: string;
   courseCode?: string | null;
+  secondaryTopicNames?: string[];
   variant: QuestionVariant;
 }
 
