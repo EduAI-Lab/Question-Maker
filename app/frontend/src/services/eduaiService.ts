@@ -110,6 +110,14 @@ class EduAIService {
   }
 
   /**
+   * Test EduAI API key validity
+   */
+  async testApiKey(): Promise<EduAITestResponse> {
+    const response = await api.get('/api/eduai/test-api-key');
+    return response.data;
+  }
+
+  /**
    * Get EduAI service status
    */
   async getStatus(): Promise<EduAIStatusResponse> {
