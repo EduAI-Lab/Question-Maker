@@ -1,5 +1,4 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
-export type BloomLevel = 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
 export type QuestionType = 'MCQ' | 'SA';
 
 export interface QuestionVariant {
@@ -43,16 +42,6 @@ export interface Question {
     code?: string | null;
   };
   variants?: QuestionVariant[];
-  /** Legacy fields maintained for backwards compatibility */
-  content?: string;
-  difficulty?: QuestionDifficulty;
-  bloomLevel?: BloomLevel;
-  classId?: number;
-  class?: {
-    id: number;
-    name: string;
-    subject?: string;
-  };
 }
 
 export interface QuestionCreate {
@@ -61,12 +50,6 @@ export interface QuestionCreate {
   primaryTopicId: number;
   type: QuestionType;
   questionOrder?: Record<string, number> | null;
-}
-
-export interface QuestionMetadata {
-  content: string;
-  difficulty: QuestionDifficulty;
-  bloom_level: BloomLevel;
 }
 
 export interface QuestionGenerationParams {
