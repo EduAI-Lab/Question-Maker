@@ -54,20 +54,6 @@ export interface EduAIQuestionGenerationResponse {
   };
 }
 
-export interface EduAIModel {
-  id: string;
-  name: string;
-  provider: string;
-}
-
-export interface EduAIStatusResponse {
-  success: boolean;
-  data: {
-    configured: boolean;
-    baseURL: string;
-    hasApiKey: boolean;
-  };
-}
 
 export interface EduAITestResponse {
   success: boolean;
@@ -92,36 +78,12 @@ class EduAIService {
     const response = await api.post('/api/eduai/generate-questions', request);
     return response.data;
   }
-
-  /**
-   * Get available AI models from EduAI
-   */
-  async getAvailableModels(): Promise<{ success: boolean; data: EduAIModel[] }> {
-    const response = await api.get('/api/eduai/models');
-    return response.data;
-  }
-
-  /**
-   * Test EduAI connection
-   */
-  async testConnection(): Promise<EduAITestResponse> {
-    const response = await api.get('/api/eduai/test');
-    return response.data;
-  }
-
+ 
   /**
    * Test EduAI API key validity
    */
   async testApiKey(): Promise<EduAITestResponse> {
     const response = await api.get('/api/eduai/test-api-key');
-    return response.data;
-  }
-
-  /**
-   * Get EduAI service status
-   */
-  async getStatus(): Promise<EduAIStatusResponse> {
-    const response = await api.get('/api/eduai/status');
     return response.data;
   }
 
