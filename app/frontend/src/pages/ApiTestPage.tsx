@@ -89,9 +89,8 @@ export const ApiTestPage = () => {
   });
   const [eduaiQuestionResult, setEduaiQuestionResult] = useState<ResultState>(defaultResult);
 
-  const [eduaiStatusResult, setEduaiStatusResult] = useState<ResultState>(defaultResult);
-  const [eduaiTestResult, setEduaiTestResult] = useState<ResultState>(defaultResult);
   const [eduaiApiKeyResult, setEduaiApiKeyResult] = useState<ResultState>(defaultResult);
+  const [isTestingApiKey, setIsTestingApiKey] = useState(false);
 
   const handleApiCall = async (
     request: () => Promise<any>,
@@ -655,58 +654,28 @@ export const ApiTestPage = () => {
               <CardTitle>EduAI Integration Tests</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* EduAI Status Check */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Service Status</h3>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    handleApiCall(
-                      () => eduaiService.getStatus(),
-                      (data) => setEduaiStatusResult({ status: 'success', payload: data }),
-                      (message) => setEduaiStatusResult({ status: 'error', message })
-                    )
-                  }
-                >
-                  Check EduAI Status
-                </Button>
-                <div>{renderResult(eduaiStatusResult)}</div>
-              </div>
-
               {/* EduAI API Key Test */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">API Key Test</h3>
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    handleApiCall(
-                      () => eduaiService.testApiKey(),
-                      (data) => setEduaiApiKeyResult({ status: 'success', payload: data }),
-                      (message) => setEduaiApiKeyResult({ status: 'error', message })
-                    )
-                  }
+                  disabled={isTestingApiKey}
+                  onClick={async () => {
+                    setIsTestingApiKey(true);
+                    try {
+                      await handleApiCall(
+                        () => eduaiService.testApiKey(),
+                        (data) => setEduaiApiKeyResult({ status: 'success', payload: data }),
+                        (message) => setEduaiApiKeyResult({ status: 'error', message })
+                      );
+                    } finally {
+                      setIsTestingApiKey(false);
+                    }
+                  }}
                 >
-                  Test API Key
+                  {isTestingApiKey ? 'Testing...' : 'Test API Key'}
                 </Button>
                 <div>{renderResult(eduaiApiKeyResult)}</div>
-              </div>
-
-              {/* EduAI Connection Test */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Connection Test</h3>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    handleApiCall(
-                      () => eduaiService.testConnection(),
-                      (data) => setEduaiTestResult({ status: 'success', payload: data }),
-                      (message) => setEduaiTestResult({ status: 'error', message })
-                    )
-                  }
-                >
-                  Test EduAI Connection
-                </Button>
-                <div>{renderResult(eduaiTestResult)}</div>
               </div>
             </CardContent>
           </Card>
