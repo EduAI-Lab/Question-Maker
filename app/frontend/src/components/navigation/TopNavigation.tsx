@@ -3,7 +3,7 @@ import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { User, ChevronDown } from 'lucide-react';
-import { Course } from '../../types/assessment';
+import { Class as Course } from '../../types/class';
 
 interface TopNavigationProps {
   selectedCourse: Course | null;
@@ -11,6 +11,7 @@ interface TopNavigationProps {
   activeTab: 'questions' | 'assessments';
   onTabChange: (tab: 'questions' | 'assessments') => void;
   courses: Course[];
+  isLoadingCourses?: boolean;
 }
 
 export const TopNavigation = ({
@@ -18,7 +19,8 @@ export const TopNavigation = ({
   onCourseChange,
   activeTab,
   onTabChange,
-  courses
+  courses,
+  isLoadingCourses = false
 }: TopNavigationProps) => {
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4">
@@ -35,21 +37,31 @@ export const TopNavigation = ({
           {/* Course Selector */}
           <div className="flex items-center space-x-2">
             <Select
-              value={selectedCourse?.id.toString() || ''}
+              value={selectedCourse?.id?.toString() || ''}
               onValueChange={(value) => {
                 const course = courses.find(c => c.id.toString() === value);
                 if (course) onCourseChange(course);
               }}
+              disabled={isLoadingCourses || courses.length === 0}
             >
               <SelectTrigger className="w-80 min-w-80">
-                <SelectValue placeholder="Select Course" className="text-base font-bold" />
+                <SelectValue
+                  placeholder={isLoadingCourses ? 'Loading courses...' : 'Select Course'}
+                  className="text-base font-bold"
+                />
               </SelectTrigger>
               <SelectContent>
-                {courses.map((course) => (
-                  <SelectItem key={course.id} value={course.id.toString()} className="text-base font-semibold">
-                    {course.code} - {course.name}
+                {courses.length === 0 ? (
+                  <SelectItem value="__no_courses" disabled>
+                    {isLoadingCourses ? 'Loading...' : 'No courses available'}
                   </SelectItem>
-                ))}
+                ) : (
+                  courses.map((course) => (
+                    <SelectItem key={course.id} value={course.id.toString()} className="text-base font-semibold">
+                      {course.code || '—'} - {course.name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <ChevronDown className="h-5 w-5 text-gray-500" />

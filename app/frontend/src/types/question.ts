@@ -1,112 +1,55 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'MCQ' | 'SA';
-export type AssessmentType = 'Assignment' | 'Lab' | 'Quiz' | 'Mid' | 'Final';
 
-// Question Metadata (matches backend Question_Metadata schema)
-export interface QuestionMetadata {
-  id: number;
-  description: string | null;
-  type: QuestionType;
-  courseId: number;
-  primaryTopicId: number;
-  questionOrder: Record<number, number> | null; // Maps assessment IDs to order numbers
-  createdAt: string;
-  updatedAt: string;
-  // Relations
-  course?: Course;
-  primaryTopic?: Topic;
-  variants?: QuestionVariant[];
-}
-
-// Question Variant (matches backend Variants schema)
 export interface QuestionVariant {
   id: number;
   questionText: string;
   difficulty: QuestionDifficulty;
-  questionMetadataId: number;
-  assessmentId: number | null;
-  secondaryTopicsId: number[] | null;
-  referenceId: number | null;
   answer: string | null;
-  createdAt: string;
-  updatedAt: string;
-  // Relations
-  questionMetadata?: QuestionMetadata;
-  assessment?: Assessment;
-  originalVariant?: QuestionVariant;
-  referencedVariants?: QuestionVariant[];
+  assessmentId: number | null;
+  secondaryTopicsId: number[];
+  referenceId: number | null;
+  baseReferenceId?: number | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// Assessment (matches backend Assessments schema)
-export interface Assessment {
+export interface QuestionVariantEntry {
+  questionId: number;
+  questionDescription: string;
+  questionType: QuestionType;
+  primaryTopicId: number;
+  primaryTopicName?: string;
+  courseId: number;
+  courseName?: string;
+  courseCode?: string | null;
+  secondaryTopicNames?: string[];
+  variant: QuestionVariant;
+}
+
+export interface Question {
   id: number;
-  type: AssessmentType;
-  name: string;
-  semester: string;
+  description: string;
+  type: QuestionType;
+  courseId: number;
+  primaryTopicId: number;
+  questionOrder: Record<string, number> | null;
   createdAt: string;
   updatedAt: string;
-  // Relations
+  course?: {
+    id: number;
+    name: string;
+    code?: string | null;
+  };
   variants?: QuestionVariant[];
 }
 
-// Course (matches backend Course schema)
-export interface Course {
-  id: number;
-  name: string;
-  code: string | null;
-  userId: number;
-  createdAt: string;
-  updatedAt: string;
-  // Relations
-  user?: User;
-  topics?: Topic[];
-  questionMetadata?: QuestionMetadata[];
-}
-
-// Topic (matches backend Topics schema)
-export interface Topic {
-  id: number;
-  name: string;
-  courseId: number;
-  createdAt: string;
-  updatedAt: string;
-  // Relations
-  course?: Course;
-  primaryQuestions?: QuestionMetadata[];
-}
-
-// User (matches backend User schema)
-export interface User {
-  id: number;
-  email: string;
-  passwordHash: string;
-  createdAt: string;
-  updatedAt: string;
-  // Relations
-  courses?: Course[];
-}
-
-// Legacy types for backward compatibility (to be removed eventually)
-export interface Question {
-  id: number;
-  content: string;
-  difficulty: QuestionDifficulty;
-  bloomLevel: string;
-  createdAt: string;
-  userId: number;
-  classId?: number;
-  class?: {
-    id: number;
-    name: string;
-    subject: string;
-  };
-}
-
 export interface QuestionCreate {
-  content: string;
-  difficulty?: QuestionDifficulty;
-  bloomLevel?: string;
-  classId?: number;
+  description: string;
+  courseId: number;
+  primaryTopicId: number;
+  type: QuestionType;
+  questionOrder?: Record<string, number> | null;
 }
 
 export interface QuestionGenerationParams {
@@ -122,13 +65,8 @@ export interface QuestionGenerationParams {
 
 export interface QuestionStats {
   totalQuestions: number;
-  difficultyStats: Array<{
-    difficulty: QuestionDifficulty;
-    count: number;
-  }>;
-  bloomLevelStats: Array<{
-    bloomLevel: string;
+  typeStats: Array<{
+    type: QuestionType;
     count: number;
   }>;
 }
-

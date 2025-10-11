@@ -2,123 +2,114 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { X, Edit, Copy, Trash2 } from 'lucide-react';
-import { Question } from '../../types/question';
+import { QuestionVariantEntry } from '../../types/question';
 
 interface QuestionDetailViewProps {
-  question: Question | null;
+  entry: QuestionVariantEntry;
   onClose: () => void;
-  onEdit: (question: Question) => void;
-  onCreateVariant: (question: Question) => void;
-  onDelete: (question: Question) => void;
+  onEdit: (entry: QuestionVariantEntry) => void;
+  onCreateVariant: (entry: QuestionVariantEntry) => void;
+  onDeleteVariant: (entry: QuestionVariantEntry) => void;
 }
 
 export const QuestionDetailView = ({
-  question,
+  entry,
   onClose,
   onEdit,
   onCreateVariant,
-  onDelete
+  onDeleteVariant
 }: QuestionDetailViewProps) => {
-  if (!question) return null;
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'hard': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getBloomLevelColor = (bloomLevel: string) => {
-    switch (bloomLevel) {
-      case 'remember': return 'bg-blue-100 text-blue-800';
-      case 'understand': return 'bg-indigo-100 text-indigo-800';
-      case 'apply': return 'bg-purple-100 text-purple-800';
-      case 'analyze': return 'bg-pink-100 text-pink-800';
-      case 'evaluate': return 'bg-orange-100 text-orange-800';
-      case 'create': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const { variant } = entry;
+  const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
+  const secondaryTopicsDisplay =
+    entry.secondaryTopicNames && entry.secondaryTopicNames.length > 0
+      ? entry.secondaryTopicNames.join(', ')
+      : variant.secondaryTopicsId && variant.secondaryTopicsId.length > 0
+        ? variant.secondaryTopicsId.map((id) => `Topic ${id}`).join(', ')
+        : 'None';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <Card className="border-0 shadow-none">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <div className="flex items-center space-x-3">
-              <CardTitle className="text-xl">Q{question.id}</CardTitle>
-              <Badge className={getDifficultyColor(question.difficulty)}>
-                {question.difficulty}
-              </Badge>
-              <Badge className={getBloomLevelColor(question.bloomLevel)}>
-                {question.bloomLevel}
-              </Badge>
+              <CardTitle className="text-xl">Variant #{variant.id}</CardTitle>
+              <Badge variant="secondary" className="uppercase">{entry.questionType}</Badge>
+              <Badge variant="outline" className="capitalize">{variant.difficulty ?? 'medium'}</Badge>
+              <Badge variant="outline">{primaryTopicLabel}</Badge>
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-4 w-4" />
             </Button>
           </CardHeader>
-          
+
           <CardContent className="space-y-6">
-            {/* Question Content */}
             <div>
-              <h3 className="text-lg font-semibold mb-2">Question</h3>
+              <h3 className="text-lg font-semibold mb-2">Question Text</h3>
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-gray-900 whitespace-pre-wrap">
-                  {question.content}
+                <p className="text-gray-900 whitespace-pre-wrap">{variant.questionText}</p>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Question Metadata</h3>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2 text-sm text-gray-700">
+                <p>
+                  <span className="font-medium">Base Question Description:</span>{' '}
+                  {entry.questionDescription}
+                </p>
+                <p>
+                  <span className="font-medium">Primary Topic:</span>{' '}
+                  {entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`}
+                </p>
+                <p>
+                  <span className="font-medium">Course:</span>{' '}
+                  {entry.courseName || 'Unassigned'}
                 </p>
               </div>
             </div>
 
-            {/* Answer Section */}
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Answer</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-gray-600 italic">
-                  Answer will be displayed here when available.
-                </p>
-              </div>
-            </div>
-
-            {/* Metadata */}
-            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-600">
               <div>
                 <span className="font-medium">Created:</span>
-                <p>{new Date(question.createdAt).toLocaleDateString()}</p>
+                <p>{new Date(variant.createdAt || variant.updatedAt || new Date().toISOString()).toLocaleString()}</p>
               </div>
-              {question.class && (
-                <div>
-                  <span className="font-medium">Course:</span>
-                  <p>{question.class.name}</p>
-                </div>
-              )}
+              <div>
+                <span className="font-medium">Assessment:</span>
+                <p>{variant.assessmentId ?? 'Not linked'}</p>
+              </div>
+              <div>
+                <span className="font-medium">Secondary Topics:</span>
+                <p>
+                  {secondaryTopicsDisplay}
+                </p>
+              </div>
+              <div>
+                <span className="font-medium">Reference Variant:</span>
+                <p>{variant.referenceId ?? 'None'}</p>
+              </div>
             </div>
 
-            {/* Action Buttons */}
+            {variant.answer && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Answer</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-gray-700 whitespace-pre-wrap">{variant.answer}</p>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end space-x-3 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => onEdit(question)}
-                className="flex items-center space-x-2"
-              >
+              <Button variant="outline" onClick={() => onEdit(entry)} className="flex items-center space-x-2">
                 <Edit className="h-4 w-4" />
                 <span>Edit</span>
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => onCreateVariant(question)}
-                className="flex items-center space-x-2"
-              >
+              <Button variant="outline" onClick={() => onCreateVariant(entry)} className="flex items-center space-x-2">
                 <Copy className="h-4 w-4" />
                 <span>Variant</span>
               </Button>
-              <Button
-                variant="destructive"
-                onClick={() => onDelete(question)}
-                className="flex items-center space-x-2"
-              >
+              <Button variant="destructive" onClick={() => onDeleteVariant(entry)} className="flex items-center space-x-2">
                 <Trash2 className="h-4 w-4" />
                 <span>Delete</span>
               </Button>
