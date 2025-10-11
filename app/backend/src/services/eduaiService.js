@@ -46,13 +46,24 @@ class EduAIService {
     }
 
     try {
-      const response = await axios.post(`${this.baseURL}/api/chat`, {
+      const requestPayload = {
         messages: params.messages || [],
         model: params.model || 'google:gemini-2.5-flash',
         apiKeys: params.apiKeys || {},
         courseCode: params.courseCode,
         streaming: params.streaming || false
-      }, {
+      };
+
+      console.log('EduAI Request:', {
+        url: `${this.baseURL}/api/chat`,
+        payload: requestPayload,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'none'
+        }
+      });
+
+      const response = await axios.post(`${this.baseURL}/api/chat`, requestPayload, {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': this.apiKey

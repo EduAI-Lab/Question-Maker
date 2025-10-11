@@ -72,14 +72,14 @@ export const ApiTestPage = () => {
 
   // EduAI form states
   const [eduaiChatForm, setEduaiChatForm] = useState({
-    courseCode: 'COSC 121',
+    courseCode: 'COSC121',
     message: '',
     model: 'ollama:gpt-oss:120b'
   });
   const [eduaiChatResult, setEduaiChatResult] = useState<ResultState>(defaultResult);
 
   const [eduaiQuestionForm, setEduaiQuestionForm] = useState({
-    courseCode: 'COSC 121',
+    courseCode: 'COSC121',
     prompt: '',
     model: 'ollama:gpt-oss:120b',
     numQuestions: '5',
@@ -723,7 +723,7 @@ export const ApiTestPage = () => {
                 <Label htmlFor="eduai-course-code">Course Code</Label>
                 <Input
                   id="eduai-course-code"
-                  placeholder="COSC 121 or COSC 211"
+                  placeholder="COSC121 or COSC211"
                   value={eduaiChatForm.courseCode}
                   onChange={(event) => setEduaiChatForm((prev) => ({ ...prev, courseCode: event.target.value }))}
                 />
@@ -768,7 +768,12 @@ export const ApiTestPage = () => {
                     () => eduaiService.chat({
                       messages: [{ role: 'user', content: eduaiChatForm.message }],
                       courseCode: eduaiChatForm.courseCode,
-                      model: eduaiChatForm.model
+                      model: eduaiChatForm.model,
+                      apiKeys: eduaiChatForm.model.includes('ollama') ? {
+                        ollama: {
+                          isEnabled: true
+                        }
+                      } : {}
                     }),
                     (data) => {
                       setEduaiChatResult({ status: 'success', payload: data });
@@ -794,7 +799,7 @@ export const ApiTestPage = () => {
                 <Label htmlFor="eduai-q-course-code">Course Code</Label>
                 <Input
                   id="eduai-q-course-code"
-                  placeholder="COSC 121 or COSC 211"
+                  placeholder="COSC121 or COSC211"
                   value={eduaiQuestionForm.courseCode}
                   onChange={(event) => setEduaiQuestionForm((prev) => ({ ...prev, courseCode: event.target.value }))}
                 />
@@ -897,6 +902,11 @@ export const ApiTestPage = () => {
                       prompt: eduaiQuestionForm.prompt,
                       courseCode: eduaiQuestionForm.courseCode,
                       model: eduaiQuestionForm.model,
+                      apiKeys: eduaiQuestionForm.model.includes('ollama') ? {
+                        ollama: {
+                          isEnabled: true
+                        }
+                      } : {},
                       numQuestions,
                       difficultyDistribution: { easy, medium, hard }
                     }),
