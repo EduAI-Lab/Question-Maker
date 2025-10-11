@@ -5,24 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 interface SearchAndFiltersProps {
   searchTerm: string;
   onSearchChange: (value: string) => void;
-  difficultyFilter: string;
-  onDifficultyChange: (value: string) => void;
-  sortBy: string;
-  onSortChange: (value: string) => void;
+  sortBy: 'newest' | 'oldest' | 'type';
+  onSortChange: (value: 'newest' | 'oldest' | 'type') => void;
 }
 
 export const SearchAndFilters = ({
   searchTerm,
   onSearchChange,
-  difficultyFilter,
-  onDifficultyChange,
   sortBy,
   onSortChange
 }: SearchAndFiltersProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg">Search & Filters</CardTitle>
+        <CardTitle className="text-lg">Search & Sort</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex flex-col md:flex-row gap-4">
@@ -34,27 +30,14 @@ export const SearchAndFilters = ({
             />
           </div>
           <div className="w-full md:w-48">
-            <Select value={difficultyFilter} onValueChange={onDifficultyChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by difficulty" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Difficulties</SelectItem>
-                <SelectItem value="easy">Easy</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="hard">Hard</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full md:w-48">
-            <Select value={sortBy} onValueChange={onSortChange}>
+            <Select value={sortBy} onValueChange={(value) => onSortChange(value as 'newest' | 'oldest' | 'type')}>
               <SelectTrigger>
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="newest">Newest First</SelectItem>
                 <SelectItem value="oldest">Oldest First</SelectItem>
-                <SelectItem value="difficulty">Difficulty</SelectItem>
+                <SelectItem value="type">Question Type</SelectItem>
               </SelectContent>
             </Select>
           </div>

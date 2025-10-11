@@ -1,96 +1,111 @@
 import { useState, useMemo } from 'react';
-import { Question } from '../../types/question';
+import { QuestionVariantEntry } from '../../types/question';
 import { QuestionCard } from './QuestionCard';
 import { SearchAndFilters } from './SearchAndFilters';
 import { QuestionBankHeader } from './QuestionBankHeader';
+import { Loader2 } from 'lucide-react';
 
 interface QuestionBankProps {
-  questions: Question[];
-  onViewQuestion: (question: Question) => void;
-  onCreateVariant: (question: Question) => void;
+  variants: QuestionVariantEntry[];
+  onViewVariant: (entry: QuestionVariantEntry) => void;
+  onCreateVariant: (entry: QuestionVariantEntry) => void;
   onAddQuestion: () => void;
+  onUploadQuestions: () => void;
+  isLoading?: boolean;
+  courseName?: string;
+  emptyMessage?: string;
+  disableAdd?: boolean;
+  disableUpload?: boolean;
 }
 
 export const QuestionBank = ({
-  questions,
-  onViewQuestion,
+  variants,
+  onViewVariant,
   onCreateVariant,
-  onAddQuestion
+  onAddQuestion,
+  onUploadQuestions,
+  isLoading = false,
+  courseName,
+  emptyMessage,
+  disableAdd = false,
+  disableUpload = false
 }: QuestionBankProps) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [difficultyFilter, setDifficultyFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('newest');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'type'>('newest');
 
-  // Filter and sort questions
-  const filteredQuestions = useMemo(() => {
-    let filtered = [...questions];
+  const filteredVariants = useMemo(() => {
+    let filtered = [...variants];
 
-    // Apply search filter
     if (searchTerm) {
-      filtered = filtered.filter(q =>
-        q.content.toLowerCase().includes(searchTerm.toLowerCase())
+      const lowered = searchTerm.toLowerCase();
+      filtered = filtered.filter((entry) =>
+        entry.variant.questionText.toLowerCase().includes(lowered) ||
+        entry.questionDescription.toLowerCase().includes(lowered)
       );
     }
 
-    // Apply difficulty filter
-    if (difficultyFilter !== 'all') {
-      filtered = filtered.filter(q => q.difficulty === difficultyFilter);
-    }
-
-    // Apply sorting
     switch (sortBy) {
       case 'newest':
-        filtered.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        filtered.sort((a, b) =>
+          new Date(b.variant.createdAt || b.variant.updatedAt || b.variant.id).getTime() -
+          new Date(a.variant.createdAt || a.variant.updatedAt || a.variant.id).getTime()
+        );
         break;
       case 'oldest':
-        filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        filtered.sort((a, b) =>
+          new Date(a.variant.createdAt || a.variant.updatedAt || a.variant.id).getTime() -
+          new Date(b.variant.createdAt || b.variant.updatedAt || b.variant.id).getTime()
+        );
         break;
-      case 'difficulty':
-        const difficultyOrder = { easy: 0, medium: 1, hard: 2 };
-        filtered.sort((a, b) => difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty]);
+      case 'type':
+        filtered.sort((a, b) => a.questionType.localeCompare(b.questionType));
         break;
     }
 
     return filtered;
-  }, [questions, searchTerm, difficultyFilter, sortBy]);
+  }, [variants, searchTerm, sortBy]);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <QuestionBankHeader
-        questionCount={filteredQuestions.length}
-        difficultyFilter={difficultyFilter}
+        questionCount={filteredVariants.length}
+        courseName={courseName}
         onAddQuestion={onAddQuestion}
+        onUploadQuestions={onUploadQuestions}
+        disableAdd={disableAdd}
+        disableUpload={disableUpload}
       />
 
-      {/* Search and Filters */}
       <SearchAndFilters
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        difficultyFilter={difficultyFilter}
-        onDifficultyChange={setDifficultyFilter}
         sortBy={sortBy}
-        onSortChange={setSortBy}
+        onSortChange={(value) => setSortBy(value)}
       />
 
-      {/* Questions List */}
-      <div className="space-y-3">
-        {filteredQuestions.map((question, index) => (
-          <QuestionCard
-            key={question.id}
-            question={question}
-            questionNumber={index + 1}
-            onViewQuestion={onViewQuestion}
-            onCreateVariant={onCreateVariant}
-          />
-        ))}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading questions...
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredVariants.map((entry, index) => (
+            <QuestionCard
+              key={`${entry.questionId}-${entry.variant.id}`}
+              entry={entry}
+              questionNumber={index + 1}
+              onView={onViewVariant}
+              onCreateVariant={onCreateVariant}
+            />
+          ))}
 
-        {filteredQuestions.length === 0 && (
-          <div className="text-center py-8">
-            <p className="text-gray-500">No questions found matching your criteria.</p>
-          </div>
-        )}
-      </div>
+          {filteredVariants.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">{emptyMessage || 'No variants available for this course yet.'}</p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

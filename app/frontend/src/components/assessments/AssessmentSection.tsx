@@ -145,10 +145,10 @@ export const AssessmentSection = ({
                                 Q{index + 1}
                               </span>
                               <p className="text-sm text-gray-900 line-clamp-1">
-                                {question.content}
+                                {question.description || question.content || 'No description'}
                               </p>
                               <Badge variant="outline" className="text-xs">
-                                {question.difficulty}
+                                {question.difficulty ?? 'medium'}
                               </Badge>
                             </div>
                             <div className="flex items-center space-x-1">
