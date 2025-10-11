@@ -207,4 +207,35 @@ router.get('/status', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * @route GET /api/eduai/test-api-key
+ * @desc Test EduAI API key validity
+ * @access Private
+ */
+router.get('/test-api-key', authenticateToken, async (req, res) => {
+  try {
+    const result = await eduaiService.testApiKey();
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: result.message,
+        data: result.response
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        error: result.error,
+        statusCode: result.statusCode
+      });
+    }
+  } catch (error) {
+    console.error('EduAI API key test error:', error);
+    res.status(500).json({ 
+      error: 'Failed to test EduAI API key',
+      details: error.message 
+    });
+  }
+});
+
 export default router;

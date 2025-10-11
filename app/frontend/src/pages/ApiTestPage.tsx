@@ -72,16 +72,16 @@ export const ApiTestPage = () => {
 
   // EduAI form states
   const [eduaiChatForm, setEduaiChatForm] = useState({
-    courseCode: '',
+    courseCode: 'COSC 121',
     message: '',
-    model: 'google:gemini-2.5-flash'
+    model: 'ollama:gpt-oss:120b'
   });
   const [eduaiChatResult, setEduaiChatResult] = useState<ResultState>(defaultResult);
 
   const [eduaiQuestionForm, setEduaiQuestionForm] = useState({
-    courseCode: '',
+    courseCode: 'COSC 121',
     prompt: '',
-    model: 'google:gemini-2.5-flash',
+    model: 'ollama:gpt-oss:120b',
     numQuestions: '5',
     difficultyEasy: '1',
     difficultyMedium: '2',
@@ -91,6 +91,7 @@ export const ApiTestPage = () => {
 
   const [eduaiStatusResult, setEduaiStatusResult] = useState<ResultState>(defaultResult);
   const [eduaiTestResult, setEduaiTestResult] = useState<ResultState>(defaultResult);
+  const [eduaiApiKeyResult, setEduaiApiKeyResult] = useState<ResultState>(defaultResult);
 
   const handleApiCall = async (
     request: () => Promise<any>,
@@ -672,6 +673,24 @@ export const ApiTestPage = () => {
                 <div>{renderResult(eduaiStatusResult)}</div>
               </div>
 
+              {/* EduAI API Key Test */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">API Key Test</h3>
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    handleApiCall(
+                      () => eduaiService.testApiKey(),
+                      (data) => setEduaiApiKeyResult({ status: 'success', payload: data }),
+                      (message) => setEduaiApiKeyResult({ status: 'error', message })
+                    )
+                  }
+                >
+                  Test API Key
+                </Button>
+                <div>{renderResult(eduaiApiKeyResult)}</div>
+              </div>
+
               {/* EduAI Connection Test */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Connection Test</h3>
@@ -704,7 +723,7 @@ export const ApiTestPage = () => {
                 <Label htmlFor="eduai-course-code">Course Code</Label>
                 <Input
                   id="eduai-course-code"
-                  placeholder="e.g. CS101"
+                  placeholder="COSC 121 or COSC 211"
                   value={eduaiChatForm.courseCode}
                   onChange={(event) => setEduaiChatForm((prev) => ({ ...prev, courseCode: event.target.value }))}
                 />
@@ -719,8 +738,8 @@ export const ApiTestPage = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B (No API key needed)</SelectItem>
                     <SelectItem value="google:gemini-2.5-flash">Google Gemini 2.5 Flash</SelectItem>
-                    <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B</SelectItem>
                     <SelectItem value="openai:gpt-4">OpenAI GPT-4</SelectItem>
                   </SelectContent>
                 </Select>
@@ -775,7 +794,7 @@ export const ApiTestPage = () => {
                 <Label htmlFor="eduai-q-course-code">Course Code</Label>
                 <Input
                   id="eduai-q-course-code"
-                  placeholder="e.g. CS101"
+                  placeholder="COSC 121 or COSC 211"
                   value={eduaiQuestionForm.courseCode}
                   onChange={(event) => setEduaiQuestionForm((prev) => ({ ...prev, courseCode: event.target.value }))}
                 />
@@ -790,8 +809,8 @@ export const ApiTestPage = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B (No API key needed)</SelectItem>
                     <SelectItem value="google:gemini-2.5-flash">Google Gemini 2.5 Flash</SelectItem>
-                    <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B</SelectItem>
                     <SelectItem value="openai:gpt-4">OpenAI GPT-4</SelectItem>
                   </SelectContent>
                 </Select>

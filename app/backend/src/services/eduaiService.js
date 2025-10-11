@@ -11,6 +11,13 @@ class EduAIService {
     this.baseURL = config.eduaiApiUrl;
     this.apiKey = config.eduaiApiKey;
     
+    console.log('EduAI Service initialized:', {
+      baseURL: this.baseURL,
+      hasApiKey: !!this.apiKey,
+      apiKeyLength: this.apiKey ? this.apiKey.length : 0,
+      apiKeyPrefix: this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'none'
+    });
+    
     if (!this.apiKey) {
       console.warn('EduAI API key not configured. EduAI features will be disabled.');
     }
@@ -57,12 +64,23 @@ class EduAIService {
     } catch (error) {
       if (error.response) {
         // API returned an error response
-        throw new Error(`EduAI API error: ${error.response.data?.error || error.response.statusText}`);
+        const errorMessage = error.response.data?.error || error.response.data?.message || error.response.statusText;
+        const statusCode = error.response.status;
+        console.error('EduAI API Error:', {
+          status: statusCode,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url: `${this.baseURL}/api/chat`,
+          headers: error.response.headers
+        });
+        throw new Error(`EduAI API error (${statusCode}): ${errorMessage}`);
       } else if (error.request) {
         // Request was made but no response received
+        console.error('EduAI Request Error:', error.request);
         throw new Error('EduAI API request failed: No response received');
       } else {
         // Something else happened
+        console.error('EduAI Error:', error.message);
         throw new Error(`EduAI API error: ${error.message}`);
       }
     }
@@ -190,24 +208,107 @@ Please ensure the questions are appropriate for the course level and cover the k
     }
 
     try {
-      const response = await this.chat({
-        messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
-        model: 'google:gemini-2.5-flash',
-        apiKeys: {},
-        courseCode: 'TEST',
-        streaming: false
+      // First, try a simple health check without course context
+      const healthResponse = await axios.get(`${this.baseURL}/api/health`, {
+        headers: {
+          'x-api-key': this.apiKey
+        },
+        timeout: 10000
       });
 
       return {
         success: true,
         message: 'EduAI connection successful',
+        response: healthResponse.data
+      };
+    } catch (error) {
+      // If health check fails, try a minimal chat request
+      try {
+        const response = await this.chat({
+          messages: [{ role: 'user', content: 'Hello, this is a test message.' }],
+          model: 'ollama:gpt-oss:120b', // Use Ollama which doesn't need API key
+          apiKeys: {
+            ollama: {
+              isEnabled: true
+            }
+          },
+          courseCode: 'DATA 301', // Try the course code from documentation
+          streaming: false
+        });
+
+        return {
+          success: true,
+          message: 'EduAI connection successful',
+          response: response
+        };
+      } catch (chatError) {
+        return {
+          success: false,
+          error: `EduAI connection failed: ${chatError.message}`,
+          details: {
+            healthCheckError: error.message,
+            chatError: chatError.message
+          }
+        };
+      }
+    }
+  }
+
+  /**
+   * Test API key validity by making a simple chat request
+   * @returns {Promise<Object>} API key test result
+   */
+  async testApiKey() {
+    if (!this.isConfigured()) {
+      return {
+        success: false,
+        error: 'EduAI API key not configured'
+      };
+    }
+
+    try {
+      // Test the API key by making a minimal chat request with Ollama
+      const response = await this.chat({
+        messages: [{ role: 'user', content: 'test' }],
+        model: 'ollama:gpt-oss:120b', // Use Ollama which doesn't need API key
+        apiKeys: {
+          ollama: {
+            isEnabled: true
+          }
+        },
+        courseCode: 'COSC 121',
+        streaming: false
+      });
+
+      return {
+        success: true,
+        message: 'API key is valid',
         response: response
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message
-      };
+      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        return {
+          success: false,
+          error: 'Invalid EduAI API key - authentication failed'
+        };
+      } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+        return {
+          success: false,
+          error: 'EduAI API key access forbidden'
+        };
+      } else if (error.message.includes('Invalid API key') || error.message.includes('test-key')) {
+        return {
+          success: true,
+          message: 'EduAI API key is valid (provider API key test failed as expected)',
+          note: 'The EduAI API key works, but you need to provide valid AI provider API keys'
+        };
+      } else {
+        return {
+          success: false,
+          error: `API key test failed: ${error.message}`,
+          statusCode: error.response?.status
+        };
+      }
     }
   }
 }
