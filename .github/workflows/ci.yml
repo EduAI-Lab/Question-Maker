@@ -22,7 +22,12 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+        
+    - name: Cache backend dependencies
+      uses: actions/cache@v3
+      with:
+        path: app/backend/node_modules
+        key: ${{ runner.os }}-node-${{ matrix.node-version }}-backend-${{ hashFiles('app/backend/package-lock.json') }}
         
     - name: Install backend dependencies
       run: |
@@ -54,7 +59,12 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+        
+    - name: Cache frontend dependencies
+      uses: actions/cache@v3
+      with:
+        path: app/frontend/node_modules
+        key: ${{ runner.os }}-node-${{ matrix.node-version }}-frontend-${{ hashFiles('app/frontend/package-lock.json') }}
         
     - name: Install frontend dependencies
       run: |
@@ -86,7 +96,12 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+        
+    - name: Cache backend dependencies
+      uses: actions/cache@v3
+      with:
+        path: app/backend/node_modules
+        key: ${{ runner.os }}-node-${{ matrix.node-version }}-backend-${{ hashFiles('app/backend/package-lock.json') }}
         
     - name: Install backend dependencies
       run: |
@@ -125,7 +140,12 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+        
+    - name: Cache frontend dependencies
+      uses: actions/cache@v3
+      with:
+        path: app/frontend/node_modules
+        key: ${{ runner.os }}-node-${{ matrix.node-version }}-frontend-${{ hashFiles('app/frontend/package-lock.json') }}
         
     - name: Install frontend dependencies
       run: |
@@ -187,7 +207,18 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '20.x'
-        cache: 'npm'
+        
+    - name: Cache backend dependencies
+      uses: actions/cache@v3
+      with:
+        path: app/backend/node_modules
+        key: ${{ runner.os }}-node-20.x-backend-${{ hashFiles('app/backend/package-lock.json') }}
+        
+    - name: Cache frontend dependencies
+      uses: actions/cache@v3
+      with:
+        path: app/frontend/node_modules
+        key: ${{ runner.os }}-node-20.x-frontend-${{ hashFiles('app/frontend/package-lock.json') }}
         
     - name: Install dependencies
       run: |
