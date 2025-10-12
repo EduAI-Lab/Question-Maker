@@ -1,103 +1,316 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { mockCourses, mockQuestions, mockAssessments } from '../data/mockData';
-import { Course } from '../types/assessment';
-import { Question, Assessment } from '../types/question';
+import { mockAssessments } from '../data/mockData';
+import { Course } from '../types/class';
+import { Question, Assessment, QuestionVariantEntry } from '../types/question';
+import { Topic } from '../types/topic';
+import { useCourses } from '../hooks/useCourses';
+import { questionService } from '../services/questionService';
+import { courseService } from '../services/courseService';
+import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 
 export const LandingPage = () => {
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(mockCourses[0]);
+  const { courses, isLoading: isCoursesLoading } = useCourses();
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
-  const [questions, setQuestions] = useState<Question[]>(mockQuestions);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
+  const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>(mockAssessments);
+  const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
+  const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
+  const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
 
-  // Filter questions by selected course
-  const filteredQuestions = selectedCourse 
-    ? questions.filter(q => q.classId === selectedCourse.id)
-    : questions;
+  useEffect(() => {
+    if (courses.length === 0) {
+      setSelectedCourse(null);
+      setQuestions([]);
+      return;
+    }
 
-  // Filter assessments by selected course
-  const filteredAssessments = selectedCourse
-    ? assessments.filter(a => a.courseId === selectedCourse.id)
-    : assessments;
+    if (!selectedCourse || !courses.some(course => course.id === selectedCourse.id)) {
+      setSelectedCourse(courses[0]);
+    }
+  }, [courses, selectedCourse]);
 
-  const handleViewQuestion = (question: Question) => {
-    setSelectedQuestion(question);
+  useEffect(() => {
+    const fetchTopicsForCourse = async (courseId: number) => {
+      try {
+        const topics = await courseService.getCourseTopics(courseId);
+        setTopicsByCourse((prev) => ({
+          ...prev,
+          [courseId]: topics
+        }));
+      } catch (error) {
+        console.error('Failed to load topics for course', courseId, error);
+      }
+    };
+
+    if (selectedCourse && !topicsByCourse[selectedCourse.id]) {
+      fetchTopicsForCourse(selectedCourse.id);
+    }
+  }, [selectedCourse, topicsByCourse]);
+
+  const filteredQuestions = useMemo(() => {
+    if (!selectedCourse) return questions;
+    return questions.filter((question) => question.courseId === selectedCourse.id);
+  }, [questions, selectedCourse]);
+
+  const variantEntries: QuestionVariantEntry[] = useMemo(() => {
+    return filteredQuestions.flatMap((question) => {
+      const topics = topicsByCourse[question.courseId] ?? [];
+      const topicNameMap = new Map(topics.map((topic) => [topic.id, topic.name]));
+      const resolveTopicName = (topicId: number) => topicNameMap.get(topicId) ?? `Topic ${topicId}`;
+
+      return (question.variants || []).map((variant) => {
+        const secondaryTopicNames = Array.isArray(variant.secondaryTopicsId)
+          ? variant.secondaryTopicsId.map((topicId) => resolveTopicName(topicId))
+          : [];
+
+        return {
+          questionId: question.id,
+          questionDescription: question.description,
+          questionType: question.type,
+          primaryTopicId: question.primaryTopicId,
+          primaryTopicName: topicNameMap.get(question.primaryTopicId),
+          courseId: question.courseId,
+          courseName: question.course?.name,
+          courseCode: question.course?.code,
+          secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+          variant
+        };
+      });
+    });
+  }, [filteredQuestions, topicsByCourse]);
+
+  const emptyStateMessage = selectedCourse
+    ? questionsError || 'No questions found for this course yet. Try adding or uploading questions.'
+    : courses.length === 0
+      ? 'No courses available yet. Create a course to get started.'
+      : 'Select a course to view its questions.';
+
+  const filteredAssessments = useMemo(() => {
+    if (!selectedCourse) return assessments;
+    return assessments.filter((assessment) => assessment.courseId === selectedCourse.id);
+  }, [assessments, selectedCourse]);
+
+  const handleViewVariant = (entry: QuestionVariantEntry) => {
+    setSelectedVariant(entry);
   };
 
-  const handleCloseQuestionDetail = () => {
-    setSelectedQuestion(null);
+  const handleCloseDetail = () => {
+    setSelectedVariant(null);
   };
 
-  const handleEditQuestion = (question: Question) => {
-    console.log('Edit question:', question);
-    // TODO: Implement edit functionality
-    setSelectedQuestion(null);
+  const handleEditVariant = (entry: QuestionVariantEntry) => {
+    console.log('Edit variant:', entry);
+    setSelectedVariant(null);
   };
 
-  const handleCreateVariant = (question: Question) => {
-    console.log('Create variant for question:', question);
-    // TODO: Implement variant creation
-    setSelectedQuestion(null);
+  const handleCreateVariant = (entry: QuestionVariantEntry) => {
+    setPresetVariant(entry);
+    setIsAddQuestionOpen(true);
+    setSelectedVariant(null);
   };
 
-  const handleDeleteQuestion = (question: Question) => {
-    setQuestions(prev => prev.filter(q => q.id !== question.id));
-    setSelectedQuestion(null);
+  const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
+    try {
+      await questionService.deleteVariant(entry.variant.id);
+      const updatedQuestion = await questionService.getQuestion(entry.questionId);
+      setQuestions((prev) => {
+        const index = prev.findIndex((question) => question.id === entry.questionId);
+        if (index === -1) return prev;
+        const next = [...prev];
+        if (updatedQuestion.variants && updatedQuestion.variants.length > 0) {
+          next[index] = updatedQuestion;
+        } else {
+          next.splice(index, 1);
+        }
+        return next;
+      });
+    } catch (error) {
+      console.error('Failed to delete variant', error);
+    } finally {
+      setSelectedVariant(null);
+    }
   };
 
   const handleAddQuestion = () => {
-    console.log('Add new question');
-    // TODO: Implement add question functionality
+    setPresetVariant(null);
+    setIsAddQuestionOpen(true);
+  };
+
+  const handleQuestionCreated = (question: Question) => {
+    const topicsForCourse = topicsByCourse[question.courseId] ?? [];
+    const topicNameMap = new Map(topicsForCourse.map((topic) => [topic.id, topic.name]));
+
+    setQuestions((prev) => {
+      const index = prev.findIndex((item) => item.id === question.id);
+      if (index >= 0) {
+        const next = [...prev];
+        next[index] = question;
+        return next;
+      }
+      return [question, ...prev];
+    });
+
+    const latestVariant = question.variants?.[question.variants.length - 1];
+    if (latestVariant) {
+      const resolveTopicName = (topicId: number) => topicNameMap.get(topicId) ?? `Topic ${topicId}`;
+      const secondaryTopicNames = Array.isArray(latestVariant.secondaryTopicsId)
+        ? latestVariant.secondaryTopicsId.map((topicId) => resolveTopicName(topicId))
+        : [];
+
+      setSelectedVariant({
+        questionId: question.id,
+        questionDescription: question.description,
+        questionType: question.type,
+        primaryTopicId: question.primaryTopicId,
+        primaryTopicName: topicNameMap.get(question.primaryTopicId),
+        courseId: question.courseId,
+        courseName: question.course?.name,
+        courseCode: question.course?.code,
+        secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+        variant: latestVariant
+      });
+    }
+
+    setPresetVariant(null);
+    setIsAddQuestionOpen(false);
+  };
+
+  const handleUploadQuestions = () => {
+    console.log('Upload questions');
+    // TODO: Implement upload questions functionality
   };
 
   const handleEditAssessment = (assessment: Assessment) => {
     console.log('Edit assessment:', assessment);
-    // TODO: Implement edit assessment functionality
   };
 
   const handleExportAssessment = (assessment: Assessment) => {
     console.log('Export assessment:', assessment);
-    // TODO: Implement export functionality
   };
 
   const handleAddAssessment = () => {
     console.log('Add new assessment');
-    // TODO: Implement add assessment functionality
   };
 
   const handleReorderQuestions = (assessmentId: number, questionIds: number[]) => {
-    setAssessments(prev => 
-      prev.map(assessment => 
-        assessment.id === assessmentId 
+    setAssessments((prev) =>
+      prev.map((assessment) =>
+        assessment.id === assessmentId
           ? { ...assessment, questions: questionIds }
           : assessment
       )
     );
   };
 
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      if (!selectedCourse) {
+        setQuestions([]);
+        setSelectedVariant(null);
+        return;
+      }
+
+      setIsQuestionsLoading(true);
+      setQuestionsError(null);
+
+      try {
+        const data = await questionService.getQuestions({ courseId: selectedCourse.id });
+        setQuestions(data);
+      } catch (error: any) {
+        setQuestions([]);
+        setQuestionsError(error?.response?.data?.error || 'Failed to load questions');
+      } finally {
+        setIsQuestionsLoading(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [selectedCourse]);
+
+  useEffect(() => {
+    if (!selectedVariant) {
+      return;
+    }
+
+    const updated = variantEntries.find(
+      (entry) =>
+        entry.questionId === selectedVariant.questionId &&
+        entry.variant.id === selectedVariant.variant.id
+    );
+
+    if (!updated) {
+      return;
+    }
+
+    const prevSecondary = selectedVariant.secondaryTopicNames?.join('|') ?? '';
+    const nextSecondary = updated.secondaryTopicNames?.join('|') ?? '';
+
+    if (
+      updated.primaryTopicName !== selectedVariant.primaryTopicName ||
+      nextSecondary !== prevSecondary
+    ) {
+      setSelectedVariant(updated);
+    }
+  }, [variantEntries, selectedVariant]);
+
+  useEffect(() => {
+    if (!presetVariant) {
+      return;
+    }
+
+    const updated = variantEntries.find(
+      (entry) =>
+        entry.questionId === presetVariant.questionId &&
+        entry.variant.id === presetVariant.variant.id
+    );
+
+    if (!updated) {
+      return;
+    }
+
+    const prevSecondary = presetVariant.secondaryTopicNames?.join('|') ?? '';
+    const nextSecondary = updated.secondaryTopicNames?.join('|') ?? '';
+
+    if (
+      updated.primaryTopicName !== presetVariant.primaryTopicName ||
+      nextSecondary !== prevSecondary
+    ) {
+      setPresetVariant(updated);
+    }
+  }, [variantEntries, presetVariant]);
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation */}
       <TopNavigation
         selectedCourse={selectedCourse}
         onCourseChange={setSelectedCourse}
         activeTab={activeTab}
         onTabChange={setActiveTab}
-        courses={mockCourses}
+        courses={courses}
+        isLoadingCourses={isCoursesLoading}
       />
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         {activeTab === 'questions' ? (
           <QuestionBank
-            questions={filteredQuestions}
-            onViewQuestion={handleViewQuestion}
+            variants={variantEntries}
+            onViewVariant={handleViewVariant}
             onCreateVariant={handleCreateVariant}
             onAddQuestion={handleAddQuestion}
+            onUploadQuestions={handleUploadQuestions}
+            isLoading={isQuestionsLoading}
+            courseName={selectedCourse?.name}
+            emptyMessage={emptyStateMessage}
+            disableAdd={!selectedCourse}
+            disableUpload={!selectedCourse}
           />
         ) : (
           <AssessmentSection
@@ -111,16 +324,27 @@ export const LandingPage = () => {
         )}
       </div>
 
-      {/* Question Detail Modal */}
-      {selectedQuestion && (
+      {selectedVariant && (
         <QuestionDetailView
-          question={selectedQuestion}
-          onClose={handleCloseQuestionDetail}
-          onEdit={handleEditQuestion}
+          entry={selectedVariant}
+          onClose={handleCloseDetail}
+          onEdit={handleEditVariant}
           onCreateVariant={handleCreateVariant}
-          onDelete={handleDeleteQuestion}
+          onDeleteVariant={handleDeleteVariant}
         />
       )}
+
+      <AddQuestionDialog
+        open={isAddQuestionOpen}
+        onClose={() => {
+          setIsAddQuestionOpen(false);
+          setPresetVariant(null);
+        }}
+        courseId={selectedCourse?.id ?? null}
+        variants={variantEntries}
+        onQuestionCreated={handleQuestionCreated}
+        presetVariant={presetVariant}
+      />
     </div>
   );
 };

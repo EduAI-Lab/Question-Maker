@@ -1,5 +1,6 @@
 import api from './api';
 import { Class, ClassCreate } from '../types/class';
+import { Topic } from '../types/topic';
 
 export const courseService = {
   async getCourses(): Promise<Class[]> {
@@ -26,8 +27,8 @@ export const courseService = {
     await api.delete(`/api/course/${id}`);
   },
 
-  async getCourseTopics(id: number): Promise<Array<{ id: number; name: string }>> {
-    const response = await api.get(`/api/course/${id}/topics`);
+  async getCourseTopics(courseId: number): Promise<Topic[]> {
+    const response = await api.get(`/api/course/${courseId}/topics`);
     return response.data.data;
   }
 };
