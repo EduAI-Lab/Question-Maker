@@ -70,5 +70,3 @@ public
 # Temporary folders
 tmp/
 temp/
-app/frontend/package-lock.json
-app/backend/package-lock.json
