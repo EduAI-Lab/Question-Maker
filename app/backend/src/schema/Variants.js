@@ -20,6 +20,12 @@ export const Variants = sequelize.define('Variants', {
     allowNull: false,
     defaultValue: 'medium'
   },
+  reasoningLevel: {
+    type: DataTypes.ENUM('factual', 'analytical', 'application'),
+    allowNull: false,
+    defaultValue: 'factual',
+    field: 'reasoning_level'
+  },
   questionMetadataId: {
     type: DataTypes.INTEGER,
     allowNull: false,

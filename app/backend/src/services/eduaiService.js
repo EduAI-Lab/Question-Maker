@@ -106,6 +106,7 @@ class EduAIService {
    * @param {Object} params.apiKeys - Provider API keys
    * @param {number} params.numQuestions - Number of questions to generate
    * @param {Object} params.difficultyDistribution - Difficulty distribution
+   * @param {Object} params.reasoningDistribution - Reasoning level distribution
    * @returns {Promise<Array>} Generated questions
    */
   async generateQuestions(params) {
@@ -115,7 +116,8 @@ class EduAIService {
       model = 'google:gemini-2.5-flash',
       apiKeys = {},
       numQuestions = 5,
-      difficultyDistribution = { easy: 1, medium: 2, hard: 2 }
+      difficultyDistribution = { easy: 1, medium: 2, hard: 2 },
+      reasoningDistribution = { factual: 40, analytical: 30, application: 30 }
     } = params;
 
     if (!prompt || !courseCode) {
@@ -127,11 +129,13 @@ class EduAIService {
 Requirements:
 - Generate exactly ${numQuestions} questions
 - Difficulty distribution: Easy: ${difficultyDistribution.easy}, Medium: ${difficultyDistribution.medium}, Hard: ${difficultyDistribution.hard}
+- Reasoning distribution: Factual: ${reasoningDistribution.factual}%, Analytical: ${reasoningDistribution.analytical}%, Application: ${reasoningDistribution.application}%
 - Each question should be relevant to the course material
 - Format each question as a JSON object with these exact fields:
   {
     "content": "The complete question text",
     "difficulty": "easy/medium/hard",
+    "reasoning_level": "factual/analytical/application",
     "bloom_level": "remember/understand/apply/analyze/evaluate/create",
     "type": "MCQ/SA"
   }
@@ -177,8 +181,10 @@ Please ensure the questions are appropriate for the course level and cover the k
       const validQuestions = questions.filter(q => 
         q.content && 
         q.difficulty && 
+        q.reasoning_level &&
         q.bloom_level &&
         ['easy', 'medium', 'hard'].includes(q.difficulty) &&
+        ['factual', 'analytical', 'application'].includes(q.reasoning_level) &&
         ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'].includes(q.bloom_level)
       );
 
