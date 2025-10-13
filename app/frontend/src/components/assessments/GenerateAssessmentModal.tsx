@@ -5,6 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { DualRangeSlider } from '../ui/DualRangeSlider';
 import { courseService } from '../../services/courseService';
 
 interface GenerateAssessmentModalProps {
@@ -36,20 +37,100 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
   const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>([]);
   const [autoContextStrength, setAutoContextStrength] = React.useState<number>(60);
   const [mode, setMode] = React.useState<'auto' | 'manual' | 'hybrid'>('auto');
-  // Dual-range boundaries representing percentages for three segments
-  // factual = [0, factualBoundary), analysis = [factualBoundary, analysisBoundary), application = [analysisBoundary, 100]
-  const [factualBoundary, setFactualBoundary] = React.useState<number>(30);
-  const [analysisBoundary, setAnalysisBoundary] = React.useState<number>(70);
+  // Matrix data model: each reasoning type has its own difficulty distribution
+  const [reasoningData, setReasoningData] = React.useState({
+    factual: {
+      total: 40, // Total percentage for factual questions
+      easyBoundary: 60, // Boundary between easy and medium
+      hardBoundary: 90  // Boundary between medium and hard
+    },
+    analytical: {
+      total: 35,
+      easyBoundary: 50,
+      hardBoundary: 80
+    },
+    application: {
+      total: 25,
+      easyBoundary: 40,
+      hardBoundary: 70
+    }
+  });
 
-  const distribution = React.useMemo(() => {
-    const left = Math.max(0, Math.min(factualBoundary, 100));
-    const right = Math.max(left, Math.min(analysisBoundary, 100));
-    return {
-      easy: Math.round(left),
-      medium: Math.round(right - left),
-      hard: Math.round(100 - right)
-    };
-  }, [factualBoundary, analysisBoundary]);
+  // Calculate difficulty distribution for each reasoning type
+  const reasoningDistributions = React.useMemo(() => ({
+    factual: {
+      easy: reasoningData.factual.easyBoundary,
+      medium: reasoningData.factual.hardBoundary - reasoningData.factual.easyBoundary,
+      hard: 100 - reasoningData.factual.hardBoundary
+    },
+    analytical: {
+      easy: reasoningData.analytical.easyBoundary,
+      medium: reasoningData.analytical.hardBoundary - reasoningData.analytical.easyBoundary,
+      hard: 100 - reasoningData.analytical.hardBoundary
+    },
+    application: {
+      easy: reasoningData.application.easyBoundary,
+      medium: reasoningData.application.hardBoundary - reasoningData.application.easyBoundary,
+      hard: 100 - reasoningData.application.hardBoundary
+    }
+  }), [reasoningData]);
+
+  // Calculate overall totals
+  const overallTotals = React.useMemo(() => {
+    const totalWeight = reasoningData.factual.total + reasoningData.analytical.total + reasoningData.application.total;
+    
+    if (totalWeight === 0) return { easy: 0, medium: 0, hard: 0, total: 0 };
+    
+    const easy = Math.round(
+      (reasoningData.factual.total * reasoningDistributions.factual.easy +
+       reasoningData.analytical.total * reasoningDistributions.analytical.easy +
+       reasoningData.application.total * reasoningDistributions.application.easy) / totalWeight
+    );
+    
+    const medium = Math.round(
+      (reasoningData.factual.total * reasoningDistributions.factual.medium +
+       reasoningData.analytical.total * reasoningDistributions.analytical.medium +
+       reasoningData.application.total * reasoningDistributions.application.medium) / totalWeight
+    );
+    
+    const hard = Math.round(
+      (reasoningData.factual.total * reasoningDistributions.factual.hard +
+       reasoningData.analytical.total * reasoningDistributions.analytical.hard +
+       reasoningData.application.total * reasoningDistributions.application.hard) / totalWeight
+    );
+    
+    return { easy, medium, hard, total: 100 };
+  }, [reasoningData, reasoningDistributions]);
+
+  // Auto-balance reasoning totals when one changes
+  const updateReasoningTotal = (reasoningType: keyof typeof reasoningData, newTotal: number) => {
+    const otherTypes = Object.keys(reasoningData).filter(key => key !== reasoningType) as Array<keyof typeof reasoningData>;
+    const otherTotal = otherTypes.reduce((sum, type) => sum + reasoningData[type].total, 0);
+    const remainingTotal = 100 - newTotal;
+    
+    if (remainingTotal < 0) return; // Prevent negative totals
+    
+    // Distribute remaining total proportionally among other types
+    const otherTypesWithValues = otherTypes.filter(type => reasoningData[type].total > 0);
+    
+    if (otherTypesWithValues.length === 0) return;
+    
+    const scaleFactor = remainingTotal / otherTotal;
+    
+    setReasoningData(prev => {
+      const newData = { ...prev };
+      newData[reasoningType] = { ...newData[reasoningType], total: newTotal };
+      
+      otherTypes.forEach(type => {
+        newData[type] = {
+          ...newData[type],
+          total: Math.round(newData[type].total * scaleFactor)
+        };
+      });
+      
+      return newData;
+    });
+  };
 
   React.useEffect(() => {
     if (!open) return;
@@ -76,11 +157,26 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
   };
 
   const handleGenerate = () => {
+    // Convert to the format expected by the API
+    const difficultyDistribution = {
+      easy: overallTotals.easy,
+      medium: overallTotals.medium,
+      hard: overallTotals.hard
+    };
+
+    const reasoningDistribution = {
+      factual: reasoningData.factual.total,
+      analytical: reasoningData.analytical.total,
+      application: reasoningData.application.total
+    };
+
     onGenerate?.({
       numQuestions,
       primaryTopicId,
       secondaryTopicIds,
-      difficultyDistribution: distribution,
+      difficultyDistribution,
+      reasoningDistribution,
+      reasoningData,
       autoContextStrength,
       mode
     });
@@ -161,60 +257,197 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Reasoning difficulty</h3>
-              <span className="text-sm text-gray-500">Factual / Analysis / Application</span>
+          {/* Reasoning × Difficulty Distribution Matrix */}
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-semibold">Reasoning × Difficulty Distribution</h3>
+              <p className="text-sm text-gray-500">Adjust the percentage of questions by reasoning type and difficulty level (total 100%)</p>
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm text-gray-700">
-                <span>Factual (easy): {distribution.easy}%</span>
-                <span>Analysis (medium): {distribution.medium}%</span>
-                <span>Application (hard): {distribution.hard}%</span>
+
+            {/* Matrix Table */}
+            <div className="border rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-sm text-gray-700">Reasoning Type</th>
+                    <th className="px-4 py-3 text-center font-medium text-sm text-gray-700">Easy</th>
+                    <th className="px-4 py-3 text-center font-medium text-sm text-gray-700">Medium</th>
+                    <th className="px-4 py-3 text-center font-medium text-sm text-gray-700">Hard</th>
+                    <th className="px-4 py-3 text-center font-medium text-sm text-gray-700">Total (%)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {/* Factual Row */}
+                  <tr>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-blue-500 rounded"></div>
+                        <span className="font-medium text-sm">Factual</span>
+                      </div>
+                    </td>
+                    <td colSpan={3} className="px-4 py-3">
+                      <div className="space-y-1">
+                        <DualRangeSlider
+                          min={0}
+                          max={100}
+                          easyBoundary={reasoningData.factual.easyBoundary}
+                          hardBoundary={reasoningData.factual.hardBoundary}
+                          onChange={(easyBoundary, hardBoundary) => {
+                            setReasoningData(prev => ({
+                              ...prev,
+                              factual: {
+                                ...prev.factual,
+                                easyBoundary,
+                                hardBoundary
+                              }
+                            }));
+                          }}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>{reasoningDistributions.factual.easy}%</span>
+                          <span>{reasoningDistributions.factual.medium}%</span>
+                          <span>{reasoningDistributions.factual.hard}%</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={reasoningData.factual.total}
+                        onChange={(e) => updateReasoningTotal('factual', parseInt(e.target.value || '0', 10))}
+                        className="w-16 text-center text-sm"
+                      />
+                    </td>
+                  </tr>
+
+                  {/* Analytical Row */}
+                  <tr>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-yellow-500 rounded"></div>
+                        <span className="font-medium text-sm">Analytical</span>
+                      </div>
+                    </td>
+                    <td colSpan={3} className="px-4 py-3">
+                      <div className="space-y-1">
+                        <DualRangeSlider
+                          min={0}
+                          max={100}
+                          easyBoundary={reasoningData.analytical.easyBoundary}
+                          hardBoundary={reasoningData.analytical.hardBoundary}
+                          onChange={(easyBoundary, hardBoundary) => {
+                            setReasoningData(prev => ({
+                              ...prev,
+                              analytical: {
+                                ...prev.analytical,
+                                easyBoundary,
+                                hardBoundary
+                              }
+                            }));
+                          }}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>{reasoningDistributions.analytical.easy}%</span>
+                          <span>{reasoningDistributions.analytical.medium}%</span>
+                          <span>{reasoningDistributions.analytical.hard}%</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={reasoningData.analytical.total}
+                        onChange={(e) => updateReasoningTotal('analytical', parseInt(e.target.value || '0', 10))}
+                        className="w-16 text-center text-sm"
+                      />
+                    </td>
+                  </tr>
+
+                  {/* Application Row */}
+                  <tr>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 bg-green-500 rounded"></div>
+                        <span className="font-medium text-sm">Application</span>
+                      </div>
+                    </td>
+                    <td colSpan={3} className="px-4 py-3">
+                      <div className="space-y-1">
+                        <DualRangeSlider
+                          min={0}
+                          max={100}
+                          easyBoundary={reasoningData.application.easyBoundary}
+                          hardBoundary={reasoningData.application.hardBoundary}
+                          onChange={(easyBoundary, hardBoundary) => {
+                            setReasoningData(prev => ({
+                              ...prev,
+                              application: {
+                                ...prev.application,
+                                easyBoundary,
+                                hardBoundary
+                              }
+                            }));
+                          }}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500">
+                          <span>{reasoningDistributions.application.easy}%</span>
+                          <span>{reasoningDistributions.application.medium}%</span>
+                          <span>{reasoningDistributions.application.hard}%</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={reasoningData.application.total}
+                        onChange={(e) => updateReasoningTotal('application', parseInt(e.target.value || '0', 10))}
+                        className="w-16 text-center text-sm"
+                      />
+                    </td>
+                  </tr>
+
+                  {/* Overall Total Row */}
+                  <tr className="bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-sm text-gray-700">Overall Total</td>
+                    <td className="px-4 py-3 text-center font-medium text-sm text-gray-700">{overallTotals.easy}%</td>
+                    <td className="px-4 py-3 text-center font-medium text-sm text-gray-700">{overallTotals.medium}%</td>
+                    <td className="px-4 py-3 text-center font-medium text-sm text-gray-700">{overallTotals.hard}%</td>
+                    <td className="px-4 py-3 text-center font-medium text-sm text-gray-700">{overallTotals.total}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+
+            {/* Overall Totals Display */}
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm font-medium text-gray-700">
+                Overall totals — Easy: {overallTotals.easy}%   Medium: {overallTotals.medium}%   Hard: {overallTotals.hard}%   (Total: {overallTotals.total}%)
               </div>
-              <div className="relative py-3">
-                <div className="h-2 rounded bg-gray-200" />
-                <div className="absolute inset-x-0 top-1.5 h-2 pointer-events-none">
-                  <div className="h-2 rounded-l bg-blue-300" style={{ width: `${Math.max(0, Math.min(factualBoundary, 100))}%` }} />
-                  <div className="h-2 bg-yellow-300" style={{ width: `${Math.max(0, Math.min(analysisBoundary - factualBoundary, 100))}%`, marginLeft: `${Math.max(0, Math.min(factualBoundary, 100))}%` }} />
-                  <div className="h-2 rounded-r bg-green-300" style={{ width: `${Math.max(0, Math.min(100 - analysisBoundary, 100))}%`, marginLeft: `${Math.max(0, Math.min(analysisBoundary, 100))}%` }} />
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={factualBoundary}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    setFactualBoundary(Math.min(v, analysisBoundary));
-                  }}
-                  className="absolute inset-x-0 -top-1 h-6 w-full opacity-0 cursor-pointer"
-                />
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={analysisBoundary}
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    setAnalysisBoundary(Math.max(v, factualBoundary));
-                  }}
-                  className="absolute inset-x-0 -top-1 h-6 w-full opacity-0 cursor-pointer"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant={mode === 'auto' ? 'default' : 'outline'} size="sm" onClick={() => setMode('auto')}>Fully Automated</Button>
-                <Button variant={mode === 'hybrid' ? 'default' : 'outline'} size="sm" onClick={() => setMode('hybrid')}>Hybrid</Button>
-                <Button variant={mode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setMode('manual')}>Manual</Button>
-              </div>
+            </div>
+
+            {/* Mode Selection */}
+            <div className="flex items-center gap-2">
+              <Button variant={mode === 'auto' ? 'default' : 'outline'} size="sm" onClick={() => setMode('auto')}>Fully Automated</Button>
+              <Button variant={mode === 'hybrid' ? 'default' : 'outline'} size="sm" onClick={() => setMode('hybrid')}>Hybrid</Button>
+              <Button variant={mode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setMode('manual')}>Manual</Button>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleGenerate}>Generate</Button>
-          </div>
-        </CardContent>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button onClick={handleGenerate}>Generate</Button>
+            </div>
+          </CardContent>
       </Card>
     </div>
   );
