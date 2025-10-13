@@ -73,7 +73,8 @@ router.post('/generate-questions', authenticateToken, async (req, res) => {
       model, 
       apiKeys, 
       numQuestions, 
-      difficultyDistribution 
+      difficultyDistribution,
+      reasoningDistribution 
     } = req.body;
     const userId = req.user.id;
 
@@ -100,7 +101,8 @@ router.post('/generate-questions', authenticateToken, async (req, res) => {
       model: model || 'google:gemini-2.5-flash',
       apiKeys: apiKeys || {},
       numQuestions: numQuestions || 5,
-      difficultyDistribution: difficultyDistribution || { easy: 1, medium: 2, hard: 2 }
+      difficultyDistribution: difficultyDistribution || { easy: 1, medium: 2, hard: 2 },
+      reasoningDistribution: reasoningDistribution || { factual: 40, analytical: 30, application: 30 }
     });
 
     res.json({

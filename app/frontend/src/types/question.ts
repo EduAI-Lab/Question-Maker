@@ -1,5 +1,6 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'MCQ' | 'SA';
+export type ReasoningLevel = 'factual' | 'analytical' | 'application';
 export type AssessmentType = 'Assignment' | 'Lab' | 'Quiz' | 'Mid' | 'Final';
 
 // Question Metadata (matches backend Question_Metadata schema)
@@ -23,6 +24,7 @@ export interface QuestionVariant {
     id: number;
     questionText: string;
     difficulty: QuestionDifficulty;
+    reasoningLevel: ReasoningLevel;
     questionMetadataId: number;
     assessmentId: number | null;
     secondaryTopicsId: number[] | null;
@@ -127,6 +129,11 @@ export interface QuestionGenerationParams {
         easy: number;
         medium: number;
         hard: number;
+    };
+    reasoningDistribution: {
+        factual: number;
+        analytical: number;
+        application: number;
     };
 }
 
