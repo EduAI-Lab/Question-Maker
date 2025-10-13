@@ -428,12 +428,6 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
             </div>
 
 
-            {/* Overall Totals Display */}
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="text-sm font-medium text-gray-700">
-                Overall totals — Easy: {overallTotals.easy}%   Medium: {overallTotals.medium}%   Hard: {overallTotals.hard}%   (Total: {overallTotals.total}%)
-              </div>
-            </div>
 
             {/* Mode Selection */}
             <div className="flex items-center gap-2">
