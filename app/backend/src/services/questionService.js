@@ -319,37 +319,65 @@ export const saveExtractedQuestions = async (userId, payload) => {
   const transaction = await Question_Metadata.sequelize.transaction();
 
   try {
-    let resolvedTopicId = primaryTopicId ? Number(primaryTopicId) : null;
+    const existingTopics = await Topics.findAll({
+      where: { courseId },
+      transaction
+    });
+    const topicIdSet = new Set(existingTopics.map((topic) => topic.id));
 
-    if (resolvedTopicId) {
-      const existingTopic = await Topics.findOne({
-        where: { id: resolvedTopicId, courseId },
+    let fallbackTopicId = primaryTopicId ? Number(primaryTopicId) : null;
+    if (fallbackTopicId && !topicIdSet.has(fallbackTopicId)) {
+      const fallbackTopic = await Topics.findOne({
+        where: { id: fallbackTopicId, courseId },
         transaction
       });
 
-      if (!existingTopic) {
+      if (!fallbackTopic) {
         throw new Error('Primary topic not found for this course');
       }
-    } else {
-      const sanitizedTopicName = topicName ? topicName.trim() : '';
-      if (!sanitizedTopicName) {
-        throw new Error('Either primaryTopicId or topicName must be provided');
+
+      topicIdSet.add(fallbackTopicId);
+    }
+
+    const sanitizedTopicName = topicName ? topicName.trim() : '';
+
+    const ensureFallbackTopic = async () => {
+      if (fallbackTopicId && topicIdSet.has(fallbackTopicId)) {
+        return fallbackTopicId;
       }
 
-      let topic = await Topics.findOne({
-        where: { name: sanitizedTopicName, courseId },
-        transaction
-      });
+      if (sanitizedTopicName) {
+        let topic = await Topics.findOne({
+          where: { name: sanitizedTopicName, courseId },
+          transaction
+        });
 
-      if (!topic) {
-        topic = await Topics.create({
-          name: sanitizedTopicName,
+        if (!topic) {
+          topic = await Topics.create({
+            name: sanitizedTopicName,
+            courseId
+          }, { transaction });
+        }
+
+        topicIdSet.add(topic.id);
+        fallbackTopicId = topic.id;
+        return fallbackTopicId;
+      }
+
+      if (topicIdSet.size === 0) {
+        const autoTopic = await Topics.create({
+          name: 'Uploaded Questions',
           courseId
         }, { transaction });
+        topicIdSet.add(autoTopic.id);
+        fallbackTopicId = autoTopic.id;
+        return fallbackTopicId;
       }
 
-      resolvedTopicId = topic.id;
-    }
+      const firstTopic = existingTopics[0];
+      fallbackTopicId = firstTopic ? firstTopic.id : null;
+      return fallbackTopicId;
+    };
 
     const createdIds = [];
 
@@ -378,10 +406,29 @@ export const saveExtractedQuestions = async (userId, payload) => {
         item.instructions
       );
 
+      let primaryTopicForQuestion = null;
+      if (item.primaryTopicId !== undefined && item.primaryTopicId !== null) {
+        const candidate = Number(item.primaryTopicId);
+        if (Number.isInteger(candidate) && topicIdSet.has(candidate)) {
+          primaryTopicForQuestion = candidate;
+        }
+      }
+
+      if (!primaryTopicForQuestion) {
+        const fallback = await ensureFallbackTopic();
+        if (!fallback) {
+          throw new Error('Unable to determine primary topic for question.');
+        }
+        primaryTopicForQuestion = fallback;
+      }
+
+      const secondaryTopics = normalizeSecondaryTopics(item.secondaryTopicIds)
+        .filter((id) => topicIdSet.has(id) && id !== primaryTopicForQuestion);
+
       const metadata = await Question_Metadata.create({
         description: summaryText,
         courseId,
-        primaryTopicId: resolvedTopicId,
+        primaryTopicId: primaryTopicForQuestion,
         type: questionType,
         questionOrder: {}
       }, { transaction });
@@ -392,7 +439,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
         difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
         answer: typeof item.answer === 'string' && item.answer.trim() ? item.answer.trim() : null,
         assessmentId: null,
-        secondaryTopicsId: normalizeSecondaryTopics(item.secondaryTopicsId),
+        secondaryTopicsId: secondaryTopics,
         referenceId: null
       }, { transaction });
 

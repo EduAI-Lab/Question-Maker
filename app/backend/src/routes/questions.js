@@ -265,7 +265,7 @@ router.post('/generate', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.post('/extract', authenticateToken, async (req, res, next) => {
   try {
-    const { text } = req.body;
+    const { text, courseId } = req.body;
 
     if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({
@@ -274,7 +274,22 @@ router.post('/extract', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const questions = await extractQuestionsFromText(text);
+    if (courseId === undefined || courseId === null || courseId === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'courseId is required to assign topics'
+      });
+    }
+
+    const numericCourseId = Number(courseId);
+    if (!Number.isInteger(numericCourseId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'courseId must be a valid integer'
+      });
+    }
+
+    const questions = await extractQuestionsFromText(text, numericCourseId);
 
     res.json({
       success: true,

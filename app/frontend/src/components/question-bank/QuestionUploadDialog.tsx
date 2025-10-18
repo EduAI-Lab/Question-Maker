@@ -36,6 +36,8 @@ type DraftQuestion = Required<Pick<ExtractedQuestion, 'question'>> &
     answer?: string | null;
     type: QuestionType;
     summary: string;
+    primaryTopicId: number | null;
+    secondaryTopicIds: number[];
     include: boolean;
   };
 
@@ -193,9 +195,13 @@ export const QuestionUploadDialog = ({
   }, [performImageOcr, performPdfOcr]);
 
   const handleExtractQuestions = useCallback(async (text: string) => {
+    if (!courseId) {
+      throw new Error('Select a course before extracting questions.');
+    }
+
     setProcessingStage('extracting');
     setProgress(85);
-    const response = await questionService.extractQuestionsFromText({ text });
+    const response = await questionService.extractQuestionsFromText({ text, courseId });
     const drafts = (response || [])
       .filter((item): item is ExtractedQuestion & { summary: string } =>
         Boolean(
@@ -215,6 +221,19 @@ export const QuestionUploadDialog = ({
         answer: item.answer ?? '',
         type: item.type && ['MCQ', 'SA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
         summary: item.summary.trim(),
+        primaryTopicId:
+          item.primaryTopicId !== undefined && item.primaryTopicId !== null
+            ? Number(item.primaryTopicId)
+            : null,
+        secondaryTopicIds: Array.isArray(item.secondaryTopicIds)
+          ? Array.from(
+              new Set(
+                item.secondaryTopicIds
+                  .map((value) => Number(value))
+                  .filter((value) => Number.isInteger(value) && value !== Number(item.primaryTopicId))
+              )
+            )
+          : [],
         include: item.include !== false
       }));
 
@@ -230,7 +249,7 @@ export const QuestionUploadDialog = ({
       title: 'Questions extracted',
       description: `Parsed ${drafts.length} question${drafts.length === 1 ? '' : 's'} from the upload.`
     });
-  }, [toast]);
+  }, [courseId, toast]);
 
   const processFile = useCallback(async (file: File) => {
     setError(null);
@@ -271,6 +290,48 @@ export const QuestionUploadDialog = ({
 
   const removeDraft = useCallback((id: string) => {
     setDraftQuestions((prev) => prev.filter((draft) => draft.id !== id));
+  }, []);
+
+  const setPrimaryTopicForDraft = useCallback((id: string, topicId: number | null) => {
+    setDraftQuestions((prev) =>
+      prev.map((draft) => {
+        if (draft.id !== id) {
+          return draft;
+        }
+        const cleanedSecondary = topicId === null
+          ? draft.secondaryTopicIds
+          : draft.secondaryTopicIds.filter((value) => value !== topicId);
+        return {
+          ...draft,
+          primaryTopicId: topicId,
+          secondaryTopicIds: cleanedSecondary
+        };
+      })
+    );
+  }, []);
+
+  const toggleSecondaryTopicForDraft = useCallback((id: string, topicId: number) => {
+    setDraftQuestions((prev) =>
+      prev.map((draft) => {
+        if (draft.id !== id) {
+          return draft;
+        }
+
+        if (draft.primaryTopicId === topicId) {
+          return draft;
+        }
+
+        const exists = draft.secondaryTopicIds.includes(topicId);
+        const nextSecondary = exists
+          ? draft.secondaryTopicIds.filter((value) => value !== topicId)
+          : [...draft.secondaryTopicIds, topicId];
+
+        return {
+          ...draft,
+          secondaryTopicIds: nextSecondary
+        };
+      })
+    );
   }, []);
 
   const includedDrafts = useMemo(
@@ -325,7 +386,9 @@ export const QuestionUploadDialog = ({
       difficulty: draft.difficulty,
       answer: draft.answer?.trim() || null,
       type: draft.type,
-      summary: draft.summary.trim()
+      summary: draft.summary.trim(),
+      primaryTopicId: draft.primaryTopicId ?? undefined,
+      secondaryTopicIds: draft.secondaryTopicIds
     }));
 
     if (payloadQuestions.length === 0) {
@@ -338,16 +401,20 @@ export const QuestionUploadDialog = ({
       setError('Each question must include the AI-generated summary before saving.');
       return;
     }
-
     setProcessingStage('saving');
     setProgress(100);
     setError(null);
 
     try {
+      const fallbackPrimaryTopicId =
+        topics.length > 0 && primaryTopicId ? Number(primaryTopicId) : undefined;
+      const fallbackTopicName =
+        topics.length === 0 ? (newTopicName.trim() || 'Uploaded Questions') : undefined;
+
       const saved = await questionService.saveExtractedQuestions({
         courseId,
-        primaryTopicId: primaryTopicId ? Number(primaryTopicId) : undefined,
-        topicName: primaryTopicId ? undefined : (newTopicName.trim() || 'Uploaded Questions'),
+        primaryTopicId: fallbackPrimaryTopicId,
+        topicName: fallbackTopicName,
         questions: payloadQuestions
       });
 
@@ -368,7 +435,7 @@ export const QuestionUploadDialog = ({
       });
       setProcessingStage('review');
     }
-  }, [canSave, courseId, includedDrafts, newTopicName, onClose, onQuestionsSaved, primaryTopicId, toast]);
+  }, [canSave, courseId, includedDrafts, newTopicName, onClose, onQuestionsSaved, primaryTopicId, toast, topics.length]);
 
   const handleReset = useCallback(() => {
     setDraftQuestions([]);
@@ -396,8 +463,6 @@ export const QuestionUploadDialog = ({
     );
   }
 
-  const primaryTopicName = topics.find((topic) => String(topic.id) === primaryTopicId)?.name ?? topics[0]?.name;
-
   return (
     <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
       <DialogContent className="max-w-3xl">
@@ -417,10 +482,7 @@ export const QuestionUploadDialog = ({
               <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
               <p className="text-xs text-muted-foreground">
                 Questions will be saved to <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
-                {' '}
-                {topics.length > 0
-                  ? `Primary topic: ${primaryTopicName ?? '—'}.`
-                  : 'A new topic will be created automatically for these questions.'}
+                {' '}Topics are assigned automatically after extraction—you can adjust them in the review step.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -538,6 +600,52 @@ export const QuestionUploadDialog = ({
                             value={draft.instructions ?? ''}
                             onChange={(event) => updateDraft(draft.id, { instructions: event.target.value })}
                           />
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Primary topic</Label>
+                            <Select
+                              value={draft.primaryTopicId !== null ? String(draft.primaryTopicId) : 'none'}
+                              onValueChange={(value) => {
+                                const nextValue = value === 'none' ? null : Number(value);
+                                setPrimaryTopicForDraft(draft.id, nextValue);
+                              }}
+                              disabled={topics.length === 0}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder={topics.length === 0 ? 'No topics available' : 'Select topic'} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Unassigned</SelectItem>
+                                {topics.map((topic) => (
+                                  <SelectItem key={topic.id} value={String(topic.id)}>
+                                    {topic.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Secondary topics</Label>
+                            {topics.length === 0 ? (
+                              <p className="text-xs text-muted-foreground">No topics available. A new topic will be created automatically.</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {topics.map((topic) => (
+                                  <label key={topic.id} className="flex items-center gap-1 text-xs">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4"
+                                      checked={draft.secondaryTopicIds.includes(topic.id)}
+                                      onChange={() => toggleSecondaryTopicForDraft(draft.id, topic.id)}
+                                      disabled={draft.primaryTopicId === topic.id}
+                                    />
+                                    <span>{topic.name}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-3">
                           <div className="space-y-2">

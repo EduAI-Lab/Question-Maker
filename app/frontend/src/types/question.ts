@@ -23,6 +23,8 @@ export interface ExtractedQuestion {
   answer?: string | null;
   type?: QuestionType;
   summary?: string;
+  primaryTopicId?: number | null;
+  secondaryTopicIds?: number[];
   include?: boolean;
 }
 
