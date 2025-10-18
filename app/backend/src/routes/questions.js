@@ -305,7 +305,7 @@ router.post('/extract', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.post('/extract/save', authenticateToken, async (req, res, next) => {
   try {
-    const { courseId, primaryTopicId, topicName, questions } = req.body;
+    const { courseId, primaryTopicId, topicName, questions, assessment } = req.body;
 
     if (!courseId) {
       return res.status(400).json({
@@ -327,7 +327,8 @@ router.post('/extract/save', authenticateToken, async (req, res, next) => {
         ? Number(primaryTopicId)
         : undefined,
       topicName,
-      questions
+      questions,
+      assessment
     });
 
     res.status(201).json({

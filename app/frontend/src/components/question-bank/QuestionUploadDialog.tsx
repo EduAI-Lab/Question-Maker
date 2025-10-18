@@ -5,12 +5,12 @@ import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker?url';
 import { UploadCloud, FileText, Loader2, Trash2, Copy as CopyIcon, RefreshCcw } from 'lucide-react';
 
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
 } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
@@ -29,701 +29,794 @@ import { questionService } from '../../services/questionService';
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 type DraftQuestion = Required<Pick<ExtractedQuestion, 'question'>> &
-  Omit<ExtractedQuestion, 'question'> & {
-    id: string;
-    instructions?: string;
-    difficulty: QuestionDifficulty;
-    answer?: string | null;
-    type: QuestionType;
-    summary: string;
-    primaryTopicId: number | null;
-    secondaryTopicIds: number[];
-    include: boolean;
-  };
+    Omit<ExtractedQuestion, 'question'> & {
+        id: string;
+        instructions?: string;
+        difficulty: QuestionDifficulty;
+        answer?: string | null;
+        type: QuestionType;
+        summary: string;
+        primaryTopicId: number | null;
+        secondaryTopicIds: number[];
+        include: boolean;
+    };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
 const questionTypes: QuestionType[] = ['SA', 'MCQ'];
+const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
 
 interface QuestionUploadDialogProps {
-  open: boolean;
-  onClose: () => void;
-  courseId: number | null;
-  courseName?: string;
-  topics: Topic[];
-  onEnsureTopics: (courseId: number) => Promise<Topic[]>;
-  onQuestionsSaved: (questions: Question[]) => void;
+    open: boolean;
+    onClose: () => void;
+    courseId: number | null;
+    courseName?: string;
+    topics: Topic[];
+    onEnsureTopics: (courseId: number) => Promise<Topic[]>;
+    onQuestionsSaved: (questions: Question[]) => void;
 }
 
 const generateId = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return Math.random().toString(36).slice(2, 11);
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    return Math.random().toString(36).slice(2, 11);
 };
 
 const isPdfFile = (file: File) =>
-  file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
 const isImageFile = (file: File) =>
-  file.type.startsWith('image/') ||
-  /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(file.name);
+    file.type.startsWith('image/') ||
+    /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(file.name);
 
 export const QuestionUploadDialog = ({
-  open,
-  onClose,
-  courseId,
-  courseName,
-  topics: providedTopics,
-  onEnsureTopics,
-  onQuestionsSaved
+    open,
+    onClose,
+    courseId,
+    courseName,
+    topics: providedTopics,
+    onEnsureTopics,
+    onQuestionsSaved
 }: QuestionUploadDialogProps) => {
-  const { toast } = useToast();
+    const { toast } = useToast();
 
-  const [topics, setTopics] = useState<Topic[]>(providedTopics);
-  const [primaryTopicId, setPrimaryTopicId] = useState<string>('');
-  const [newTopicName, setNewTopicName] = useState('Uploaded Questions');
-  const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([]);
-  const [processingStage, setProcessingStage] = useState<'idle' | 'ocr' | 'extracting' | 'review' | 'saving'>('idle');
-  const [progress, setProgress] = useState<number>(0);
-  const [error, setError] = useState<string | null>(null);
-  const [lastFileName, setLastFileName] = useState<string>('');
+    const [topics, setTopics] = useState<Topic[]>(providedTopics);
+    const [primaryTopicId, setPrimaryTopicId] = useState<string>('');
+    const [newTopicName, setNewTopicName] = useState('Uploaded Questions');
+    const [draftQuestions, setDraftQuestions] = useState<DraftQuestion[]>([]);
+    const [processingStage, setProcessingStage] = useState<'idle' | 'ocr' | 'extracting' | 'review' | 'saving'>('idle');
+    const [progress, setProgress] = useState<number>(0);
+    const [error, setError] = useState<string | null>(null);
+    const [lastFileName, setLastFileName] = useState<string>('');
+    const [assessmentType, setAssessmentType] = useState<typeof assessmentTypes[number]>('Assignment');
+    const [assessmentName, setAssessmentName] = useState('Uploaded Assessment');
+    const [assessmentSemester, setAssessmentSemester] = useState(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        return `Fall ${year}`;
+    });
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
+    useEffect(() => {
+        if (!open) {
+            return;
+        }
 
-    setTopics(providedTopics);
-    if (providedTopics.length > 0) {
-      setPrimaryTopicId(String(providedTopics[0].id));
-      setNewTopicName('');
-    } else {
-      setPrimaryTopicId('');
-      setNewTopicName('Uploaded Questions');
-    }
-    setDraftQuestions([]);
-    setProcessingStage('idle');
-    setProgress(0);
-    setError(null);
-    setLastFileName('');
-  }, [open, providedTopics]);
-
-  useEffect(() => {
-    if (!open || !courseId) return;
-    if (providedTopics.length > 0) return;
-
-    const ensureTopics = async () => {
-      try {
-        const refreshed = await onEnsureTopics(courseId);
-        setTopics(refreshed);
-        if (refreshed.length > 0) {
-          setPrimaryTopicId(String(refreshed[0].id));
-          setNewTopicName('');
+        setTopics(providedTopics);
+        if (providedTopics.length > 0) {
+            setPrimaryTopicId(String(providedTopics[0].id));
+            setNewTopicName('');
         } else {
-          setPrimaryTopicId('');
-          setNewTopicName('Uploaded Questions');
+            setPrimaryTopicId('');
+            setNewTopicName('Uploaded Questions');
         }
-      } catch (err) {
-        console.error('Failed to refresh topics', err);
-        setTopics([]);
-        setPrimaryTopicId('');
-        setNewTopicName('Uploaded Questions');
-      }
-    };
+        setDraftQuestions([]);
+        setProcessingStage('idle');
+        setProgress(0);
+        setError(null);
+        setLastFileName('');
+        setAssessmentType('Assignment');
+        setAssessmentName('Assignment 1');
+        setAssessmentSemester(() => {
+            const now = new Date();
+            const year = now.getFullYear();
+            return `Fall ${year}`;
+        });
+    }, [open, providedTopics]);
 
-    void ensureTopics();
-  }, [open, courseId, providedTopics.length, onEnsureTopics]);
+    useEffect(() => {
+        if (!open || !courseId) return;
+        if (providedTopics.length > 0) return;
 
-  useEffect(() => {
-    if (!open) return;
-    if (topics.length > 0) {
-      setPrimaryTopicId((prev) => (prev ? prev : String(topics[0].id)));
-      setNewTopicName('');
-    } else {
-      setPrimaryTopicId('');
-      setNewTopicName('Uploaded Questions');
-    }
-  }, [open, topics]);
+        const ensureTopics = async () => {
+            try {
+                const refreshed = await onEnsureTopics(courseId);
+                setTopics(refreshed);
+                if (refreshed.length > 0) {
+                    setPrimaryTopicId(String(refreshed[0].id));
+                    setNewTopicName('');
+                } else {
+                    setPrimaryTopicId('');
+                    setNewTopicName('Uploaded Questions');
+                }
+            } catch (err) {
+                console.error('Failed to refresh topics', err);
+                setTopics([]);
+                setPrimaryTopicId('');
+                setNewTopicName('Uploaded Questions');
+            }
+        };
 
-  const performPdfOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await getDocument({ data: arrayBuffer }).promise;
-    let combinedText = '';
+        void ensureTopics();
+    }, [open, courseId, providedTopics.length, onEnsureTopics]);
 
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-      const page = await pdf.getPage(pageNumber);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item: any) => ('str' in item ? item.str : ''))
-        .join(' ');
-      combinedText += `${pageText}\n`;
-      onProgress(Math.round((pageNumber / pdf.numPages) * 70));
-    }
-
-    return combinedText;
-  }, []);
-
-  const performImageOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {
-    const result = await Tesseract.recognize(file, 'eng', {
-      logger: (message) => {
-        if (message.status === 'recognizing text') {
-          onProgress(10 + Math.round(message.progress * 60));
+    useEffect(() => {
+        if (!open) return;
+        if (topics.length > 0) {
+            setPrimaryTopicId((prev) => (prev ? prev : String(topics[0].id)));
+            setNewTopicName('');
+        } else {
+            setPrimaryTopicId('');
+            setNewTopicName('Uploaded Questions');
         }
-      }
-    });
-    return result.data.text;
-  }, []);
+    }, [open, topics]);
 
-  const performOcr = useCallback(async (file: File) => {
-    setProcessingStage('ocr');
-    setProgress(5);
+    const performPdfOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await getDocument({ data: arrayBuffer }).promise;
+        let combinedText = '';
 
-    let text = '';
-    if (isPdfFile(file)) {
-      text = await performPdfOcr(file, setProgress);
-    } else if (isImageFile(file)) {
-      text = await performImageOcr(file, setProgress);
-    } else {
-      throw new Error('Unsupported file type. Please upload a PDF or image file.');
-    }
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+            const page = await pdf.getPage(pageNumber);
+            const content = await page.getTextContent();
+            const pageText = content.items
+                .map((item: any) => ('str' in item ? item.str : ''))
+                .join(' ');
+            combinedText += `${pageText}\n`;
+            onProgress(Math.round((pageNumber / pdf.numPages) * 70));
+        }
 
-    if (!text.trim()) {
-      throw new Error('No text detected in the uploaded file.');
-    }
+        return combinedText;
+    }, []);
 
-    return text;
-  }, [performImageOcr, performPdfOcr]);
+    const performImageOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {
+        const result = await Tesseract.recognize(file, 'eng', {
+            logger: (message) => {
+                if (message.status === 'recognizing text') {
+                    onProgress(10 + Math.round(message.progress * 60));
+                }
+            }
+        });
+        return result.data.text;
+    }, []);
 
-  const handleExtractQuestions = useCallback(async (text: string) => {
-    if (!courseId) {
-      throw new Error('Select a course before extracting questions.');
-    }
+    const performOcr = useCallback(async (file: File) => {
+        setProcessingStage('ocr');
+        setProgress(5);
 
-    setProcessingStage('extracting');
-    setProgress(85);
-    const response = await questionService.extractQuestionsFromText({ text, courseId });
-    const drafts = (response || [])
-      .filter((item): item is ExtractedQuestion & { summary: string } =>
-        Boolean(
-          item.question &&
-          item.question.trim().length > 0 &&
-          item.summary &&
-          item.summary.trim().length > 0
-        )
-      )
-      .map((item) => ({
-        id: item.id ?? generateId(),
-        question: item.question.trim(),
-        instructions: item.instructions?.trim() ?? '',
-        difficulty: item.difficulty && ['easy', 'medium', 'hard'].includes(item.difficulty)
-          ? (item.difficulty as QuestionDifficulty)
-          : 'medium',
-        answer: item.answer ?? '',
-        type: item.type && ['MCQ', 'SA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
-        summary: item.summary.trim(),
-        primaryTopicId:
-          item.primaryTopicId !== undefined && item.primaryTopicId !== null
-            ? Number(item.primaryTopicId)
-            : null,
-        secondaryTopicIds: Array.isArray(item.secondaryTopicIds)
-          ? Array.from(
-              new Set(
-                item.secondaryTopicIds
-                  .map((value) => Number(value))
-                  .filter((value) => Number.isInteger(value) && value !== Number(item.primaryTopicId))
-              )
+        let text = '';
+        if (isPdfFile(file)) {
+            text = await performPdfOcr(file, setProgress);
+        } else if (isImageFile(file)) {
+            text = await performImageOcr(file, setProgress);
+        } else {
+            throw new Error('Unsupported file type. Please upload a PDF or image file.');
+        }
+
+        if (!text.trim()) {
+            throw new Error('No text detected in the uploaded file.');
+        }
+
+        return text;
+    }, [performImageOcr, performPdfOcr]);
+
+    const handleExtractQuestions = useCallback(async (text: string) => {
+        if (!courseId) {
+            throw new Error('Select a course before extracting questions.');
+        }
+
+        setProcessingStage('extracting');
+        setProgress(85);
+        const response = await questionService.extractQuestionsFromText({ text, courseId });
+        const drafts = (response || [])
+            .filter((item): item is ExtractedQuestion & { summary: string } =>
+                Boolean(
+                    item.question &&
+                    item.question.trim().length > 0 &&
+                    item.summary &&
+                    item.summary.trim().length > 0
+                )
             )
-          : [],
-        include: item.include !== false
-      }));
+            .map((item) => {
+                const primaryCandidate = item.primaryTopicId !== undefined && item.primaryTopicId !== null
+                    ? Number(item.primaryTopicId)
+                    : null;
+                const primaryTopicId = Number.isInteger(primaryCandidate) ? primaryCandidate : null;
 
-    if (drafts.length === 0) {
-      throw new Error('No questions could be extracted from the provided text.');
-    }
+                const secondaryTopicIds = Array.isArray(item.secondaryTopicIds)
+                    ? Array.from(
+                        new Set(
+                            item.secondaryTopicIds
+                                .map((value) => Number(value))
+                                .filter((value) => Number.isInteger(value) && value !== primaryTopicId)
+                        )
+                    )
+                    : [];
 
-    setDraftQuestions(drafts);
-    setProcessingStage('review');
-    setProgress(100);
+                return {
+                    id: item.id ?? generateId(),
+                    question: item.question.trim(),
+                    instructions: item.instructions?.trim() ?? '',
+                    difficulty: item.difficulty && ['easy', 'medium', 'hard'].includes(item.difficulty)
+                        ? (item.difficulty as QuestionDifficulty)
+                        : 'medium',
+                    answer: item.answer ?? '',
+                    type: item.type && ['MCQ', 'SA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
+                    summary: item.summary.trim(),
+                    primaryTopicId,
+                    secondaryTopicIds,
+                    include: item.include !== false
+                };
+            });
 
-    toast({
-      title: 'Questions extracted',
-      description: `Parsed ${drafts.length} question${drafts.length === 1 ? '' : 's'} from the upload.`
-    });
-  }, [courseId, toast]);
-
-  const processFile = useCallback(async (file: File) => {
-    setError(null);
-    setDraftQuestions([]);
-    setLastFileName(file.name);
-    try {
-      const text = await performOcr(file);
-      await handleExtractQuestions(text);
-    } catch (err: any) {
-      console.error('Question extraction failed', err);
-      const message = err?.response?.data?.error || err?.message || 'Failed to extract questions.';
-      setError(message);
-      setProcessingStage('idle');
-      setProgress(0);
-      toast({
-        variant: 'destructive',
-        title: 'Question extraction failed',
-        description: message
-      });
-    }
-  }, [handleExtractQuestions, performOcr, toast]);
-
-  const handleFileChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        void processFile(file);
-      }
-    },
-    [processFile]
-  );
-
-  const updateDraft = useCallback((id: string, updates: Partial<DraftQuestion>) => {
-    setDraftQuestions((prev) =>
-      prev.map((draft) => (draft.id === id ? { ...draft, ...updates } : draft))
-    );
-  }, []);
-
-  const removeDraft = useCallback((id: string) => {
-    setDraftQuestions((prev) => prev.filter((draft) => draft.id !== id));
-  }, []);
-
-  const setPrimaryTopicForDraft = useCallback((id: string, topicId: number | null) => {
-    setDraftQuestions((prev) =>
-      prev.map((draft) => {
-        if (draft.id !== id) {
-          return draft;
-        }
-        const cleanedSecondary = topicId === null
-          ? draft.secondaryTopicIds
-          : draft.secondaryTopicIds.filter((value) => value !== topicId);
-        return {
-          ...draft,
-          primaryTopicId: topicId,
-          secondaryTopicIds: cleanedSecondary
-        };
-      })
-    );
-  }, []);
-
-  const toggleSecondaryTopicForDraft = useCallback((id: string, topicId: number) => {
-    setDraftQuestions((prev) =>
-      prev.map((draft) => {
-        if (draft.id !== id) {
-          return draft;
+        if (drafts.length === 0) {
+            throw new Error('No questions could be extracted from the provided text.');
         }
 
-        if (draft.primaryTopicId === topicId) {
-          return draft;
+        setDraftQuestions(drafts);
+        setProcessingStage('review');
+        setProgress(100);
+
+        toast({
+            title: 'Questions extracted',
+            description: `Parsed ${drafts.length} question${drafts.length === 1 ? '' : 's'} from the upload.`
+        });
+    }, [courseId, toast]);
+
+    const processFile = useCallback(async (file: File) => {
+        setError(null);
+        setDraftQuestions([]);
+        setLastFileName(file.name);
+        try {
+            const text = await performOcr(file);
+            await handleExtractQuestions(text);
+        } catch (err: any) {
+            console.error('Question extraction failed', err);
+            const message = err?.response?.data?.error || err?.message || 'Failed to extract questions.';
+            setError(message);
+            setProcessingStage('idle');
+            setProgress(0);
+            toast({
+                variant: 'destructive',
+                title: 'Question extraction failed',
+                description: message
+            });
+        }
+    }, [handleExtractQuestions, performOcr, toast]);
+
+    const handleFileChange = useCallback(
+        (event: React.ChangeEvent<HTMLInputElement>) => {
+            const file = event.target.files?.[0];
+            if (file) {
+                void processFile(file);
+            }
+        },
+        [processFile]
+    );
+
+    const updateDraft = useCallback((id: string, updates: Partial<DraftQuestion>) => {
+        setDraftQuestions((prev) =>
+            prev.map((draft) => (draft.id === id ? { ...draft, ...updates } : draft))
+        );
+    }, []);
+
+    const removeDraft = useCallback((id: string) => {
+        setDraftQuestions((prev) => prev.filter((draft) => draft.id !== id));
+    }, []);
+
+    const setPrimaryTopicForDraft = useCallback((id: string, topicId: number | null) => {
+        const normalizedTopicId = typeof topicId === 'number' && Number.isInteger(topicId) ? topicId : null;
+        setDraftQuestions((prev) =>
+            prev.map((draft) => {
+                if (draft.id !== id) {
+                    return draft;
+                }
+                const cleanedSecondary = normalizedTopicId === null
+                    ? draft.secondaryTopicIds
+                    : draft.secondaryTopicIds.filter((value) => value !== normalizedTopicId);
+                return {
+                    ...draft,
+                    primaryTopicId: normalizedTopicId,
+                    secondaryTopicIds: cleanedSecondary
+                };
+            })
+        );
+    }, []);
+
+    const toggleSecondaryTopicForDraft = useCallback((id: string, topicId: number) => {
+        setDraftQuestions((prev) =>
+            prev.map((draft) => {
+                if (draft.id !== id) {
+                    return draft;
+                }
+
+                if (draft.primaryTopicId === topicId) {
+                    return draft;
+                }
+
+                const exists = draft.secondaryTopicIds.includes(topicId);
+                const nextSecondary = exists
+                    ? draft.secondaryTopicIds.filter((value) => value !== topicId)
+                    : [...draft.secondaryTopicIds, topicId];
+
+                return {
+                    ...draft,
+                    secondaryTopicIds: nextSecondary
+                };
+            })
+        );
+    }, []);
+
+    const includedDrafts = useMemo(
+        () => draftQuestions.filter((draft) => draft.include && draft.question.trim().length > 0),
+        [draftQuestions]
+    );
+
+    const canSave = useMemo(() => {
+        if (processingStage === 'saving') return false;
+        if (!courseId) return false;
+        if (includedDrafts.length === 0) return false;
+        if (!assessmentType || !assessmentName.trim() || !assessmentSemester.trim()) return false;
+        return true;
+    }, [assessmentName, assessmentSemester, assessmentType, courseId, includedDrafts.length, processingStage]);
+
+    const handleCopyAll = useCallback(async () => {
+        const lines = draftQuestions.map((draft, index) => {
+            const base = [`${index + 1}. ${draft.question.trim()}`];
+            if (draft.summary?.trim()) {
+                base.splice(1, 0, `Summary: ${draft.summary.trim()}`);
+            }
+            if (draft.instructions?.trim()) {
+                base.push(`Instructions: ${draft.instructions.trim()}`);
+            }
+            if (draft.answer?.trim()) {
+                base.push(`Answer: ${draft.answer.trim()}`);
+            }
+            base.push(`Difficulty: ${draft.difficulty}`);
+            return base.join('\n');
+        });
+
+        try {
+            await navigator.clipboard.writeText(lines.join('\n\n'));
+            toast({
+                title: 'Copied',
+                description: 'Extracted questions copied to clipboard.'
+            });
+        } catch (err) {
+            toast({
+                variant: 'destructive',
+                title: 'Copy failed',
+                description: 'Could not copy questions to clipboard.'
+            });
+        }
+    }, [draftQuestions, toast]);
+
+    const handleSave = useCallback(async () => {
+        if (!canSave || !courseId) return;
+
+        const payloadQuestions = includedDrafts.map((draft) => ({
+            question: draft.question.trim(),
+            instructions: draft.instructions?.trim(),
+            difficulty: draft.difficulty,
+            answer: draft.answer?.trim() || null,
+            type: draft.type,
+            summary: draft.summary.trim(),
+            primaryTopicId: draft.primaryTopicId ?? undefined,
+            secondaryTopicIds: draft.secondaryTopicIds
+        }));
+
+        if (payloadQuestions.length === 0) {
+            setError('Select at least one question to create.');
+            return;
         }
 
-        const exists = draft.secondaryTopicIds.includes(topicId);
-        const nextSecondary = exists
-          ? draft.secondaryTopicIds.filter((value) => value !== topicId)
-          : [...draft.secondaryTopicIds, topicId];
+        const missingSummary = payloadQuestions.find((item) => !item.summary);
+        if (missingSummary) {
+            setError('Each question must include the AI-generated summary before saving.');
+            return;
+        }
+        if (!assessmentType || !assessmentName.trim() || !assessmentSemester.trim()) {
+            setError('Assessment type, name, and semester are required.');
+            return;
+        }
+        setProcessingStage('saving');
+        setProgress(100);
+        setError(null);
 
-        return {
-          ...draft,
-          secondaryTopicIds: nextSecondary
-        };
-      })
-    );
-  }, []);
+        try {
+            const fallbackPrimaryTopicId =
+                topics.length > 0 && primaryTopicId ? Number(primaryTopicId) : undefined;
+            const fallbackTopicName =
+                topics.length === 0 ? (newTopicName.trim() || 'Uploaded Questions') : undefined;
 
-  const includedDrafts = useMemo(
-    () => draftQuestions.filter((draft) => draft.include && draft.question.trim().length > 0),
-    [draftQuestions]
-  );
+            const saved = await questionService.saveExtractedQuestions({
+                courseId,
+                primaryTopicId: fallbackPrimaryTopicId,
+                topicName: fallbackTopicName,
+                questions: payloadQuestions,
+                assessment: {
+                    type: assessmentType,
+                    name: assessmentName.trim(),
+                    semester: assessmentSemester.trim()
+                }
+            });
 
-  const canSave = useMemo(() => {
-    if (processingStage === 'saving') return false;
-    if (!courseId) return false;
-    if (includedDrafts.length === 0) return false;
-    return true;
-  }, [courseId, includedDrafts.length, processingStage]);
+            onQuestionsSaved(saved);
+            toast({
+                title: 'Questions added',
+                description: `${saved.length} question${saved.length === 1 ? '' : 's'} saved successfully.`
+            });
+            onClose();
+        } catch (err: any) {
+            console.error('Failed to save extracted questions', err);
+            const message = err?.response?.data?.error || err?.message || 'Failed to save questions.';
+            setError(message);
+            toast({
+                variant: 'destructive',
+                title: 'Save failed',
+                description: message
+            });
+            setProcessingStage('review');
+        }
+    }, [assessmentName, assessmentSemester, assessmentType, canSave, courseId, includedDrafts, newTopicName, onClose, onQuestionsSaved, primaryTopicId, toast, topics.length]);
 
-  const handleCopyAll = useCallback(async () => {
-    const lines = draftQuestions.map((draft, index) => {
-      const base = [`${index + 1}. ${draft.question.trim()}`];
-      if (draft.summary?.trim()) {
-        base.splice(1, 0, `Summary: ${draft.summary.trim()}`);
-      }
-      if (draft.instructions?.trim()) {
-        base.push(`Instructions: ${draft.instructions.trim()}`);
-      }
-      if (draft.answer?.trim()) {
-        base.push(`Answer: ${draft.answer.trim()}`);
-      }
-      base.push(`Difficulty: ${draft.difficulty}`);
-      return base.join('\n');
-    });
+    const handleReset = useCallback(() => {
+        setDraftQuestions([]);
+        setProcessingStage('idle');
+        setProgress(0);
+        setError(null);
+        setLastFileName('');
+        setPrimaryTopicId(topics.length > 0 ? String(topics[0].id) : '');
+        setNewTopicName(topics.length > 0 ? '' : 'Uploaded Questions');
+        setAssessmentType('Assignment');
+        setAssessmentName('Assignment 1');
+        setAssessmentSemester(() => {
+            const now = new Date();
+            const year = now.getFullYear();
+            return `Fall ${year}`;
+        });
+    }, [topics]);
 
-    try {
-      await navigator.clipboard.writeText(lines.join('\n\n'));
-      toast({
-        title: 'Copied',
-        description: 'Extracted questions copied to clipboard.'
-      });
-    } catch (err) {
-      toast({
-        variant: 'destructive',
-        title: 'Copy failed',
-        description: 'Could not copy questions to clipboard.'
-      });
+    if (!courseId) {
+        return (
+            <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>No course selected</DialogTitle>
+                        <DialogDescription>Select a course before uploading questions.</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button onClick={onClose}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
     }
-  }, [draftQuestions, toast]);
 
-  const handleSave = useCallback(async () => {
-    if (!canSave || !courseId) return;
-
-    const payloadQuestions = includedDrafts.map((draft) => ({
-      question: draft.question.trim(),
-      instructions: draft.instructions?.trim(),
-      difficulty: draft.difficulty,
-      answer: draft.answer?.trim() || null,
-      type: draft.type,
-      summary: draft.summary.trim(),
-      primaryTopicId: draft.primaryTopicId ?? undefined,
-      secondaryTopicIds: draft.secondaryTopicIds
-    }));
-
-    if (payloadQuestions.length === 0) {
-      setError('Select at least one question to create.');
-      return;
-    }
-
-    const missingSummary = payloadQuestions.find((item) => !item.summary);
-    if (missingSummary) {
-      setError('Each question must include the AI-generated summary before saving.');
-      return;
-    }
-    setProcessingStage('saving');
-    setProgress(100);
-    setError(null);
-
-    try {
-      const fallbackPrimaryTopicId =
-        topics.length > 0 && primaryTopicId ? Number(primaryTopicId) : undefined;
-      const fallbackTopicName =
-        topics.length === 0 ? (newTopicName.trim() || 'Uploaded Questions') : undefined;
-
-      const saved = await questionService.saveExtractedQuestions({
-        courseId,
-        primaryTopicId: fallbackPrimaryTopicId,
-        topicName: fallbackTopicName,
-        questions: payloadQuestions
-      });
-
-      onQuestionsSaved(saved);
-      toast({
-        title: 'Questions added',
-        description: `${saved.length} question${saved.length === 1 ? '' : 's'} saved successfully.`
-      });
-      onClose();
-    } catch (err: any) {
-      console.error('Failed to save extracted questions', err);
-      const message = err?.response?.data?.error || err?.message || 'Failed to save questions.';
-      setError(message);
-      toast({
-        variant: 'destructive',
-        title: 'Save failed',
-        description: message
-      });
-      setProcessingStage('review');
-    }
-  }, [canSave, courseId, includedDrafts, newTopicName, onClose, onQuestionsSaved, primaryTopicId, toast, topics.length]);
-
-  const handleReset = useCallback(() => {
-    setDraftQuestions([]);
-    setProcessingStage('idle');
-    setProgress(0);
-    setError(null);
-    setLastFileName('');
-    setPrimaryTopicId(topics.length > 0 ? String(topics[0].id) : '');
-    setNewTopicName(topics.length > 0 ? '' : 'Uploaded Questions');
-  }, [topics]);
-
-  if (!courseId) {
     return (
-      <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>No course selected</DialogTitle>
-            <DialogDescription>Select a course before uploading questions.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={onClose}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+        <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Upload Questions</DialogTitle>
+                    <DialogDescription>
+                        Upload a PDF or image containing questions for{' '}
+                        <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
+                        {' '}
+                        We&apos;ll extract them with OCR and AI so you can review before saving.
+                    </DialogDescription>
+                </DialogHeader>
 
-  return (
-    <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Upload Questions</DialogTitle>
-          <DialogDescription>
-            Upload a PDF or image containing questions for{' '}
-            <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
-            {' '}
-            We&apos;ll extract them with OCR and AI so you can review before saving.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6 py-2">
-          <Card>
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Questions will be saved to <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
-                {' '}Topics are assigned automatically after extraction—you can adjust them in the review step.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <label
-                htmlFor="question-upload"
-                className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center transition hover:border-primary hover:bg-muted/50 cursor-pointer"
-              >
-                <UploadCloud className="h-10 w-10 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">Drop PDF or image file here</p>
-                  <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG and other common formats.</p>
-                </div>
-                <input
-                  id="question-upload"
-                  type="file"
-                  accept=".pdf,image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                  disabled={processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving'}
-                />
-              </label>
-              {lastFileName && (
-                <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <span className="truncate">{lastFileName}</span>
-                  <Button variant="ghost" size="icon" className="ml-auto" onClick={handleReset}>
-                    <RefreshCcw className="h-4 w-4" />
-                    <span className="sr-only">Reset</span>
-                  </Button>
-                </div>
-              )}
-              {(processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving') && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>
-                      {processingStage === 'ocr' && 'Running OCR...'}
-                      {processingStage === 'extracting' && 'Extracting questions with AI...'}
-                      {processingStage === 'saving' && 'Saving questions to the database...'}
-                    </span>
-                  </div>
-                  <Progress value={progress} />
-                </div>
-              )}
-              {error && (
-                <p className="text-sm text-red-600">
-                  {error}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {draftQuestions.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base font-semibold">
-                  Review extracted questions ({draftQuestions.length})
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={handleCopyAll}>
-                    <CopyIcon className="mr-2 h-4 w-4" />
-                    Copy all
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={handleReset}>
-                    Clear
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="max-h-[320px] rounded-md border">
-                  <div className="divide-y">
-                    {draftQuestions.map((draft, index) => (
-                      <div key={draft.id} className="space-y-4 p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="space-y-1">
-                            <p className="text-sm font-semibold">Question {index + 1}</p>
+                <div className="space-y-6 py-2">
+                    <Card>
+                        <CardHeader className="space-y-1">
+                            <CardTitle className="text-base font-semibold">Assessment details</CardTitle>
                             <p className="text-xs text-muted-foreground">
-                              Toggle include to skip saving a specific question.
+                                A new assessment will be created for these questions.
                             </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant={draft.include ? 'secondary' : 'outline'}
-                              size="sm"
-                              onClick={() => updateDraft(draft.id, { include: !draft.include })}
-                            >
-                              {draft.include ? 'Included' : 'Excluded'}
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => removeDraft(draft.id)}>
-                              <Trash2 className="h-4 w-4" />
-                              <span className="sr-only">Remove question</span>
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Question summary</Label>
-                          <Input
-                            value={draft.summary}
-                            placeholder="One sentence describing the question"
-                            onChange={(event) => updateDraft(draft.id, { summary: event.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Question text</Label>
-                          <Textarea
-                            rows={3}
-                            value={draft.question}
-                            onChange={(event) => updateDraft(draft.id, { question: event.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Instructions (optional)</Label>
-                          <Textarea
-                            rows={2}
-                            value={draft.instructions ?? ''}
-                            onChange={(event) => updateDraft(draft.id, { instructions: event.target.value })}
-                          />
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div className="space-y-2">
-                            <Label>Primary topic</Label>
-                            <Select
-                              value={draft.primaryTopicId !== null ? String(draft.primaryTopicId) : 'none'}
-                              onValueChange={(value) => {
-                                const nextValue = value === 'none' ? null : Number(value);
-                                setPrimaryTopicForDraft(draft.id, nextValue);
-                              }}
-                              disabled={topics.length === 0}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder={topics.length === 0 ? 'No topics available' : 'Select topic'} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="none">Unassigned</SelectItem>
-                                {topics.map((topic) => (
-                                  <SelectItem key={topic.id} value={String(topic.id)}>
-                                    {topic.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Secondary topics</Label>
-                            {topics.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">No topics available. A new topic will be created automatically.</p>
-                            ) : (
-                              <div className="flex flex-wrap gap-2">
-                                {topics.map((topic) => (
-                                  <label key={topic.id} className="flex items-center gap-1 text-xs">
-                                    <input
-                                      type="checkbox"
-                                      className="h-4 w-4"
-                                      checked={draft.secondaryTopicIds.includes(topic.id)}
-                                      onChange={() => toggleSecondaryTopicForDraft(draft.id, topic.id)}
-                                      disabled={draft.primaryTopicId === topic.id}
-                                    />
-                                    <span>{topic.name}</span>
-                                  </label>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-3">
-                          <div className="space-y-2">
-                            <Label>Difficulty</Label>
-                            <Select
-                              value={draft.difficulty}
-                              onValueChange={(value) =>
-                                updateDraft(draft.id, { difficulty: value as QuestionDifficulty })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {difficultyOptions.map((difficulty) => (
-                                  <SelectItem key={difficulty} value={difficulty}>
-                                    {difficulty}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Type</Label>
-                            <Select
-                              value={draft.type}
-                              onValueChange={(value) =>
-                                updateDraft(draft.id, { type: value as QuestionType })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {questionTypes.map((type) => (
-                                  <SelectItem key={type} value={type}>
-                                    {type === 'MCQ' ? 'Multiple Choice' : 'Short Answer'}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Answer (optional)</Label>
-                            <Textarea
-                              rows={2}
-                              value={draft.answer ?? ''}
-                              onChange={(event) => updateDraft(draft.id, { answer: event.target.value })}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-                <p className="pt-3 text-xs text-muted-foreground">
-                  The AI extraction is a starting point—adjust the question text, instructions, difficulty, or answers before saving.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                        </CardHeader>
+                        <CardContent className="grid gap-4 sm:grid-cols-3">
+                            <div className="space-y-2">
+                                <Label htmlFor="assessment-type">Type</Label>
+                                <Select
+                                    value={assessmentType}
+                                    onValueChange={(value) => setAssessmentType(value as typeof assessmentTypes[number])}
+                                >
+                                    <SelectTrigger id="assessment-type">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {assessmentTypes.map((type) => (
+                                            <SelectItem key={type} value={type}>
+                                                {type}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="assessment-name">Name</Label>
+                                <Input
+                                    id="assessment-name"
+                                    placeholder="e.g. Midterm Review Set"
+                                    value={assessmentName}
+                                    onChange={(event) => setAssessmentName(event.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="assessment-semester">Semester</Label>
+                                <Input
+                                    id="assessment-semester"
+                                    placeholder="e.g. Fall 2024"
+                                    value={assessmentSemester}
+                                    onChange={(event) => setAssessmentSemester(event.target.value)}
+                                />
+                            </div>
+                        </CardContent>
+                    </Card>
 
-        <DialogFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="text-sm text-muted-foreground">
-            {includedDrafts.length} question{includedDrafts.length === 1 ? '' : 's'} ready to save.
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleSave()} disabled={!canSave}>
-              {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create Questions
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+                    <Card>
+                        <CardHeader className="space-y-1">
+                            <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
+                            <p className="text-xs text-muted-foreground">
+                                Questions will be saved to <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
+                                {' '}Topics are assigned automatically after extraction—you can adjust them in the review step.
+                            </p>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <label
+                                htmlFor="question-upload"
+                                className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center transition hover:border-primary hover:bg-muted/50 cursor-pointer"
+                            >
+                                <UploadCloud className="h-10 w-10 text-muted-foreground" />
+                                <div className="space-y-1">
+                                    <p className="text-sm font-medium">Drop PDF or image file here</p>
+                                    <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG and other common formats.</p>
+                                </div>
+                                <input
+                                    id="question-upload"
+                                    type="file"
+                                    accept=".pdf,image/*"
+                                    className="hidden"
+                                    onChange={handleFileChange}
+                                    disabled={processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving'}
+                                />
+                            </label>
+                            {lastFileName && (
+                                <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                    <span className="truncate">{lastFileName}</span>
+                                    <Button variant="ghost" size="icon" className="ml-auto" onClick={handleReset}>
+                                        <RefreshCcw className="h-4 w-4" />
+                                        <span className="sr-only">Reset</span>
+                                    </Button>
+                                </div>
+                            )}
+                            {(processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving') && (
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        <span>
+                                            {processingStage === 'ocr' && 'Running OCR...'}
+                                            {processingStage === 'extracting' && 'Extracting questions with AI...'}
+                                            {processingStage === 'saving' && 'Saving questions to the database...'}
+                                        </span>
+                                    </div>
+                                    <Progress value={progress} />
+                                </div>
+                            )}
+                            {error && (
+                                <p className="text-sm text-red-600">
+                                    {error}
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {draftQuestions.length > 0 && (
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="text-base font-semibold">
+                                    Review extracted questions ({draftQuestions.length})
+                                </CardTitle>
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" onClick={handleCopyAll}>
+                                        <CopyIcon className="mr-2 h-4 w-4" />
+                                        Copy all
+                                    </Button>
+                                    <Button variant="ghost" size="sm" onClick={handleReset}>
+                                        Clear
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <ScrollArea className="max-h-[320px] rounded-md border">
+                                    <div className="divide-y">
+                                        {draftQuestions.map((draft, index) => (
+                                            <div key={draft.id} className="space-y-4 p-4">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="space-y-1">
+                                                        <p className="text-sm font-semibold">Question {index + 1}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Toggle include to skip saving a specific question.
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant={draft.include ? 'secondary' : 'outline'}
+                                                            size="sm"
+                                                            onClick={() => updateDraft(draft.id, { include: !draft.include })}
+                                                        >
+                                                            {draft.include ? 'Included' : 'Excluded'}
+                                                        </Button>
+                                                        <Button variant="ghost" size="icon" onClick={() => removeDraft(draft.id)}>
+                                                            <Trash2 className="h-4 w-4" />
+                                                            <span className="sr-only">Remove question</span>
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Question summary</Label>
+                                                    <Input
+                                                        value={draft.summary}
+                                                        placeholder="One sentence describing the question"
+                                                        onChange={(event) => updateDraft(draft.id, { summary: event.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Question text</Label>
+                                                    <Textarea
+                                                        rows={3}
+                                                        value={draft.question}
+                                                        onChange={(event) => updateDraft(draft.id, { question: event.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label>Instructions (optional)</Label>
+                                                    <Textarea
+                                                        rows={2}
+                                                        value={draft.instructions ?? ''}
+                                                        onChange={(event) => updateDraft(draft.id, { instructions: event.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="grid gap-4 sm:grid-cols-2">
+                                                    <div className="space-y-2">
+                                                        <Label>Primary topic</Label>
+                                                        <Select
+                                                            value={draft.primaryTopicId !== null ? String(draft.primaryTopicId) : 'none'}
+                                                            onValueChange={(value) => {
+                                                                if (value === 'none') {
+                                                                    setPrimaryTopicForDraft(draft.id, null);
+                                                                    return;
+                                                                }
+                                                                const parsed = Number.parseInt(value, 10);
+                                                                setPrimaryTopicForDraft(
+                                                                    draft.id,
+                                                                    Number.isNaN(parsed) ? null : parsed
+                                                                );
+                                                            }}
+                                                            disabled={topics.length === 0}
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue placeholder={topics.length === 0 ? 'No topics available' : 'Select topic'} />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="none">Unassigned</SelectItem>
+                                                                {topics.map((topic) => (
+                                                                    <SelectItem key={topic.id} value={String(topic.id)}>
+                                                                        {topic.name}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Secondary topics</Label>
+                                                        {topics.length === 0 ? (
+                                                            <p className="text-xs text-muted-foreground">No topics available. A new topic will be created automatically.</p>
+                                                        ) : (
+                                                            <div className="flex flex-wrap gap-2">
+                                                                {topics.map((topic) => (
+                                                                    <label key={topic.id} className="flex items-center gap-1 text-xs">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            className="h-4 w-4"
+                                                                            checked={draft.secondaryTopicIds.includes(topic.id)}
+                                                                            onChange={() => toggleSecondaryTopicForDraft(draft.id, topic.id)}
+                                                                            disabled={draft.primaryTopicId === topic.id}
+                                                                        />
+                                                                        <span>{topic.name}</span>
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="grid gap-4 sm:grid-cols-3">
+                                                    <div className="space-y-2">
+                                                        <Label>Difficulty</Label>
+                                                        <Select
+                                                            value={draft.difficulty}
+                                                            onValueChange={(value) =>
+                                                                updateDraft(draft.id, { difficulty: value as QuestionDifficulty })
+                                                            }
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {difficultyOptions.map((difficulty) => (
+                                                                    <SelectItem key={difficulty} value={difficulty}>
+                                                                        {difficulty}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Type</Label>
+                                                        <Select
+                                                            value={draft.type}
+                                                            onValueChange={(value) =>
+                                                                updateDraft(draft.id, { type: value as QuestionType })
+                                                            }
+                                                        >
+                                                            <SelectTrigger>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                {questionTypes.map((type) => (
+                                                                    <SelectItem key={type} value={type}>
+                                                                        {type === 'MCQ' ? 'Multiple Choice' : 'Short Answer'}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Answer (optional)</Label>
+                                                        <Textarea
+                                                            rows={2}
+                                                            value={draft.answer ?? ''}
+                                                            onChange={(event) => updateDraft(draft.id, { answer: event.target.value })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </ScrollArea>
+                                <p className="pt-3 text-xs text-muted-foreground">
+                                    The AI extraction is a starting point—adjust the question text, instructions, difficulty, or answers before saving.
+                                </p>
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+
+                <DialogFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="text-sm text-muted-foreground">
+                        {includedDrafts.length} question{includedDrafts.length === 1 ? '' : 's'} ready to save.
+                    </div>
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={onClose}>
+                            Cancel
+                        </Button>
+                        <Button onClick={() => void handleSave()} disabled={!canSave}>
+                            {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Create Questions
+                        </Button>
+                    </div>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 };

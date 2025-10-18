@@ -1,4 +1,4 @@
-import { Question_Metadata, Variants, Topics } from '../schema/index.js';
+import { Question_Metadata, Variants, Topics, Assessments } from '../schema/index.js';
 import { Course } from '../schema/Course.js';
 
 const normalizeSecondaryTopics = (value) => {
@@ -297,7 +297,7 @@ export const createMultipleQuestions = async (userId, questionsData) => {
 };
 
 export const saveExtractedQuestions = async (userId, payload) => {
-  const { courseId, primaryTopicId, topicName, questions } = payload;
+  const { courseId, primaryTopicId, topicName, questions, assessment } = payload;
 
   if (!courseId) {
     throw new Error('courseId is required');
@@ -379,7 +379,21 @@ export const saveExtractedQuestions = async (userId, payload) => {
       return fallbackTopicId;
     };
 
+    let createdAssessment = null;
+    if (assessment) {
+      const { type, name, semester } = assessment;
+      if (!type || !name || !semester) {
+        throw new Error('Assessment type, name, and semester are required.');
+      }
+      createdAssessment = await Assessments.create({
+        type,
+        name,
+        semester
+      }, { transaction });
+    }
+
     const createdIds = [];
+    let orderCounter = 1;
 
     for (const item of questions) {
       const questionText = typeof item.question === 'string' ? item.question.trim() : '';
@@ -430,7 +444,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
         courseId,
         primaryTopicId: primaryTopicForQuestion,
         type: questionType,
-        questionOrder: {}
+        questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {}
       }, { transaction });
 
       await Variants.create({
@@ -438,12 +452,15 @@ export const saveExtractedQuestions = async (userId, payload) => {
         questionText,
         difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
         answer: typeof item.answer === 'string' && item.answer.trim() ? item.answer.trim() : null,
-        assessmentId: null,
+        assessmentId: createdAssessment ? createdAssessment.id : null,
         secondaryTopicsId: secondaryTopics,
         referenceId: null
       }, { transaction });
 
       createdIds.push(metadata.id);
+      if (createdAssessment) {
+        orderCounter += 1;
+      }
     }
 
     if (createdIds.length === 0) {

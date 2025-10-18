@@ -130,6 +130,11 @@ export const questionService = {
     primaryTopicId?: number;
     topicName?: string;
     questions: ExtractedQuestion[];
+    assessment?: {
+      type: string;
+      name: string;
+      semester: string;
+    };
   }): Promise<Question[]> {
     const response = await api.post('/api/questions/extract/save', payload);
     return (response.data.data || []).map(mapQuestion);
