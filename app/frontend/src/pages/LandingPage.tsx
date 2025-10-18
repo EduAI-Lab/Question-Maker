@@ -145,32 +145,8 @@ export const LandingPage = () => {
       );
     });
 
-    const first = createdQuestions[0];
-    const firstVariant = first.variants?.[first.variants.length - 1];
-
-    if (firstVariant) {
-      const topics = topicsMap.get(first.courseId) ?? topicsByCourse[first.courseId] ?? [];
-      const topicNameMap = new Map(topics.map((topic) => [topic.id, topic.name]));
-      const secondaryTopicNames = Array.isArray(firstVariant.secondaryTopicsId)
-        ? firstVariant.secondaryTopicsId
-            .map((topicId) => topicNameMap.get(topicId) ?? `Topic ${topicId}`)
-            .filter(Boolean)
-        : [];
-
-      setSelectedVariant({
-        questionId: first.id,
-        questionDescription: first.description,
-        questionType: first.type,
-        primaryTopicId: first.primaryTopicId,
-        primaryTopicName: topicNameMap.get(first.primaryTopicId),
-        courseId: first.courseId,
-        courseName: first.course?.name,
-        courseCode: first.course?.code,
-        secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-        variant: firstVariant
-      });
-    }
-
+    setSelectedVariant(null);
+    setPresetVariant(null);
     setIsUploadOpen(false);
   };
 

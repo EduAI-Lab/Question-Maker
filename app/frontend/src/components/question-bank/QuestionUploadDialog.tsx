@@ -503,8 +503,8 @@ export const QuestionUploadDialog = ({
     }
 
     return (
-        <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
-            <DialogContent className="max-w-3xl">
+    <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Upload Questions</DialogTitle>
                     <DialogDescription>
@@ -572,24 +572,26 @@ export const QuestionUploadDialog = ({
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <label
-                                htmlFor="question-upload"
-                                className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center transition hover:border-primary hover:bg-muted/50 cursor-pointer"
-                            >
-                                <UploadCloud className="h-10 w-10 text-muted-foreground" />
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium">Drop PDF or image file here</p>
-                                    <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG and other common formats.</p>
-                                </div>
-                                <input
-                                    id="question-upload"
-                                    type="file"
-                                    accept=".pdf,image/*"
-                                    className="hidden"
-                                    onChange={handleFileChange}
-                                    disabled={processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving'}
-                                />
-                            </label>
+              {(!lastFileName && draftQuestions.length === 0) && (
+                <label
+                  htmlFor="question-upload"
+                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center transition hover:border-primary hover:bg-muted/50 cursor-pointer"
+                >
+                  <UploadCloud className="h-10 w-10 text-muted-foreground" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Drop PDF or image file here</p>
+                    <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG and other common formats.</p>
+                  </div>
+                  <input
+                    id="question-upload"
+                    type="file"
+                    accept=".pdf,image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    disabled={processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving'}
+                  />
+                </label>
+              )}
                             {lastFileName && (
                                 <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
                                     <FileText className="h-4 w-4 text-muted-foreground" />
@@ -627,15 +629,7 @@ export const QuestionUploadDialog = ({
                                 <CardTitle className="text-base font-semibold">
                                     Review extracted questions ({draftQuestions.length})
                                 </CardTitle>
-                                <div className="flex items-center gap-2">
-                                    <Button variant="outline" size="sm" onClick={handleCopyAll}>
-                                        <CopyIcon className="mr-2 h-4 w-4" />
-                                        Copy all
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={handleReset}>
-                                        Clear
-                                    </Button>
-                                </div>
+                <div className="flex items-center gap-2" />
                             </CardHeader>
                             <CardContent>
                                 <ScrollArea className="max-h-[320px] rounded-md border">
@@ -677,14 +671,6 @@ export const QuestionUploadDialog = ({
                                                         rows={3}
                                                         value={draft.question}
                                                         onChange={(event) => updateDraft(draft.id, { question: event.target.value })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Instructions (optional)</Label>
-                                                    <Textarea
-                                                        rows={2}
-                                                        value={draft.instructions ?? ''}
-                                                        onChange={(event) => updateDraft(draft.id, { instructions: event.target.value })}
                                                     />
                                                 </div>
                                                 <div className="grid gap-4 sm:grid-cols-2">
