@@ -1,10 +1,12 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'MCQ' | 'SA';
+export type ReasoningLevel = 'factual' | 'analytical' | 'application';
 
 export interface QuestionVariant {
   id: number;
   questionText: string;
   difficulty: QuestionDifficulty;
+  reasoningLevel: ReasoningLevel;
   answer: string | null;
   assessmentId: number | null;
   secondaryTopicsId: number[];
@@ -60,6 +62,11 @@ export interface QuestionGenerationParams {
     easy: number;
     medium: number;
     hard: number;
+  };
+  reasoningDistribution: {
+    factual: number;
+    analytical: number;
+    application: number;
   };
 }
 

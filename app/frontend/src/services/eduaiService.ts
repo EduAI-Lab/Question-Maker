@@ -34,6 +34,11 @@ export interface EduAIQuestionGenerationRequest {
     medium: number;
     hard: number;
   };
+  reasoningDistribution?: {
+    factual: number;
+    analytical: number;
+    application: number;
+  };
 }
 
 export interface EduAIQuestionGenerationResponse {
@@ -42,6 +47,7 @@ export interface EduAIQuestionGenerationResponse {
     questions: Array<{
       content: string;
       difficulty: 'easy' | 'medium' | 'hard';
+      reasoning_level: 'factual' | 'analytical' | 'application';
       bloom_level: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
       type: 'MCQ' | 'SA';
     }>;
@@ -108,6 +114,7 @@ class EduAIService {
       model: 'google:gemini-2.5-flash',
       numQuestions: 5,
       difficultyDistribution: { easy: 1, medium: 2, hard: 2 },
+      reasoningDistribution: { factual: 40, analytical: 30, application: 30 },
       ...options
     };
   }
