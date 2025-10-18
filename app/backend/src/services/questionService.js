@@ -1,6 +1,5 @@
-import { Question_Metadata, Variants } from '../schema/index.js';
+import { Question_Metadata, Variants, Topics } from '../schema/index.js';
 import { Course } from '../schema/Course.js';
-import { Op } from 'sequelize';
 
 const normalizeSecondaryTopics = (value) => {
   if (Array.isArray(value)) {
@@ -25,6 +24,27 @@ const normalizeSecondaryTopics = (value) => {
   }
 
   return [];
+};
+
+const generateMetadataDescription = (questionText, summary, instructions) => {
+  const candidate = [summary, instructions, questionText].find(
+    (value) => typeof value === 'string' && value.trim().length > 0
+  );
+
+  if (!candidate) {
+    return 'Question';
+  }
+
+  const normalized = candidate.replace(/\s+/g, ' ').trim();
+  const sentenceMatch = normalized.match(/[^.!?]+[.!?]?/);
+  const base = (sentenceMatch ? sentenceMatch[0] : normalized).trim();
+  const words = base.split(' ');
+
+  if (words.length <= 12) {
+    return base;
+  }
+
+  return `${words.slice(0, 12).join(' ')}…`;
 };
 
 export const createQuestion = async (userId, questionData) => {
@@ -272,6 +292,140 @@ export const createMultipleQuestions = async (userId, questionsData) => {
 
     return createdQuestions;
   } catch (error) {
+    throw error;
+  }
+};
+
+export const saveExtractedQuestions = async (userId, payload) => {
+  const { courseId, primaryTopicId, topicName, questions } = payload;
+
+  if (!courseId) {
+    throw new Error('courseId is required');
+  }
+
+  if (!Array.isArray(questions) || questions.length === 0) {
+    throw new Error('Questions array is required');
+  }
+
+  const course = await Course.findOne({
+    where: { id: Number(courseId), userId },
+    attributes: ['id']
+  });
+
+  if (!course) {
+    throw new Error('Course not found');
+  }
+
+  const transaction = await Question_Metadata.sequelize.transaction();
+
+  try {
+    let resolvedTopicId = primaryTopicId ? Number(primaryTopicId) : null;
+
+    if (resolvedTopicId) {
+      const existingTopic = await Topics.findOne({
+        where: { id: resolvedTopicId, courseId },
+        transaction
+      });
+
+      if (!existingTopic) {
+        throw new Error('Primary topic not found for this course');
+      }
+    } else {
+      const sanitizedTopicName = topicName ? topicName.trim() : '';
+      if (!sanitizedTopicName) {
+        throw new Error('Either primaryTopicId or topicName must be provided');
+      }
+
+      let topic = await Topics.findOne({
+        where: { name: sanitizedTopicName, courseId },
+        transaction
+      });
+
+      if (!topic) {
+        topic = await Topics.create({
+          name: sanitizedTopicName,
+          courseId
+        }, { transaction });
+      }
+
+      resolvedTopicId = topic.id;
+    }
+
+    const createdIds = [];
+
+    for (const item of questions) {
+      const questionText = typeof item.question === 'string' ? item.question.trim() : '';
+      if (!questionText) {
+        continue;
+      }
+
+      const difficulty = typeof item.difficulty === 'string'
+        ? item.difficulty.toLowerCase().trim()
+        : '';
+
+      const questionType = typeof item.type === 'string' && ['MCQ', 'SA'].includes(item.type)
+        ? item.type
+        : 'SA';
+
+      const summary = typeof item.summary === 'string' ? item.summary.trim() : '';
+      if (!summary) {
+        throw new Error('Each question must include an AI-generated summary.');
+      }
+
+      const summaryText = generateMetadataDescription(
+        questionText,
+        summary,
+        item.instructions
+      );
+
+      const metadata = await Question_Metadata.create({
+        description: summaryText,
+        courseId,
+        primaryTopicId: resolvedTopicId,
+        type: questionType,
+        questionOrder: {}
+      }, { transaction });
+
+      await Variants.create({
+        questionMetadataId: metadata.id,
+        questionText,
+        difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
+        answer: typeof item.answer === 'string' && item.answer.trim() ? item.answer.trim() : null,
+        assessmentId: null,
+        secondaryTopicsId: normalizeSecondaryTopics(item.secondaryTopicsId),
+        referenceId: null
+      }, { transaction });
+
+      createdIds.push(metadata.id);
+    }
+
+    if (createdIds.length === 0) {
+      await transaction.rollback();
+      throw new Error('No valid questions to save.');
+    }
+
+    await transaction.commit();
+
+    const savedQuestions = await Question_Metadata.findAll({
+      where: { id: createdIds },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          attributes: ['id', 'name', 'code'],
+          where: { userId }
+        },
+        {
+          model: Variants,
+          as: 'variants'
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    return savedQuestions.map((question) => question.toJSON());
+  } catch (error) {
+    await transaction.rollback();
     throw error;
   }
 };

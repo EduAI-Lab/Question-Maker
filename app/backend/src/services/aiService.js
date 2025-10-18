@@ -138,6 +138,149 @@ const callDeepSeekAPI = async (prompt, params) => {
   }
 };
 
+const normalizeExtractText = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/\t/g, ' ')
+    .replace(/\u00a0/g, ' ')
+    // collapse runs of more than two newlines to a double newline
+    .replace(/\n{3,}/g, '\n\n')
+    // collapse excessive spaces while preserving newlines
+    .replace(/[ ]{2,}/g, ' ')
+    .trim();
+};
+
+const chunkText = (text, chunkSize = 6000) => {
+  if (!text) return [];
+  const chunks = [];
+  for (let i = 0; i < text.length; i += chunkSize) {
+    chunks.push(text.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
+const callOpenAIForExtraction = async (textChunk) => {
+  if (!config.openaiApiKey) {
+    throw new Error('OpenAI API key is not configured. Please add it to the .env file.');
+  }
+
+  const systemPrompt = `You are an assistant that extracts study questions from source material.
+Return a JSON array (no additional text). Each object must follow this shape exactly:
+{
+  "summary": "Short descriptive sentence (<=12 words, no trailing question mark)",
+  "question": "Full question text exactly as presented to students. Include all sub-parts, numbering, and instructions. Use \\n to represent line breaks.",
+  "instructions": "Optional teaching notes or context (string, omit or set to null if not available)",
+  "difficulty": "easy | medium | hard",
+  "answer": "Optional short answer text or null",
+  "type": "MCQ | SA"
+}
+
+Guidelines:
+- Treat each contiguous question block as a single entry even when it contains sub-parts (a), (b), etc.
+- Preserve the question wording verbatim; do not omit instructions, numbering, or formatting cues.
+- Use the instructions field only for teacher-facing notes that are separate from the student prompt.
+- Do not fabricate content. If no valid question exists, return [].`;
+
+  const userPrompt = `Extract distinct assessment questions from the following content. Focus on question statements that can be asked to students.
+
+Ensure each question you return includes every related instruction, bullet, and sub-part that accompanies it. Never split multi-part questions into separate entries. Preserve the original formatting by inserting \\n where new lines occur.
+
+Source material:
+"""
+${textChunk}
+"""`;
+
+  const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+    model: 'gpt-3.5-turbo',
+    temperature: 0.2,
+    max_tokens: 1500,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ]
+  }, {
+    headers: {
+      'Authorization': `Bearer ${config.openaiApiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  const content = response.data?.choices?.[0]?.message?.content ?? '[]';
+  return content;
+};
+
+const sanitizeExtractedQuestion = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const questionText = typeof raw.question === 'string' ? raw.question.trim() : '';
+  if (!questionText) {
+    return null;
+  }
+
+  const summary = typeof raw.summary === 'string' ? raw.summary.trim() : '';
+  if (!summary) {
+    return null;
+  }
+
+  const difficulty = typeof raw.difficulty === 'string'
+    ? raw.difficulty.toLowerCase().trim()
+    : '';
+
+  const allowedDifficulty = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
+  const type = typeof raw.type === 'string' && ['MCQ', 'SA'].includes(raw.type)
+    ? raw.type
+    : 'SA';
+
+  return {
+    summary,
+    question: questionText,
+    instructions: typeof raw.instructions === 'string' ? raw.instructions.trim() || undefined : undefined,
+    difficulty: allowedDifficulty,
+    answer: typeof raw.answer === 'string' ? raw.answer.trim() || null : null,
+    type
+  };
+};
+
+export const extractQuestionsFromText = async (rawText) => {
+  const normalized = normalizeExtractText(rawText);
+  if (!normalized) {
+    return [];
+  }
+
+  const chunks = chunkText(normalized);
+  const extracted = [];
+
+  for (const chunk of chunks) {
+    const response = await callOpenAIForExtraction(chunk);
+    try {
+      const parsed = JSON.parse(response);
+      if (Array.isArray(parsed)) {
+        extracted.push(...parsed);
+      }
+    } catch (error) {
+      // If parsing fails, ignore this chunk but continue processing others
+      console.error('Failed to parse extraction response', error);
+    }
+  }
+
+  const deduped = [];
+  const seen = new Set();
+  extracted.forEach((item) => {
+    const sanitized = sanitizeExtractedQuestion(item);
+    if (!sanitized) return;
+    const key = sanitized.question.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(sanitized);
+    }
+  });
+
+  return deduped;
+};
+
 export const generateQuestions = async (prompt, provider, params) => {
   try {
     let response;
@@ -236,4 +379,3 @@ export const generateAndSaveQuestions = async (prompt, provider, params, userId,
 };
 
 export { AI_PROVIDERS };
-

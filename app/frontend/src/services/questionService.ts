@@ -6,7 +6,8 @@ import {
   QuestionGenerationParams,
   QuestionStats,
   QuestionVariant,
-  QuestionDifficulty
+  QuestionDifficulty,
+  ExtractedQuestion
 } from '../types/question';
 
 const mapVariant = (variant: any): QuestionVariant => ({
@@ -117,5 +118,20 @@ export const questionService = {
   async getQuestionStats(): Promise<QuestionStats> {
     const response = await api.get('/api/questions/stats');
     return response.data.data;
+  },
+
+  async extractQuestionsFromText(payload: { text: string }): Promise<ExtractedQuestion[]> {
+    const response = await api.post('/api/questions/extract', payload);
+    return response.data.data || [];
+  },
+
+  async saveExtractedQuestions(payload: {
+    courseId: number;
+    primaryTopicId?: number;
+    topicName?: string;
+    questions: ExtractedQuestion[];
+  }): Promise<Question[]> {
+    const response = await api.post('/api/questions/extract/save', payload);
+    return (response.data.data || []).map(mapQuestion);
   }
 };
