@@ -200,6 +200,9 @@ Visit your domain to test the application.
 ## Useful Commands
 
 ```bash
+
+ssh cwl@questionmaker.ok.ubc.ca
+cd /srv/www/questionmaker.ok.ubc.ca
 # PM2 Management
 pm2 list                    # List all processes
 pm2 logs question-maker-backend    # View backend logs
