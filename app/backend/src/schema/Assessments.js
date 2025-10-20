@@ -8,7 +8,7 @@ export const Assessments = sequelize.define('Assessments', {
     autoIncrement: true
   },
   type: {
-    type: DataTypes.ENUM('Assignment', 'Lab', 'Quiz', 'Mid', 'Final'),
+    type: DataTypes.ENUM('Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'),
     allowNull: false
   },
   name: {

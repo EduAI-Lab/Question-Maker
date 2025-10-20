@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { config } from '../config/settings.js';
-import { Question_Metadata, Variants } from '../schema/index.js';
+import { Question_Metadata, Variants, Topics } from '../schema/index.js';
 
 const AI_PROVIDERS = {
   GROQ: 'groq',
@@ -138,6 +138,310 @@ const callDeepSeekAPI = async (prompt, params) => {
   }
 };
 
+const normalizeExtractText = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/\t/g, ' ')
+    .replace(/\u00a0/g, ' ')
+    // collapse runs of more than two newlines to a double newline
+    .replace(/\n{3,}/g, '\n\n')
+    // collapse excessive spaces while preserving newlines
+    .replace(/[ ]{2,}/g, ' ')
+    .trim();
+};
+
+const chunkText = (text, chunkSize = 6000) => {
+  if (!text) return [];
+  const chunks = [];
+  for (let i = 0; i < text.length; i += chunkSize) {
+    chunks.push(text.slice(i, i + chunkSize));
+  }
+  return chunks;
+};
+
+const callOpenAIForExtraction = async (textChunk) => {
+  if (!config.openaiApiKey) {
+    throw new Error('OpenAI API key is not configured. Please add it to the .env file.');
+  }
+
+  const systemPrompt = `You are an assistant that extracts study questions from source material.
+Return a JSON array (no additional text). Each object must follow this shape exactly:
+{
+  "summary": "Short descriptive sentence (<=12 words, no trailing question mark)",
+  "question": "Full question text exactly as presented to students. Include all sub-parts, numbering, and instructions. Use \\n to represent line breaks.",
+  "instructions": "Optional teaching notes or context (string, omit or set to null if not available)",
+  "difficulty": "easy | medium | hard",
+  "answer": "Optional short answer text or null",
+  "type": "MCQ | SA"
+}
+
+Guidelines:
+- Treat each contiguous question block as a single entry even when it contains sub-parts (a), (b), etc.
+- Preserve the question wording verbatim; do not omit instructions, numbering, or formatting cues.
+- Use the instructions field only for teacher-facing notes that are separate from the student prompt.
+- Do not fabricate content. If no valid question exists, return [].`;
+
+  const userPrompt = `Extract distinct assessment questions from the following content. Focus on question statements that can be asked to students.
+
+Ensure each question you return includes every related instruction, bullet, and sub-part that accompanies it. Never split multi-part questions into separate entries. Preserve the original formatting by inserting \\n where new lines occur.
+
+Source material:
+"""
+${textChunk}
+"""`;
+
+  const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+    model: 'gpt-3.5-turbo',
+    temperature: 0.2,
+    max_tokens: 1500,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ]
+  }, {
+    headers: {
+      'Authorization': `Bearer ${config.openaiApiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  const content = response.data?.choices?.[0]?.message?.content ?? '[]';
+  return content;
+};
+
+const sanitizeExtractedQuestion = (raw) => {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const questionText = typeof raw.question === 'string' ? raw.question.trim() : '';
+  if (!questionText) {
+    return null;
+  }
+
+  const summary = typeof raw.summary === 'string' ? raw.summary.trim() : '';
+  if (!summary) {
+    return null;
+  }
+
+  const difficulty = typeof raw.difficulty === 'string'
+    ? raw.difficulty.toLowerCase().trim()
+    : '';
+
+  const allowedDifficulty = ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium';
+  const type = typeof raw.type === 'string' && ['MCQ', 'SA'].includes(raw.type)
+    ? raw.type
+    : 'SA';
+
+  return {
+    summary,
+    question: questionText,
+    instructions: typeof raw.instructions === 'string' ? raw.instructions.trim() || undefined : undefined,
+    difficulty: allowedDifficulty,
+    answer: typeof raw.answer === 'string' ? raw.answer.trim() || null : null,
+    type,
+    primaryTopicId: null,
+    secondaryTopicIds: []
+  };
+};
+
+const callOpenAIForTopicAssignment = async (questions, topics) => {
+  if (!config.openaiApiKey) {
+    throw new Error('OpenAI API key is not configured. Please add it to the .env file.');
+  }
+
+  const systemPrompt = `You are an assistant that assigns course topics to questions.
+You will receive JSON with two arrays: topics and questions.
+- topics: array of { "id": number, "name": string }
+- questions: array of { "index": number, "summary": string, "question": string }
+
+Return ONLY a JSON array. Each element must have:
+{
+  "index": number,                 // matches the question index from input
+  "primaryTopicId": number | null, // id from provided topics, or null if no good match
+  "secondaryTopicIds": number[]    // optional additional topic ids, exclude the primary id, no duplicates
+}
+
+Use only IDs from the provided topics. Keep the array order identical to the input questions.`;
+
+  const payload = JSON.stringify({
+    topics: topics.map((topic) => ({
+      id: topic.id,
+      name: topic.name
+    })),
+    questions: questions.map((question, index) => ({
+      index,
+      summary: question.summary,
+      question: question.question
+    }))
+  }, null, 2);
+
+  const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+    model: 'gpt-3.5-turbo',
+    temperature: 0,
+    max_tokens: 1200,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: payload }
+    ]
+  }, {
+    headers: {
+      'Authorization': `Bearer ${config.openaiApiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  return response.data?.choices?.[0]?.message?.content ?? '[]';
+};
+
+const sanitizeTopicAssignment = (raw, validTopicIds) => {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const index = Number(raw.index);
+  if (!Number.isInteger(index) || index < 0) {
+    return null;
+  }
+
+  let primaryTopicId = raw.primaryTopicId;
+  if (primaryTopicId === null || primaryTopicId === undefined) {
+    primaryTopicId = null;
+  } else {
+    primaryTopicId = Number(primaryTopicId);
+    if (!validTopicIds.has(primaryTopicId)) {
+      primaryTopicId = null;
+    }
+  }
+
+  let secondaryTopicIds = [];
+  if (Array.isArray(raw.secondaryTopicIds)) {
+    const seen = new Set();
+    secondaryTopicIds = raw.secondaryTopicIds
+      .map((value) => Number(value))
+      .filter((value) => {
+        if (!validTopicIds.has(value)) {
+          return false;
+        }
+        if (value === primaryTopicId) {
+          return false;
+        }
+        if (seen.has(value)) {
+          return false;
+        }
+        seen.add(value);
+        return true;
+      });
+  }
+
+  return {
+    index,
+    primaryTopicId,
+    secondaryTopicIds
+  };
+};
+
+const enrichQuestionsWithTopics = async (questions, courseId) => {
+  if (!courseId) {
+    return questions;
+  }
+
+  const topics = await Topics.findAll({
+    where: { courseId },
+    order: [['id', 'ASC']]
+  });
+
+  if (topics.length === 0) {
+    return questions;
+  }
+
+  try {
+    const response = await callOpenAIForTopicAssignment(questions, topics);
+    const parsed = JSON.parse(response);
+    if (!Array.isArray(parsed)) {
+      return questions;
+    }
+
+    const validTopicIds = new Set(topics.map((topic) => topic.id));
+    const assignmentMap = new Map();
+
+    parsed.forEach((item) => {
+      const sanitized = sanitizeTopicAssignment(item, validTopicIds);
+      if (sanitized) {
+        assignmentMap.set(sanitized.index, sanitized);
+      }
+    });
+
+    const fallbackTopicId = topics[0]?.id ?? null;
+
+   return questions.map((question, index) => {
+      const assignment = assignmentMap.get(index);
+      const primaryTopicId = assignment?.primaryTopicId ?? fallbackTopicId ?? question.primaryTopicId ?? null;
+      const candidateSecondary = Array.isArray(assignment?.secondaryTopicIds)
+        ? [...assignment.secondaryTopicIds]
+        : Array.isArray(question.secondaryTopicIds)
+          ? [...question.secondaryTopicIds]
+          : [];
+      const secondaryTopicIds = candidateSecondary.filter((id) => id !== primaryTopicId);
+
+      return {
+        ...question,
+        primaryTopicId,
+        secondaryTopicIds
+      };
+    });
+  } catch (error) {
+    console.error('Failed to assign topics via AI', error);
+    return questions;
+  }
+};
+
+export const extractQuestionsFromText = async (rawText, courseId) => {
+  const normalized = normalizeExtractText(rawText);
+  if (!normalized) {
+    return [];
+  }
+
+  const chunks = chunkText(normalized);
+  const extracted = [];
+
+  for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+    const chunk = chunks[chunkIndex];
+    const response = await callOpenAIForExtraction(chunk);
+    try {
+      const parsed = JSON.parse(response);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((item, indexInChunk) => {
+          const order = chunkIndex * 1000 + indexInChunk;
+          extracted.push({ item, order });
+        });
+      }
+    } catch (error) {
+      // If parsing fails, ignore this chunk but continue processing others
+      console.error('Failed to parse extraction response', error);
+    }
+  }
+
+  const deduped = [];
+  const seen = new Set();
+  extracted
+    .sort((a, b) => a.order - b.order)
+    .forEach(({ item }) => {
+      const sanitized = sanitizeExtractedQuestion(item);
+      if (!sanitized) return;
+      const key = `${sanitized.summary.toLowerCase()}::${sanitized.question.toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(sanitized);
+      }
+    });
+
+  const enriched = await enrichQuestionsWithTopics(deduped, courseId);
+
+  return enriched;
+};
+
 export const generateQuestions = async (prompt, provider, params) => {
   try {
     let response;
@@ -236,4 +540,3 @@ export const generateAndSaveQuestions = async (prompt, provider, params, userId,
 };
 
 export { AI_PROVIDERS };
-

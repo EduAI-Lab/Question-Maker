@@ -16,6 +16,19 @@ export interface QuestionVariant {
   updatedAt?: string;
 }
 
+export interface ExtractedQuestion {
+  id?: string;
+  question: string;
+  instructions?: string;
+  difficulty?: QuestionDifficulty;
+  answer?: string | null;
+  type?: QuestionType;
+  summary?: string;
+  primaryTopicId?: number | null;
+  secondaryTopicIds?: number[];
+  include?: boolean;
+}
+
 export interface QuestionVariantEntry {
   questionId: number;
   questionDescription: string;
@@ -26,6 +39,11 @@ export interface QuestionVariantEntry {
   courseName?: string;
   courseCode?: string | null;
   secondaryTopicNames?: string[];
+  variant: QuestionVariant;
+}
+
+export interface SavedExtractedQuestion {
+  metadata: Question;
   variant: QuestionVariant;
 }
 

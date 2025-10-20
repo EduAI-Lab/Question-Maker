@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
@@ -11,6 +11,7 @@ import { useCourses } from '../hooks/useCourses';
 import { questionService } from '../services/questionService';
 import { courseService } from '../services/courseService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
+import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
 
 export const LandingPage = () => {
   const { courses, isLoading: isCoursesLoading } = useCourses();
@@ -22,8 +23,31 @@ export const LandingPage = () => {
   const [questionsError, setQuestionsError] = useState<string | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>(mockAssessments);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
+
+  const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
+    if (!courseId) {
+      return [] as Topic[];
+    }
+
+    if (!options.force && topicsByCourse[courseId]) {
+      return topicsByCourse[courseId];
+    }
+
+    try {
+      const topics = await courseService.getCourseTopics(courseId);
+      setTopicsByCourse((prev) => ({
+        ...prev,
+        [courseId]: topics
+      }));
+      return topics;
+    } catch (error) {
+      console.error('Failed to load topics for course', courseId, error);
+      return [];
+    }
+  }, [topicsByCourse]);
 
   useEffect(() => {
     if (courses.length === 0) {
@@ -38,22 +62,10 @@ export const LandingPage = () => {
   }, [courses, selectedCourse]);
 
   useEffect(() => {
-    const fetchTopicsForCourse = async (courseId: number) => {
-      try {
-        const topics = await courseService.getCourseTopics(courseId);
-        setTopicsByCourse((prev) => ({
-          ...prev,
-          [courseId]: topics
-        }));
-      } catch (error) {
-        console.error('Failed to load topics for course', courseId, error);
-      }
-    };
-
-    if (selectedCourse && !topicsByCourse[selectedCourse.id]) {
-      fetchTopicsForCourse(selectedCourse.id);
+    if (selectedCourse) {
+      void loadTopicsForCourse(selectedCourse.id);
     }
-  }, [selectedCourse, topicsByCourse]);
+  }, [selectedCourse, loadTopicsForCourse]);
 
   const filteredQuestions = useMemo(() => {
     if (!selectedCourse) return questions;
@@ -102,6 +114,42 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
+  const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
+    if (createdQuestions.length === 0) {
+      setIsUploadOpen(false);
+      return;
+    }
+
+    const uniqueCourseIds = Array.from(new Set(createdQuestions.map((question) => question.courseId)));
+    const topicsMap = new Map<number, Topic[]>();
+
+    await Promise.all(
+      uniqueCourseIds.map(async (courseId) => {
+        const topics = await loadTopicsForCourse(courseId, { force: true });
+        topicsMap.set(courseId, topics);
+      })
+    );
+
+    setQuestions((prev) => {
+      const merged = new Map<number, Question>();
+      createdQuestions.forEach((question) => {
+        merged.set(question.id, question);
+      });
+      prev.forEach((question) => {
+        if (!merged.has(question.id)) {
+          merged.set(question.id, question);
+        }
+      });
+      return Array.from(merged.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    });
+
+    setSelectedVariant(null);
+    setPresetVariant(null);
+    setIsUploadOpen(false);
+  };
+
   const handleCloseDetail = () => {
     setSelectedVariant(null);
   };
@@ -145,6 +193,7 @@ export const LandingPage = () => {
   };
 
   const handleQuestionCreated = (question: Question) => {
+    void loadTopicsForCourse(question.courseId);
     const topicsForCourse = topicsByCourse[question.courseId] ?? [];
     const topicNameMap = new Map(topicsForCourse.map((topic) => [topic.id, topic.name]));
 
@@ -184,8 +233,10 @@ export const LandingPage = () => {
   };
 
   const handleUploadQuestions = () => {
-    console.log('Upload questions');
-    // TODO: Implement upload questions functionality
+    if (selectedCourse) {
+      void loadTopicsForCourse(selectedCourse.id);
+    }
+    setIsUploadOpen(true);
   };
 
   const handleEditAssessment = (assessment: Assessment) => {
@@ -333,6 +384,16 @@ export const LandingPage = () => {
           onDeleteVariant={handleDeleteVariant}
         />
       )}
+
+      <QuestionUploadDialog
+        open={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        courseId={selectedCourse?.id ?? null}
+        courseName={selectedCourse?.name}
+        topics={selectedCourse ? (topicsByCourse[selectedCourse.id] ?? []) : []}
+        onEnsureTopics={loadTopicsForCourse}
+        onQuestionsSaved={handleQuestionsUploaded}
+      />
 
       <AddQuestionDialog
         open={isAddQuestionOpen}

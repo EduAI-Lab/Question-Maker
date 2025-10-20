@@ -8,9 +8,10 @@ import {
   createMultipleQuestions,
   getQuestionStats,
   updateQuestionOrder,
-  removeQuestionFromAssessment
+  removeQuestionFromAssessment,
+  saveExtractedQuestions
 } from '../services/questionService.js';
-import { generateQuestions, AI_PROVIDERS } from '../services/aiService.js';
+import { generateQuestions, AI_PROVIDERS, extractQuestionsFromText } from '../services/aiService.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -253,6 +254,87 @@ router.post('/generate', authenticateToken, async (req, res, next) => {
       success: true,
       message: 'Questions generated successfully',
       data: questions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   POST /api/questions/extract
+// @desc    Extract questions from OCR/parsed text
+// @access  Private
+router.post('/extract', authenticateToken, async (req, res, next) => {
+  try {
+    const { text, courseId } = req.body;
+
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Text content is required for extraction'
+      });
+    }
+
+    if (courseId === undefined || courseId === null || courseId === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'courseId is required to assign topics'
+      });
+    }
+
+    const numericCourseId = Number(courseId);
+    if (!Number.isInteger(numericCourseId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'courseId must be a valid integer'
+      });
+    }
+
+    const questions = await extractQuestionsFromText(text, numericCourseId);
+
+    res.json({
+      success: true,
+      data: questions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// @route   POST /api/questions/extract/save
+// @desc    Persist extracted questions
+// @access  Private
+router.post('/extract/save', authenticateToken, async (req, res, next) => {
+  try {
+    const { courseId, primaryTopicId, topicName, questions, assessment } = req.body;
+
+    if (!courseId) {
+      return res.status(400).json({
+        success: false,
+        error: 'courseId is required'
+      });
+    }
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'At least one question is required'
+      });
+    }
+
+    const saved = await saveExtractedQuestions(req.user.id, {
+      courseId: Number(courseId),
+      primaryTopicId: primaryTopicId !== undefined && primaryTopicId !== null && primaryTopicId !== ''
+        ? Number(primaryTopicId)
+        : undefined,
+      topicName,
+      questions,
+      assessment
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `${saved.length} question${saved.length === 1 ? '' : 's'} saved successfully`,
+      data: saved
     });
   } catch (error) {
     next(error);
