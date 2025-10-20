@@ -26,6 +26,7 @@ export interface Class {
   name: string;
   subject: string;
   courseCode?: string;
+  code?: string | null;
   semester?: string;
   year?: number;
   description?: string;
@@ -43,4 +44,3 @@ export interface ClassCreate {
   description?: string;
   department?: string;
 }
-

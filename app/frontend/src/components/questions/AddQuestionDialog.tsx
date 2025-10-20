@@ -22,6 +22,9 @@ import { questionService } from '../../services/questionService';
 import { courseService } from '../../services/courseService';
 import { assessmentService, AssessmentSummary } from '../../services/assessmentService';
 import { Topic } from '../../types/topic';
+import { useToast } from '../ui/use-toast';
+import eduaiService from '../../services/eduaiService';
+import { Class } from '../../types/class';
 
 interface AddQuestionDialogProps {
   open: boolean;
@@ -47,6 +50,9 @@ type FormState = {
   questionDescription: string;
   primaryTopicId: string;
   questionOrder: string;
+  generationPrompt: string;
+  generationModel: string;
+  generationDifficulty: QuestionDifficulty | 'balanced';
 };
 
 const defaultForm: FormState = {
@@ -61,7 +67,10 @@ const defaultForm: FormState = {
   questionType: 'MCQ',
   questionDescription: '',
   primaryTopicId: '',
-  questionOrder: ''
+  questionOrder: '',
+  generationPrompt: '',
+  generationModel: 'ollama:gpt-oss:120b',
+  generationDifficulty: 'balanced'
 };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
@@ -81,6 +90,9 @@ export const AddQuestionDialog = ({
   const [topics, setTopics] = useState<Topic[]>([]);
   const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
   const [isAuxLoading, setIsAuxLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [courseDetails, setCourseDetails] = useState<Class | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!open) {
@@ -88,6 +100,8 @@ export const AddQuestionDialog = ({
       setError(null);
       setTopics([]);
       setAssessments([]);
+      setCourseDetails(null);
+      setIsGenerating(false);
       return;
     }
 
@@ -139,6 +153,34 @@ export const AddQuestionDialog = ({
     fetchSupportingData();
   }, [open, courseId]);
 
+  useEffect(() => {
+    if (!open || !courseId) {
+      setCourseDetails(null);
+      return;
+    }
+
+    let isMounted = true;
+    const loadCourse = async () => {
+      try {
+        const course = await courseService.getCourse(courseId);
+        if (isMounted) {
+          setCourseDetails(course);
+        }
+      } catch (courseError) {
+        console.error('Failed to load course details', courseError);
+        if (isMounted) {
+          setCourseDetails(null);
+        }
+      }
+    };
+
+    loadCourse();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, courseId]);
+
   const baseVariantOptions = useMemo(
     () =>
       variants.map((entry) => ({
@@ -183,6 +225,108 @@ export const AddQuestionDialog = ({
     });
   };
 
+  const createDescriptionFromText = (text: string) => {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    if (!normalized) {
+      return '';
+    }
+    const sentenceMatch = normalized.match(/[^.!?]+[.!?]?/);
+    const base = (sentenceMatch ? sentenceMatch[0] : normalized).trim();
+    const words = base.split(' ');
+    if (words.length <= 12) {
+      return base;
+    }
+    return `${words.slice(0, 12).join(' ')}…`;
+  };
+
+  const handleGenerateWithAI = async () => {
+    if (!courseId) {
+      setError('Select a course before generating a question.');
+      return;
+    }
+
+    const courseCode = courseDetails?.code ?? courseDetails?.courseCode;
+    if (!courseCode) {
+      setError('Selected course is missing a course code. Please update the course before using EduAI.');
+      return;
+    }
+
+    if (!form.generationPrompt.trim()) {
+      setError('Enter a topic or prompt before asking EduAI to generate a question.');
+      return;
+    }
+
+    try {
+      setIsGenerating(true);
+      setError(null);
+
+      const difficultyDistribution = (() => {
+        if (form.generationDifficulty === 'balanced') {
+          return { easy: 0, medium: 1, hard: 0 };
+        }
+        return {
+          easy: form.generationDifficulty === 'easy' ? 1 : 0,
+          medium: form.generationDifficulty === 'medium' ? 1 : 0,
+          hard: form.generationDifficulty === 'hard' ? 1 : 0
+        };
+      })();
+
+      const response = await eduaiService.generateQuestions({
+        prompt: form.generationPrompt.trim(),
+        courseCode,
+        model: form.generationModel,
+        numQuestions: 1,
+        difficultyDistribution,
+        apiKeys: form.generationModel.startsWith('ollama')
+          ? { ollama: { isEnabled: true } }
+          : {}
+      });
+
+      const generated = response?.data?.questions?.[0];
+      if (!generated) {
+        throw new Error('EduAI did not return a question. Try a different prompt.');
+      }
+
+      const inferredType: QuestionType =
+        generated.type === 'SA' || generated.type === 'MCQ' ? generated.type : 'MCQ';
+      const inferredDifficulty: QuestionDifficulty =
+        generated.difficulty === 'easy' || generated.difficulty === 'hard'
+          ? generated.difficulty
+          : 'medium';
+
+      setForm((prev) => ({
+        ...prev,
+        questionType: inferredType,
+        variantText: generated.content ?? prev.variantText,
+        variantDifficulty: inferredDifficulty,
+        questionDescription:
+          prev.questionDescription.trim() || createDescriptionFromText(generated.content ?? ''),
+        generationPrompt: prev.generationPrompt,
+        variantReferenceId: '',
+        variantAnswer: ''
+      }));
+
+      toast({
+        title: 'Question generated',
+        description: 'Review the generated text and adjust any details before saving.'
+      });
+    } catch (generateError: any) {
+      console.error('EduAI generation failed', generateError);
+      const message =
+        generateError?.response?.data?.error ||
+        generateError?.message ||
+        'Failed to generate question.';
+      setError(message);
+      toast({
+        variant: 'destructive',
+        title: 'EduAI generation failed',
+        description: message
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
@@ -221,8 +365,12 @@ export const AddQuestionDialog = ({
         return;
       }
 
-      if (!form.questionDescription.trim()) {
-        throw new Error('Question description is required.');
+      let description = form.questionDescription.trim();
+      if (!description) {
+        description = createDescriptionFromText(form.variantText);
+        if (!description) {
+          throw new Error('Question description is required.');
+        }
       }
 
       const primaryTopicId = parseNumber(form.primaryTopicId);
@@ -240,7 +388,7 @@ export const AddQuestionDialog = ({
       }
 
       const createdQuestion = await questionService.createQuestion({
-        description: form.questionDescription.trim(),
+        description,
         courseId,
         primaryTopicId,
         type: form.questionType,
@@ -365,6 +513,76 @@ export const AddQuestionDialog = ({
 
             {form.mode === 'new' && (
               <div className="space-y-4">
+                <div className="space-y-2 rounded-md border bg-muted/30 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <Label className="text-sm font-semibold">Generate with EduAI</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Provide a topic or concept and let EduAI draft the question. You can edit the
+                        result before saving.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleGenerateWithAI}
+                      disabled={isGenerating}
+                    >
+                      {isGenerating ? 'Generating…' : 'Generate Question'}
+                    </Button>
+                  </div>
+                  <div className="space-y-2 pt-3">
+                    <Label htmlFor="generation-prompt">Topic / Prompt</Label>
+                    <Textarea
+                      id="generation-prompt"
+                      value={form.generationPrompt}
+                      onChange={(event) => handleFieldChange('generationPrompt', event.target.value)}
+                      placeholder="e.g. Analyze the time complexity of quicksort."
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Model</Label>
+                      <Select
+                        value={form.generationModel}
+                        onValueChange={(value) => handleFieldChange('generationModel', value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ollama:gpt-oss:120b">
+                            Ollama GPT OSS 120B (no API key required)
+                          </SelectItem>
+                          <SelectItem value="google:gemini-2.5-flash">Google Gemini 2.5 Flash</SelectItem>
+                          <SelectItem value="openai:gpt-4">OpenAI GPT-4</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Desired Difficulty</Label>
+                      <Select
+                        value={form.generationDifficulty}
+                        onValueChange={(value) =>
+                          handleFieldChange(
+                            'generationDifficulty',
+                            (value as QuestionDifficulty | 'balanced')
+                          )
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="balanced">Let EduAI decide</SelectItem>
+                          <SelectItem value="easy">Easy</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="hard">Hard</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="question-type">Question Type</Label>
                   <Select
