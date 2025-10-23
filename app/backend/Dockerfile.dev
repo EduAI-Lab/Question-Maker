@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies)
+# Install dependencies
 RUN npm install
 
 # Copy source code
@@ -24,6 +24,5 @@ USER nodejs
 # Expose port
 EXPOSE 8000
 
-# Start the application in development mode
+# Start the development server
 CMD ["npm", "run", "dev"]
-
