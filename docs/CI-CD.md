@@ -4,80 +4,80 @@ This document describes the GitHub Actions CI/CD pipeline for the Question Maker
 
 ## Pipeline Overview
 
-The CI/CD pipeline consists of several jobs that run in parallel and sequence to ensure code quality, security, and successful deployment.
+The CI/CD pipeline consists of three separate workflows that run based on different branch triggers to ensure code quality, security, and successful deployment.
+
+## Branch Strategy
+
+```
+feature/* → dev → deploy → main
+    ↓        ↓       ↓        ↓
+  lint/test integration staging production
+```
+
+- **`feature/*`** - Development work (linting + testing)
+- **`dev`** - Integration branch (testing)
+- **`deploy`** - Deployment branch (staging environment)
+- **`main`** - Production releases (stable releases only)
+
+## Workflow Files
+
+### 1. Feature Branch CI (`feature-ci.yml`)
+- **Triggers**: Push to `feature/*` branches, PRs to `dev`
+- **Purpose**: Quick feedback on code quality
+- **Jobs**:
+  - `lint-and-test` - Linting, testing, security audits
+  - `build-and-test-docker` - Docker build validation (PR only)
+
+### 2. Deploy to Staging (`deploy.yml`)
+- **Triggers**: Push to `deploy` branch, manual trigger
+- **Purpose**: Deploy to staging environment for testing
+- **Jobs**:
+  - `lint-and-test` - Code quality checks
+  - `build-and-test-docker` - Docker validation
+  - `deploy-staging` - Deploy to UBC server (staging)
+
+### 3. Production Release (`main.yml`)
+- **Triggers**: Push to `main` branch, manual trigger
+- **Purpose**: Deploy to production environment
+- **Jobs**:
+  - `lint-and-test` - Code quality checks
+  - `build-and-test-docker` - Docker validation
+  - `deploy-production` - Deploy to UBC server (production)
 
 ## Workflow Triggers
 
-- **Push to main**: Triggers full pipeline including production deployment
-- **Push to dev**: Triggers staging deployment
-- **Push to feature branches**: Triggers CI checks only
-- **Pull Requests**: Triggers CI checks and Docker testing
-- **Manual trigger**: Available via GitHub Actions UI
+| Branch | Workflow | Environment | Purpose |
+|--------|----------|-------------|---------|
+| `feature/*` | `feature-ci.yml` | CI only | Code quality |
+| `dev` | `feature-ci.yml` | CI only | Integration testing |
+| `deploy` | `deploy.yml` | Staging | Pre-production testing |
+| `main` | `main.yml` | Production | Stable releases |
 
 ## Jobs Description
 
-### 1. Linting Jobs (`lint-backend`, `lint-frontend`)
-- **Purpose**: Code quality and style enforcement
-- **Triggers**: All events
-- **Matrix**: Node.js 18.x and 20.x
+### Lint and Test Job
+- **Purpose**: Code quality and security enforcement
 - **Actions**:
   - ESLint code analysis
-  - Prettier formatting checks
+  - Unit test execution (Jest + Vitest)
+  - Security audit (npm audit)
   - Dependency caching for performance
 
-### 2. Testing Jobs (`test-backend`, `test-frontend`)
-- **Purpose**: Automated testing and coverage reporting
-- **Triggers**: All events
-- **Matrix**: Node.js 18.x and 20.x
-- **Actions**:
-  - Unit test execution
-  - Coverage report generation
-  - Codecov integration for coverage tracking
-
-### 3. Docker Testing (`build-and-test-docker`)
+### Build and Test Docker Job
 - **Purpose**: Container build validation
-- **Triggers**: Pull requests only
 - **Actions**:
   - Docker image builds
   - Docker Compose configuration validation
-  - Container startup testing
+  - Container startup testing (staging only)
   - Service health verification
 
-### 4. Security Audit (`security-audit`)
-- **Purpose**: Dependency vulnerability scanning
-- **Triggers**: Pull requests only
+### Deploy Jobs
+- **Purpose**: Automated deployment to UBC server
 - **Actions**:
-  - npm audit for backend dependencies
-  - npm audit for frontend dependencies
-  - Moderate+ severity vulnerability detection
-
-### 5. Database Migration (`database-migration`)
-- **Purpose**: Database schema updates
-- **Triggers**: Push to main only
-- **Dependencies**: Linting and testing jobs
-- **Actions**:
-  - Sequelize migration execution
-  - Migration status verification
-  - Production database updates
-
-### 6. Production Deployment (`deploy-production`)
-- **Purpose**: Automated production deployment
-- **Triggers**: Push to main only
-- **Dependencies**: All CI jobs + database migration
-- **Actions**:
-  - Docker image building and pushing to GitHub Container Registry
   - SSH deployment to UBC server
+  - Docker Compose orchestration
   - Health check verification
-  - Container orchestration
-
-### 7. Staging Deployment (`deploy-staging`)
-- **Purpose**: Development environment testing
-- **Triggers**: Push to dev branch only
-- **Dependencies**: CI jobs (no database migration)
-- **Actions**:
-  - Development Docker Compose testing
-  - Container validation
-  - Deployment notification
+  - Deployment notifications
 
 ## Required Secrets
 
@@ -85,51 +85,52 @@ Configure these secrets in your GitHub repository settings:
 
 ### Repository Secrets
 - `UBC_SERVER_SSH_KEY`: SSH private key for UBC server access
-- `DATABASE_URL`: Production database connection string
+- `DATABASE_URL`: Database connection string
+- `OPENAI_API_KEY`: OpenAI API key for AI features
+- `EDUAI_API_KEY`: EduAI API key for educational AI features
+- `PERSONAL_ACCESS_TOKEN`: GitHub Personal Access Token
 
 ### Automatic Secrets
 - `GITHUB_TOKEN`: Automatically provided by GitHub Actions
 
 ## Environment Variables
 
-- `NODE_VERSION`: '20.x' (default Node.js version)
-- `DOCKER_REGISTRY`: 'ghcr.io' (GitHub Container Registry)
-
-## Docker Registry
-
-Images are pushed to GitHub Container Registry:
-- `ghcr.io/[repository]/question-maker-backend`
-- `ghcr.io/[repository]/question-maker-frontend`
+- `NODE_VERSION`: '20.x' (Node.js version)
 
 ## Deployment Process
 
-### Production Deployment (main branch)
-1. **Code Quality**: Linting and testing
-2. **Security**: Vulnerability scanning
-3. **Database**: Migration execution
-4. **Build**: Docker image creation
-5. **Registry**: Image push to GHCR
-6. **Deploy**: SSH to UBC server
-7. **Verify**: Health check validation
+### Feature Development Flow
+1. **Create feature branch**: `git checkout -b feature/new-feature`
+2. **Develop and commit**: Make changes, commit to feature branch
+3. **Automatic CI**: Linting and testing run automatically
+4. **Create PR**: Merge to `dev` branch for integration testing
 
-### Staging Deployment (dev branch)
-1. **Code Quality**: Linting and testing
-2. **Security**: Vulnerability scanning
-3. **Test**: Development environment validation
-4. **Notify**: Deployment completion
+### Staging Deployment Flow
+1. **Merge to deploy**: `git checkout deploy && git merge dev`
+2. **Push to deploy**: `git push origin deploy`
+3. **Automatic staging**: Deploy to staging environment
+4. **Test in staging**: Verify functionality in staging
+5. **Health checks**: Pipeline validates deployment success
+
+### Production Release Flow
+1. **Merge to main**: `git checkout main && git merge deploy`
+2. **Push to main**: `git push origin main`
+3. **Automatic production**: Deploy to production environment
+4. **Health checks**: Pipeline validates production deployment
+5. **Release notification**: Success notification with release info
 
 ## Monitoring and Debugging
 
 ### View Pipeline Status
 - GitHub Actions tab in repository
-- Individual job logs and outputs
+- Individual workflow logs and outputs
 - Real-time execution monitoring
 
 ### Common Issues
 1. **Build Failures**: Check Dockerfile syntax and dependencies
 2. **Test Failures**: Review test output and coverage reports
 3. **Deployment Issues**: Check SSH key configuration and server access
-4. **Migration Errors**: Verify database connection and migration scripts
+4. **Health Check Failures**: Verify application endpoints and server status
 
 ### Log Locations
 - **GitHub Actions**: Repository Actions tab
@@ -141,7 +142,7 @@ Images are pushed to GitHub Container Registry:
 - **Dependency Caching**: npm packages cached between runs
 - **Docker Layer Caching**: Image layers cached for faster builds
 - **Parallel Execution**: Jobs run in parallel where possible
-- **Matrix Strategy**: Multiple Node.js versions tested efficiently
+- **Workflow Separation**: Different workflows for different purposes
 
 ## Security Considerations
 
@@ -175,13 +176,14 @@ docker compose up -d
 1. **Branch Protection**: Require CI checks before merging to main
 2. **Code Reviews**: Mandatory PR reviews for production changes
 3. **Testing**: Comprehensive test coverage before deployment
-4. **Monitoring**: Regular health check monitoring
-5. **Documentation**: Keep deployment docs updated
+4. **Staging First**: Always test in staging before production
+5. **Monitoring**: Regular health check monitoring
+6. **Documentation**: Keep deployment docs updated
 
 ## Troubleshooting
 
 ### Pipeline Failures
-1. Check job logs for specific error messages
+1. Check workflow logs for specific error messages
 2. Verify secret configurations
 3. Test Docker builds locally
 4. Validate SSH connectivity
@@ -192,5 +194,4 @@ docker compose up -d
 3. Review application logs
 4. Test database connectivity
 
-This pipeline ensures reliable, secure, and automated deployment of the Question Maker application.
-
+This pipeline ensures reliable, secure, and automated deployment of the Question Maker application with proper staging and production environments.
