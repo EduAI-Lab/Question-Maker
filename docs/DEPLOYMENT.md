@@ -11,6 +11,70 @@ This guide provides step-by-step instructions for deploying the Question Maker a
 - **Personal Access Token** for GitHub (passwords no longer work for Git operations)
 - Docker and Docker Compose installed
 
+## CI/CD Pipeline
+
+The Question Maker application uses GitHub Actions for automated testing and deployment.
+
+### Automatic Deployment
+
+**Triggers:**
+- ✅ **Push to `deploy` branch** - Automatically deploys to staging
+- ✅ **Push to `main` branch** - Automatically deploys to production
+- ✅ **Pull requests** - Runs tests and Docker builds (no deployment)
+
+### Manual Deployment
+
+**Option 1: GitHub Actions UI**
+1. Go to your repository on GitHub
+2. Click **Actions** tab
+3. Select **CI/CD Pipeline** workflow
+4. Click **Run workflow** button
+5. Select branch and click **Run workflow**
+
+**Option 2: Command Line**
+```bash
+# Push to staging (deploy branch)
+git push origin deploy
+
+# Push to production (main branch)
+git push origin main
+
+# Or create a new commit to trigger deployment
+git add .
+git commit -m "Deploy latest changes"
+git push origin deploy  # or main
+```
+
+### Required GitHub Secrets
+
+Add these secrets in GitHub repository settings:
+
+1. **`UBC_SERVER_SSH_KEY`** - Your SSH private key for server access
+   - Generate: `ssh-keygen -t rsa -b 4096 -C "your_email@example.com"`
+   - Copy private key content to GitHub secret
+
+2. **`DATABASE_URL`** - Database connection string
+   - Format: `postgresql://postgres:password@postgres:5432/eduquery`
+
+3. **`OPENAI_API_KEY`** - OpenAI API key for AI features
+
+4. **`EDUAI_API_KEY`** - EduAI API key for educational AI features
+
+5. **`PERSONAL_ACCESS_TOKEN`** - GitHub Personal Access Token
+   - For Git operations and API access
+
+### Pipeline Jobs
+
+1. **`feature-ci.yml`** - Feature branch linting and testing
+2. **`deploy.yml`** - Deploy branch (staging deployment)
+3. **`main.yml`** - Main branch (production deployment)
+
+### Monitoring Deployments
+
+- **GitHub Actions**: View deployment status in Actions tab
+- **Server Logs**: SSH to server and run `docker compose logs`
+- **Health Checks**: Pipeline automatically tests endpoints after deployment
+
 ## SSH Connection
 
 ### 1. Connect to UBC Server
