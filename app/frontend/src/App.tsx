@@ -18,7 +18,7 @@ function App() {
               {process.env.NODE_ENV === 'development' && (
                 <Route path="/api-test" element={<ApiTestPage />} />
               )}
-              <Route path="/" element={<Navigate to="/landing" replace />} />
+              <Route path="/" element={<Navigate to="/login" replace />} />
             </Routes>
             <Toaster />
           </div>
