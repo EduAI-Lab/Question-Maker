@@ -302,4 +302,4 @@ For support and questions:
 - AI question generation
 - Class management
 - File upload support
-- Docker containerization
+.
