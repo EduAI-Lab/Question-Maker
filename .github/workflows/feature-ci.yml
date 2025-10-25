@@ -37,7 +37,7 @@ jobs:
     - name: Install backend dependencies
       run: |
         cd app/backend
-        npm ci
+        npm install
         
     - name: Install frontend dependencies
       run: |
@@ -102,3 +102,4 @@ jobs:
         docker-compose -f docker-compose.dev.yml ps
         docker-compose -f docker-compose.dev.yml logs --tail=50
         docker-compose -f docker-compose.dev.yml down
+
