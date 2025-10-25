@@ -33,4 +33,3 @@ build/
 # Database
 *.db
 *.sqlite
-app/frontend/package-lock.json
