@@ -396,8 +396,26 @@ export const AddQuestionDialog = ({
                 };
             })();
 
+            const promptWithTopics = (() => {
+                const trimmedPrompt = form.generationPrompt.trim();
+                if (!topics.length) {
+                    return trimmedPrompt;
+                }
+
+                const topicLines = topics
+                    .map((topic) => `- [${topic.id}] ${topic.name}`)
+                    .join('\n');
+
+                return `${trimmedPrompt}
+
+Course topics:
+${topicLines}
+
+Use these numeric IDs for "primary_topic_id" and "secondary_topic_ids".`;
+            })();
+
             const response = await eduaiService.generateQuestions({
-                prompt: form.generationPrompt.trim(),
+                prompt: promptWithTopics,
                 courseCode,
                 model: form.generationModel,
                 numQuestions: 1,
@@ -419,17 +437,49 @@ export const AddQuestionDialog = ({
                     ? generated.difficulty
                     : 'medium';
 
-            setForm((prev) => ({
-                ...prev,
-                questionType: inferredType,
-                variantText: generated.content ?? prev.variantText,
-                variantDifficulty: inferredDifficulty,
-                questionDescription:
-                    prev.questionDescription.trim() || createDescriptionFromText(generated.content ?? ''),
-                generationPrompt: prev.generationPrompt,
-                variantReferenceId: '',
-                variantAnswer: ''
-            }));
+            setForm((prev) => {
+                const topicIdSet = new Set(topics.map((topic) => topic.id));
+                const primaryCandidate = Number(generated.primary_topic_id);
+                const primaryTopicNumeric =
+                    Number.isInteger(primaryCandidate) && topicIdSet.has(primaryCandidate)
+                        ? primaryCandidate
+                        : null;
+                const resolvedPrimaryTopicId =
+                    primaryTopicNumeric !== null ? primaryTopicNumeric.toString() : prev.primaryTopicId;
+
+                const resolvedSecondaryTopics = Array.isArray(generated.secondary_topic_ids)
+                    ? Array.from(
+                          new Set(
+                              generated.secondary_topic_ids
+                                  .map((value: unknown) => Number(value))
+                                  .filter(
+                                      (value) =>
+                                          Number.isInteger(value) &&
+                                          topicIdSet.has(value) &&
+                                          value !== primaryTopicNumeric
+                                  )
+                          )
+                      )
+                    : prev.variantSecondaryTopics;
+
+                const resolvedDescription =
+                    typeof generated.description === 'string' && generated.description.trim().length > 0
+                        ? generated.description.trim()
+                        : prev.questionDescription.trim() || createDescriptionFromText(generated.content ?? '');
+
+                return {
+                    ...prev,
+                    questionType: inferredType,
+                    variantText: generated.content ?? prev.variantText,
+                    variantDifficulty: inferredDifficulty,
+                    questionDescription: resolvedDescription,
+                    generationPrompt: prev.generationPrompt,
+                    variantReferenceId: '',
+                    variantAnswer: '',
+                    primaryTopicId: resolvedPrimaryTopicId,
+                    variantSecondaryTopics: resolvedSecondaryTopics
+                };
+            });
 
             toast({
                 title: 'Question generated',

@@ -46,10 +46,13 @@ export interface EduAIQuestionGenerationResponse {
   data: {
     questions: Array<{
       content: string;
+      description?: string;
       difficulty: 'easy' | 'medium' | 'hard';
       reasoning_level: 'factual' | 'analytical' | 'application';
       bloom_level: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
       type: 'MCQ' | 'SA';
+      primary_topic_id?: number | null;
+      secondary_topic_ids?: number[];
     }>;
     count: number;
     course: {
