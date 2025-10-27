@@ -225,7 +225,8 @@ export const AssessmentSection = ({
           open={isCreateModalOpen}
           onClose={() => setIsCreateModalOpen(false)}
           courseId={selectedCourseId}
-          onGenerate={(_params) => {
+          onGenerate={(params) => {
+            console.log('Generate assessment params', params);
             onAddAssessment();
             setIsCreateModalOpen(false);
           }}
