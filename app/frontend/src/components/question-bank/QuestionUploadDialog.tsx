@@ -44,6 +44,12 @@ type DraftQuestion = Required<Pick<ExtractedQuestion, 'question'>> &
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
 const questionTypes: QuestionType[] = ['SA', 'MCQ'];
 const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
+const aiModelOptions = [
+    { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
+    { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
+    { id: 'gemini-1-5-pro', label: 'Gemini 1.5 Pro' },
+    { id: 'llama-3-1-70b', label: 'Llama 3.1 70B' }
+] as const;
 
 interface QuestionUploadDialogProps {
     open: boolean;
@@ -95,6 +101,7 @@ export const QuestionUploadDialog = ({
         const year = now.getFullYear();
         return `Fall ${year}`;
     });
+    const [aiModel, setAiModel] = useState('gpt-4o');
 
     useEffect(() => {
         if (!open) {
@@ -503,8 +510,8 @@ export const QuestionUploadDialog = ({
     }
 
     return (
-    <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
-      <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+        <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
+            <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Upload Questions</DialogTitle>
                     <DialogDescription>
@@ -572,26 +579,42 @@ export const QuestionUploadDialog = ({
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
-              {(!lastFileName && draftQuestions.length === 0) && (
-                <label
-                  htmlFor="question-upload"
-                  className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center transition hover:border-primary hover:bg-muted/50 cursor-pointer"
-                >
-                  <UploadCloud className="h-10 w-10 text-muted-foreground" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">Drop PDF or image file here</p>
-                    <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG and other common formats.</p>
-                  </div>
-                  <input
-                    id="question-upload"
-                    type="file"
-                    accept=".pdf,image/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                    disabled={processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving'}
-                  />
-                </label>
-              )}
+                            <div className="space-y-2">
+                                <Label htmlFor="ai-model">AI model</Label>
+                                <Select value={aiModel} onValueChange={setAiModel}>
+                                    <SelectTrigger id="ai-model">
+                                        <SelectValue placeholder="Select a model" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {aiModelOptions.map((option) => (
+                                            <SelectItem key={option.id} value={option.id}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {(!lastFileName && draftQuestions.length === 0) && (
+                                <label
+                                    htmlFor="question-upload"
+                                    className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center transition hover:border-primary hover:bg-muted/50 cursor-pointer"
+                                >
+                                    <UploadCloud className="h-10 w-10 text-muted-foreground" />
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-medium">Drop PDF or image file here</p>
+                                        <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG and other common formats.</p>
+                                    </div>
+                                    <input
+                                        id="question-upload"
+                                        type="file"
+                                        accept=".pdf,image/*"
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                        disabled={processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving'}
+                                    />
+                                </label>
+                            )}
                             {lastFileName && (
                                 <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
                                     <FileText className="h-4 w-4 text-muted-foreground" />
@@ -629,7 +652,7 @@ export const QuestionUploadDialog = ({
                                 <CardTitle className="text-base font-semibold">
                                     Review extracted questions ({draftQuestions.length})
                                 </CardTitle>
-                <div className="flex items-center gap-2" />
+                                <div className="flex items-center gap-2" />
                             </CardHeader>
                             <CardContent>
                                 <ScrollArea className="max-h-[320px] rounded-md border">
