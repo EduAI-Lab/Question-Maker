@@ -1,5 +1,5 @@
-import axios from 'axios';
-import { config } from '../config/settings.js';
+import axios from "axios";
+import { config } from "../config/settings.js";
 
 /**
  * EduAI Service - Integration with external EduAI RAG API
@@ -10,16 +10,18 @@ class EduAIService {
   constructor() {
     this.baseURL = config.eduaiApiUrl;
     this.apiKey = config.eduaiApiKey;
-    
-    console.log('EduAI Service initialized:', {
+
+    console.log("EduAI Service initialized:", {
       baseURL: this.baseURL,
       hasApiKey: !!this.apiKey,
       apiKeyLength: this.apiKey ? this.apiKey.length : 0,
-      apiKeyPrefix: this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'none'
+      apiKeyPrefix: this.apiKey ? this.apiKey.substring(0, 8) + "..." : "none",
     });
-    
+
     if (!this.apiKey) {
-      console.warn('EduAI API key not configured. EduAI features will be disabled.');
+      console.warn(
+        "EduAI API key not configured. EduAI features will be disabled."
+      );
     }
   }
 
@@ -42,56 +44,67 @@ class EduAIService {
    */
   async chat(params) {
     if (!this.isConfigured()) {
-      throw new Error('EduAI service is not configured. Please set EDUAI_API_KEY environment variable.');
+      throw new Error(
+        "EduAI service is not configured. Please set EDUAI_API_KEY environment variable."
+      );
     }
 
     try {
       const requestPayload = {
         messages: params.messages || [],
-        model: params.model || 'google:gemini-2.5-flash',
+        model: params.model || "google:gemini-2.5-flash",
         apiKeys: params.apiKeys || {},
         courseCode: params.courseCode,
-        streaming: params.streaming || false
+        streaming: params.streaming || false,
       };
 
-      console.log('EduAI Request:', {
+      console.log("EduAI Request:", {
         url: `${this.baseURL}/api/chat`,
         payload: requestPayload,
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey ? this.apiKey.substring(0, 8) + '...' : 'none'
-        }
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey
+            ? this.apiKey.substring(0, 8) + "..."
+            : "none",
+        },
       });
 
-      const response = await axios.post(`${this.baseURL}/api/chat`, requestPayload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey
-        },
-        timeout: 30000 // 30 second timeout
-      });
+      const response = await axios.post(
+        `${this.baseURL}/api/chat`,
+        requestPayload,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": this.apiKey,
+          },
+          timeout: 30000, // 30 second timeout
+        }
+      );
 
       return response.data;
     } catch (error) {
       if (error.response) {
         // API returned an error response
-        const errorMessage = error.response.data?.error || error.response.data?.message || error.response.statusText;
+        const errorMessage =
+          error.response.data?.error ||
+          error.response.data?.message ||
+          error.response.statusText;
         const statusCode = error.response.status;
-        console.error('EduAI API Error:', {
+        console.error("EduAI API Error:", {
           status: statusCode,
           statusText: error.response.statusText,
           data: error.response.data,
           url: `${this.baseURL}/api/chat`,
-          headers: error.response.headers
+          headers: error.response.headers,
         });
         throw new Error(`EduAI API error (${statusCode}): ${errorMessage}`);
       } else if (error.request) {
         // Request was made but no response received
-        console.error('EduAI Request Error:', error.request);
-        throw new Error('EduAI API request failed: No response received');
+        console.error("EduAI Request Error:", error.request);
+        throw new Error("EduAI API request failed: No response received");
       } else {
         // Something else happened
-        console.error('EduAI Error:', error.message);
+        console.error("EduAI Error:", error.message);
         throw new Error(`EduAI API error: ${error.message}`);
       }
     }
@@ -113,15 +126,17 @@ class EduAIService {
     const {
       prompt,
       courseCode,
-      model = 'google:gemini-2.5-flash',
+      model = "google:gemini-2.5-flash",
       apiKeys = {},
       numQuestions = 5,
       difficultyDistribution = { easy: 1, medium: 2, hard: 2 },
-      reasoningDistribution = { factual: 40, analytical: 30, application: 30 }
+      reasoningDistribution = { factual: 40, analytical: 30, application: 30 },
     } = params;
 
     if (!prompt || !courseCode) {
-      throw new Error('Prompt and courseCode are required for question generation');
+      throw new Error(
+        "Prompt and courseCode are required for question generation"
+      );
     }
 
     const systemPrompt = `You are an expert question generator for educational assessments. Generate exactly ${numQuestions} high-quality questions based on the course material.
@@ -154,66 +169,88 @@ Please ensure the questions are appropriate for the course level and cover the k
     try {
       const response = await this.chat({
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
         ],
         model,
         apiKeys,
         courseCode,
-        streaming: false
+        streaming: false,
       });
 
       // Parse the response
       let questions;
       try {
-        questions = JSON.parse(response.content || response.message || response);
+        questions = JSON.parse(
+          response.content || response.message || response
+        );
       } catch (parseError) {
         // If parsing fails, try to extract JSON from the response
-        const jsonMatch = (response.content || response.message || response).match(/\[[\s\S]*\]/);
+        const jsonMatch = (
+          response.content ||
+          response.message ||
+          response
+        ).match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           questions = JSON.parse(jsonMatch[0]);
         } else {
-          throw new Error('Could not parse questions from EduAI response');
+          throw new Error("Could not parse questions from EduAI response");
         }
       }
 
       // Validate questions
       if (!Array.isArray(questions)) {
-        throw new Error('EduAI response is not an array of questions');
+        throw new Error("EduAI response is not an array of questions");
       }
 
       // Filter and validate each question
-      const validQuestions = questions.filter(q => 
-        q.content && 
-        q.difficulty && 
-        q.reasoning_level &&
-        q.bloom_level &&
-        ['easy', 'medium', 'hard'].includes(q.difficulty) &&
-        ['factual', 'analytical', 'application'].includes(q.reasoning_level) &&
-        ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'].includes(q.bloom_level)
+      const validQuestions = questions.filter(
+        (q) =>
+          q.content &&
+          q.difficulty &&
+          q.reasoning_level &&
+          q.bloom_level &&
+          ["easy", "medium", "hard"].includes(q.difficulty) &&
+          ["factual", "analytical", "application"].includes(
+            q.reasoning_level
+          ) &&
+          [
+            "remember",
+            "understand",
+            "apply",
+            "analyze",
+            "evaluate",
+            "create",
+          ].includes(q.bloom_level)
       );
 
       if (validQuestions.length === 0) {
-        throw new Error('No valid questions found in EduAI response');
+        throw new Error("No valid questions found in EduAI response");
       }
 
       const normalizedQuestions = validQuestions.map((question) => {
         const content = question.content.trim();
 
         const description =
-          typeof question.description === 'string' && question.description.trim().length > 0
+          typeof question.description === "string" &&
+          question.description.trim().length > 0
             ? question.description.trim()
-            : '';
+            : "";
 
         const primaryCandidate = Number(question.primary_topic_id);
-        const primaryTopicId = Number.isInteger(primaryCandidate) ? primaryCandidate : null;
+        const primaryTopicId = Number.isInteger(primaryCandidate)
+          ? primaryCandidate
+          : null;
 
         const secondaryTopicIds = Array.isArray(question.secondary_topic_ids)
           ? Array.from(
               new Set(
                 question.secondary_topic_ids
                   .map((value) => Number(value))
-                  .filter((value) => Number.isInteger(value) && value !== primaryTopicId)
+                  .filter(
+                    (value) =>
+                      Number.isInteger(value) && value !== primaryTopicId
+                  )
               )
             )
           : [];
@@ -225,11 +262,12 @@ Please ensure the questions are appropriate for the course level and cover the k
           reasoning_level: question.reasoning_level,
           bloom_level: question.bloom_level,
           type:
-            typeof question.type === 'string' && question.type.toUpperCase().trim() === 'SA'
-              ? 'SA'
-              : 'MCQ',
+            typeof question.type === "string" &&
+            question.type.toUpperCase().trim() === "SA"
+              ? "SA"
+              : "MCQ",
           primary_topic_id: primaryTopicId,
-          secondary_topic_ids: secondaryTopicIds
+          secondary_topic_ids: secondaryTopicIds,
         };
       });
 
@@ -247,51 +285,61 @@ Please ensure the questions are appropriate for the course level and cover the k
     if (!this.isConfigured()) {
       return {
         success: false,
-        error: 'EduAI API key not configured'
+        error: "EduAI API key not configured",
       };
     }
 
     try {
       // Test the API key by making a minimal chat request with Ollama
       const response = await this.chat({
-        messages: [{ role: 'user', content: 'test' }],
-        model: 'ollama:gpt-oss:120b', // Use Ollama which doesn't need API key
+        messages: [{ role: "user", content: "test" }],
+        model: "ollama:gpt-oss:120b", // Use Ollama which doesn't need API key
         apiKeys: {
           ollama: {
-            isEnabled: true
-          }
+            isEnabled: true,
+          },
         },
-        courseCode: 'COSC 121',
-        streaming: false
+        courseCode: "COSC 121",
+        streaming: false,
       });
 
       return {
         success: true,
-        message: 'API key is valid',
-        response: response
+        message: "API key is valid",
+        response: response,
       };
     } catch (error) {
-      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+      if (
+        error.message.includes("401") ||
+        error.message.includes("Unauthorized")
+      ) {
         return {
           success: false,
-          error: 'Invalid EduAI API key - authentication failed'
+          error: "Invalid EduAI API key - authentication failed",
         };
-      } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+      } else if (
+        error.message.includes("403") ||
+        error.message.includes("Forbidden")
+      ) {
         return {
           success: false,
-          error: 'EduAI API key access forbidden'
+          error: "EduAI API key access forbidden",
         };
-      } else if (error.message.includes('Invalid API key') || error.message.includes('test-key')) {
+      } else if (
+        error.message.includes("Invalid API key") ||
+        error.message.includes("test-key")
+      ) {
         return {
           success: true,
-          message: 'EduAI API key is valid (provider API key test failed as expected)',
-          note: 'The EduAI API key works, but you need to provide valid AI provider API keys'
+          message:
+            "EduAI API key is valid (provider API key test failed as expected)",
+          note: "The EduAI API key works, but you need to provide valid AI provider API keys",
         };
       } else {
         return {
           success: false,
           error: `API key test failed: ${error.message}`,
-          statusCode: error.response?.status
+          statusCode: error.response?.status,
         };
       }
     }
