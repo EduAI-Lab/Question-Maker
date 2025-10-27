@@ -24,21 +24,37 @@ export interface AssessmentGenerationParams {
     medium: number; // Analysis
     hard: number; // Application
   };
-  autoContextStrength: number; // 0-100
+  reasoningDistribution: {
+    factual: number;
+    analytical: number;
+    application: number;
+  };
+  reasoningData: ReasoningDataState;
   mode: 'auto' | 'manual' | 'hybrid';
 }
 
 type Topic = { id: number; name: string };
+
+type ReasoningProfile = {
+  total: number;
+  easyBoundary: number;
+  hardBoundary: number;
+};
+
+type ReasoningDataState = {
+  factual: ReasoningProfile;
+  analytical: ReasoningProfile;
+  application: ReasoningProfile;
+};
 
 export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }: GenerateAssessmentModalProps) => {
   const [numQuestions, setNumQuestions] = React.useState<number>(10);
   const [availableTopics, setAvailableTopics] = React.useState<Topic[]>([]);
   const [primaryTopicId, setPrimaryTopicId] = React.useState<number | undefined>(undefined);
   const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>([]);
-  const [autoContextStrength, setAutoContextStrength] = React.useState<number>(60);
   const [mode, setMode] = React.useState<'auto' | 'manual' | 'hybrid'>('auto');
   // Matrix data model: each reasoning type has its own difficulty distribution
-  const [reasoningData, setReasoningData] = React.useState({
+  const [reasoningData, setReasoningData] = React.useState<ReasoningDataState>({
     factual: {
       total: 40, // Total percentage for factual questions
       easyBoundary: 60, // Boundary between easy and medium
@@ -177,7 +193,6 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
       difficultyDistribution,
       reasoningDistribution,
       reasoningData,
-      autoContextStrength,
       mode
     });
     onClose();
@@ -188,22 +203,33 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <Card className="relative w-full max-w-3xl">
         <CardHeader className="border-b">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Generate Assessment</CardTitle>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <span className="text-xs uppercase tracking-wide text-muted-foreground sm:hidden">Mode</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">Auto context</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={autoContextStrength}
-                  onChange={(e) => setAutoContextStrength(parseInt(e.target.value, 10))}
-                  className="w-32"
-                />
-                <span className="w-8 text-right text-sm text-gray-700">{autoContextStrength}</span>
+                <Button
+                  variant={mode === 'auto' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMode('auto')}
+                >
+                  Fully Automated
+                </Button>
+                <Button
+                  variant={mode === 'hybrid' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMode('hybrid')}
+                >
+                  Hybrid
+                </Button>
+                <Button
+                  variant={mode === 'manual' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setMode('manual')}
+                >
+                  Manual
+                </Button>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setMode('manual')}>Manual</Button>
             </div>
           </div>
         </CardHeader>
@@ -427,16 +453,7 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
               </table>
             </div>
 
-
-
-            {/* Mode Selection */}
-            <div className="flex items-center gap-2">
-              <Button variant={mode === 'auto' ? 'default' : 'outline'} size="sm" onClick={() => setMode('auto')}>Fully Automated</Button>
-              <Button variant={mode === 'hybrid' ? 'default' : 'outline'} size="sm" onClick={() => setMode('hybrid')}>Hybrid</Button>
-              <Button variant={mode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setMode('manual')}>Manual</Button>
-            </div>
           </div>
-
             <div className="flex justify-end gap-3 pt-4">
               <Button variant="outline" onClick={onClose}>Cancel</Button>
               <Button onClick={handleGenerate}>Generate</Button>
@@ -448,6 +465,3 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
 };
 
 export default GenerateAssessmentModal;
-
-
-
