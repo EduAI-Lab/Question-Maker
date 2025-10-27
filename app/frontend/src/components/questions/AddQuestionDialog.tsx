@@ -302,19 +302,6 @@ export const AddQuestionDialog = ({
                 return normalizeCourseCode(candidate) === normalizedCode;
             });
         });
-        console.log('[EduAI] course recognition check', {
-            code,
-            normalizedCode,
-            availableCourses: availableEduCourses.map((course) => ({
-                id: course.id,
-                code: course.code,
-                name: course.name,
-                normalizedId: normalizeCourseCode(course.id),
-                normalizedCode: course.code ? normalizeCourseCode(course.code) : null,
-                normalizedName: normalizeCourseCode(course.name)
-            })),
-            result
-        });
         return result;
     };
 
@@ -449,17 +436,17 @@ Use these numeric IDs for "primary_topic_id" and "secondary_topic_ids".`;
 
                 const resolvedSecondaryTopics = Array.isArray(generated.secondary_topic_ids)
                     ? Array.from(
-                          new Set(
-                              generated.secondary_topic_ids
-                                  .map((value: unknown) => Number(value))
-                                  .filter(
-                                      (value) =>
-                                          Number.isInteger(value) &&
-                                          topicIdSet.has(value) &&
-                                          value !== primaryTopicNumeric
-                                  )
-                          )
-                      )
+                        new Set(
+                            generated.secondary_topic_ids
+                                .map((value: unknown) => Number(value))
+                                .filter(
+                                    (value) =>
+                                        Number.isInteger(value) &&
+                                        topicIdSet.has(value) &&
+                                        value !== primaryTopicNumeric
+                                )
+                        )
+                    )
                     : prev.variantSecondaryTopics;
 
                 const resolvedDescription =
