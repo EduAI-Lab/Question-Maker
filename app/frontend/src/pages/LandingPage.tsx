@@ -371,6 +371,7 @@ export const LandingPage = () => {
             onExportAssessment={handleExportAssessment}
             onAddAssessment={handleAddAssessment}
             onReorderQuestions={handleReorderQuestions}
+            selectedCourseId={selectedCourse?.id ?? null}
           />
         )}
       </div>
