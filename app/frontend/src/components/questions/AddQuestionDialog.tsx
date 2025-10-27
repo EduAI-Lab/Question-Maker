@@ -385,20 +385,34 @@ export const AddQuestionDialog = ({
 
             const promptWithTopics = (() => {
                 const trimmedPrompt = form.generationPrompt.trim();
-                if (!topics.length) {
-                    return trimmedPrompt;
+                const sections: string[] = [trimmedPrompt];
+
+                if (form.mode === 'variant') {
+                    const contextLines: string[] = [];
+                    const baseSource = selectedBase ?? presetVariant ?? null;
+
+                    if (baseSource) {
+                        if (baseSource.questionDescription) {
+                            contextLines.push(`Base question description: ${baseSource.questionDescription}`);
+                        }
+                        if (baseSource.variant?.questionText) {
+                            contextLines.push(`Existing variant text: ${baseSource.variant.questionText}`);
+                        }
+                    }
+
+                    if (contextLines.length > 0) {
+                        sections.push(`Base question context:\n${contextLines.join('\n')}`);
+                    }
                 }
 
-                const topicLines = topics
-                    .map((topic) => `- [${topic.id}] ${topic.name}`)
-                    .join('\n');
+                if (topics.length > 0) {
+                    const topicLines = topics.map((topic) => `- [${topic.id}] ${topic.name}`).join('\n');
+                    sections.push(
+                        `Course topics:\n${topicLines}\n\nUse these numeric IDs for "primary_topic_id" and "secondary_topic_ids".`
+                    );
+                }
 
-                return `${trimmedPrompt}
-
-Course topics:
-${topicLines}
-
-Use these numeric IDs for "primary_topic_id" and "secondary_topic_ids".`;
+                return sections.filter(Boolean).join('\n\n');
             })();
 
             const response = await eduaiService.generateQuestions({
@@ -431,23 +445,35 @@ Use these numeric IDs for "primary_topic_id" and "secondary_topic_ids".`;
                     Number.isInteger(primaryCandidate) && topicIdSet.has(primaryCandidate)
                         ? primaryCandidate
                         : null;
-                const resolvedPrimaryTopicId =
-                    primaryTopicNumeric !== null ? primaryTopicNumeric.toString() : prev.primaryTopicId;
 
                 const resolvedSecondaryTopics = Array.isArray(generated.secondary_topic_ids)
                     ? Array.from(
-                        new Set(
-                            generated.secondary_topic_ids
-                                .map((value: unknown) => Number(value))
-                                .filter(
-                                    (value) =>
-                                        Number.isInteger(value) &&
-                                        topicIdSet.has(value) &&
-                                        value !== primaryTopicNumeric
-                                )
-                        )
-                    )
-                    : prev.variantSecondaryTopics;
+                          new Set(
+                              generated.secondary_topic_ids
+                                  .map((value: unknown) => Number(value))
+                                  .filter(
+                                      (value) =>
+                                          Number.isInteger(value) &&
+                                          topicIdSet.has(value) &&
+                                          value !== primaryTopicNumeric
+                                  )
+                          )
+                      )
+                    : [];
+
+                if (prev.mode === 'variant') {
+                    return {
+                        ...prev,
+                        variantText: generated.content ?? prev.variantText,
+                        variantDifficulty: inferredDifficulty,
+                        generationPrompt: prev.generationPrompt,
+                        variantSecondaryTopics:
+                            resolvedSecondaryTopics.length > 0 ? resolvedSecondaryTopics : prev.variantSecondaryTopics
+                    };
+                }
+
+                const resolvedPrimaryTopicId =
+                    primaryTopicNumeric !== null ? primaryTopicNumeric.toString() : prev.primaryTopicId;
 
                 const resolvedDescription =
                     typeof generated.description === 'string' && generated.description.trim().length > 0
@@ -464,7 +490,8 @@ Use these numeric IDs for "primary_topic_id" and "secondary_topic_ids".`;
                     variantReferenceId: '',
                     variantAnswer: '',
                     primaryTopicId: resolvedPrimaryTopicId,
-                    variantSecondaryTopics: resolvedSecondaryTopics
+                    variantSecondaryTopics:
+                        resolvedSecondaryTopics.length > 0 ? resolvedSecondaryTopics : prev.variantSecondaryTopics
                 };
             });
 
@@ -827,6 +854,101 @@ Use these numeric IDs for "primary_topic_id" and "secondary_topic_ids".`;
 
                         <div className="space-y-4">
                             <h4 className="text-sm font-semibold">Variant Details</h4>
+
+                            {form.mode === 'variant' && (
+                                <div className="space-y-3 rounded-md border bg-muted/30 p-4">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="space-y-1">
+                                            <Label className="text-sm font-semibold">Generate Variant with EduAI</Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Describe how you want to tweak this question and let EduAI draft a new variant.
+                                                {selectedBase && (
+                                                    <>
+                                                        {' '}
+                                                        The base question is &ldquo;{selectedBase.questionDescription}&rdquo;.
+                                                    </>
+                                                )}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            onClick={handleGenerateWithAI}
+                                            disabled={isGenerating}
+                                        >
+                                            {isGenerating ? 'Generating…' : 'Generate Variant'}
+                                        </Button>
+                                    </div>
+
+                                    {courseWarningMessage && (
+                                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+                                            {courseWarningMessage}
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="variant-generation-prompt">Variant Prompt</Label>
+                                        <Textarea
+                                            id="variant-generation-prompt"
+                                            value={form.generationPrompt}
+                                            onChange={(event) =>
+                                                handleFieldChange('generationPrompt', event.target.value)
+                                            }
+                                            placeholder="e.g. Create a harder twist that focuses on application rather than recall."
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="space-y-2">
+                                            <Label>Model</Label>
+                                            <Select
+                                                value={form.generationModel}
+                                                onValueChange={(value) => handleFieldChange('generationModel', value)}
+                                                disabled={availableModels.length === 0}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select a model" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {availableModels.length === 0 ? (
+                                                        <SelectItem value="__no_models" disabled>
+                                                            No models available yet
+                                                        </SelectItem>
+                                                    ) : (
+                                                        availableModels.map((model) => (
+                                                            <SelectItem key={model.id} value={model.id}>
+                                                                {model.label}
+                                                                {model.provider ? ` (${model.provider})` : ''}
+                                                            </SelectItem>
+                                                        ))
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Desired Difficulty</Label>
+                                            <Select
+                                                value={form.generationDifficulty}
+                                                onValueChange={(value) =>
+                                                    handleFieldChange(
+                                                        'generationDifficulty',
+                                                        value as QuestionDifficulty | 'balanced'
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="balanced">Let EduAI decide</SelectItem>
+                                                    <SelectItem value="easy">Easy</SelectItem>
+                                                    <SelectItem value="medium">Medium</SelectItem>
+                                                    <SelectItem value="hard">Hard</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="space-y-2">
                                 <Label htmlFor="variant-text">Variant Question Text</Label>
