@@ -138,5 +138,14 @@ export const questionService = {
   }): Promise<Question[]> {
     const response = await api.post('/api/questions/extract/save', payload);
     return (response.data.data || []).map(mapQuestion);
+  },
+
+  async previewEduAIExtraction(payload: {
+    text: string;
+    courseCode?: string;
+    model?: string;
+  }): Promise<any> {
+    const response = await api.post('/api/eduai/extract-preview', payload);
+    return response.data;
   }
 };

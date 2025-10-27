@@ -45,6 +45,7 @@ const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
 const questionTypes: QuestionType[] = ['SA', 'MCQ'];
 const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
 const aiModelOptions = [
+    { id: 'ollama:gpt-oss:120b', label: 'Ollama GPT-OSS 120B' },
     { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
     { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
     { id: 'gemini-1-5-pro', label: 'Gemini 1.5 Pro' },
@@ -101,7 +102,9 @@ export const QuestionUploadDialog = ({
         const year = now.getFullYear();
         return `Fall ${year}`;
     });
-    const [aiModel, setAiModel] = useState('gpt-4o');
+    const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
+    const [eduPreview, setEduPreview] = useState<Array<{ summary: string; question: string }> | null>(null);
+    const [eduPreviewError, setEduPreviewError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!open) {
@@ -279,13 +282,71 @@ export const QuestionUploadDialog = ({
         });
     }, [courseId, toast]);
 
+    const previewEduAIExtraction = useCallback(
+        async (text: string) => {
+            try {
+                const response = await questionService.previewEduAIExtraction({
+                    text,
+                    courseCode: courseName ?? 'COSC328',
+                    model: aiModel
+                });
+                console.log('[EduAI Extraction Preview]', response);
+
+                const rawContent =
+                    response?.data?.content ??
+                    (typeof response?.data === 'string' ? response.data : null);
+
+                if (!rawContent) {
+                    setEduPreview(null);
+                    setEduPreviewError('EduAI response did not include content.');
+                    return;
+                }
+
+                try {
+                    const parsed = JSON.parse(rawContent);
+                    if (Array.isArray(parsed)) {
+                        const simplified = parsed.map((item) => ({
+                            summary:
+                                typeof item?.summary === 'string' && item.summary.trim()
+                                    ? item.summary.trim()
+                                    : 'Summary unavailable',
+                            question:
+                                typeof item?.question === 'string' && item.question.trim()
+                                    ? item.question.trim()
+                                    : 'Question text unavailable'
+                        }));
+                        setEduPreview(simplified);
+                        setEduPreviewError(null);
+                    } else {
+                        setEduPreview(null);
+                        setEduPreviewError('EduAI returned a non-array response.');
+                    }
+                } catch (parseError) {
+                    console.error('Failed to parse EduAI preview content', parseError);
+                    setEduPreview(null);
+                    setEduPreviewError('Unable to parse EduAI preview JSON.');
+                }
+            } catch (err: any) {
+                console.error('EduAI extraction preview failed', err);
+                setEduPreview(null);
+                setEduPreviewError(
+                    err?.response?.data?.error || err?.message || 'EduAI preview failed.'
+                );
+            }
+        },
+        [aiModel, courseName]
+    );
+
     const processFile = useCallback(async (file: File) => {
         setError(null);
         setDraftQuestions([]);
         setLastFileName(file.name);
+        setEduPreview(null);
+        setEduPreviewError(null);
         try {
             const text = await performOcr(file);
             await handleExtractQuestions(text);
+            void previewEduAIExtraction(text);
         } catch (err: any) {
             console.error('Question extraction failed', err);
             const message = err?.response?.data?.error || err?.message || 'Failed to extract questions.';
@@ -298,7 +359,7 @@ export const QuestionUploadDialog = ({
                 description: message
             });
         }
-    }, [handleExtractQuestions, performOcr, toast]);
+    }, [handleExtractQuestions, performOcr, previewEduAIExtraction, toast]);
 
     const handleFileChange = useCallback(
         (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -570,6 +631,32 @@ export const QuestionUploadDialog = ({
                         </CardContent>
                     </Card>
 
+                    {(eduPreview?.length || eduPreviewError) && (
+                        <Card>
+                            <CardHeader className="space-y-1">
+                                <CardTitle className="text-base font-semibold">EduAI preview</CardTitle>
+                                <p className="text-xs text-muted-foreground">
+                                    Quick look at the experimental EduAI extraction output.
+                                </p>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-sm">
+                                {eduPreviewError && (
+                                    <p className="text-xs text-red-600">{eduPreviewError}</p>
+                                )}
+                                {eduPreview?.map((item, index) => (
+                                    <div key={index} className="rounded-md border bg-muted/30 p-3 space-y-1">
+                                        <p className="font-medium text-foreground">
+                                            {index + 1}. {item.summary}
+                                        </p>
+                                        <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+                                            {item.question}
+                                        </p>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+
                     <Card>
                         <CardHeader className="space-y-1">
                             <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
@@ -580,8 +667,8 @@ export const QuestionUploadDialog = ({
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="ai-model">AI model</Label>
-                                <Select value={aiModel} onValueChange={setAiModel}>
+                                <Label htmlFor="ai-model">AI model (demo)</Label>
+                                <Select value={aiModel} onValueChange={(value) => setAiModel(value)}>
                                     <SelectTrigger id="ai-model">
                                         <SelectValue placeholder="Select a model" />
                                     </SelectTrigger>
@@ -593,6 +680,9 @@ export const QuestionUploadDialog = ({
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    Preview only – model choice is not applied yet.
+                                </p>
                             </div>
 
                             {(!lastFileName && draftQuestions.length === 0) && (
