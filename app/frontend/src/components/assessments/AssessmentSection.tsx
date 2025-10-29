@@ -15,6 +15,7 @@ interface AssessmentSectionProps {
   onExportAssessment: (assessment: Assessment) => void;
   onAddAssessment: () => void;
   onReorderQuestions: (assessmentId: number, questionIds: number[]) => void;
+  selectedCourseId?: number | null;
 }
 
 export const AssessmentSection = ({
@@ -23,10 +24,12 @@ export const AssessmentSection = ({
   onEditAssessment,
   onExportAssessment,
   onAddAssessment,
-  onReorderQuestions
+  onReorderQuestions,
+  selectedCourseId
 }: AssessmentSectionProps) => {
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
   const [openGenerateModalForId, setOpenGenerateModalForId] = useState<number | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const getAssessmentTypeColor = (type: string) => {
     switch (type) {
@@ -68,7 +71,11 @@ export const AssessmentSection = ({
           <h2 className="text-2xl font-bold text-gray-900">Assessments</h2>
           <p className="text-sm text-gray-600">Lab / Midterm / Quiz / Final</p>
         </div>
-        <Button onClick={onAddAssessment} className="flex items-center space-x-2">
+        <Button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center space-x-2"
+          disabled={!selectedCourseId}
+        >
           <Plus className="h-4 w-4" />
           <span>Add Assessment</span>
         </Button>
@@ -202,11 +209,28 @@ export const AssessmentSection = ({
       {assessments.length === 0 && (
         <div className="text-center py-8">
           <p className="text-gray-500 mb-4">No assessments created yet.</p>
-          <Button onClick={onAddAssessment} className="flex items-center space-x-2">
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center space-x-2"
+            disabled={!selectedCourseId}
+          >
             <Plus className="h-4 w-4" />
             <span>Create Your First Assessment</span>
           </Button>
         </div>
+      )}
+
+      {isCreateModalOpen && selectedCourseId && (
+        <GenerateAssessmentModal
+          open={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          courseId={selectedCourseId}
+          onGenerate={(params) => {
+            console.log('Generate assessment params', params);
+            onAddAssessment();
+            setIsCreateModalOpen(false);
+          }}
+        />
       )}
 
       {!!openGenerateModalForId && (
