@@ -134,11 +134,16 @@ Requirements:
 - Format each question as a JSON object with these exact fields:
   {
     "content": "The complete question text",
+    "description": "Brief summary (<= 15 words) that does not simply repeat the question text",
     "difficulty": "easy/medium/hard",
     "reasoning_level": "factual/analytical/application",
     "bloom_level": "remember/understand/apply/analyze/evaluate/create",
-    "type": "MCQ/SA"
+    "type": "MCQ/SA",
+    "primary_topic_id": number | null,
+    "secondary_topic_ids": number[]
   }
+
+If the user prompt includes a "Course topics" section, use those numeric IDs exactly when setting primary_topic_id and secondary_topic_ids.
 
 IMPORTANT: Return ONLY a valid JSON array of question objects. No other text.`;
 
@@ -192,7 +197,43 @@ Please ensure the questions are appropriate for the course level and cover the k
         throw new Error('No valid questions found in EduAI response');
       }
 
-      return validQuestions;
+      const normalizedQuestions = validQuestions.map((question) => {
+        const content = question.content.trim();
+
+        const description =
+          typeof question.description === 'string' && question.description.trim().length > 0
+            ? question.description.trim()
+            : '';
+
+        const primaryCandidate = Number(question.primary_topic_id);
+        const primaryTopicId = Number.isInteger(primaryCandidate) ? primaryCandidate : null;
+
+        const secondaryTopicIds = Array.isArray(question.secondary_topic_ids)
+          ? Array.from(
+              new Set(
+                question.secondary_topic_ids
+                  .map((value) => Number(value))
+                  .filter((value) => Number.isInteger(value) && value !== primaryTopicId)
+              )
+            )
+          : [];
+
+        return {
+          content,
+          description,
+          difficulty: question.difficulty,
+          reasoning_level: question.reasoning_level,
+          bloom_level: question.bloom_level,
+          type:
+            typeof question.type === 'string' && question.type.toUpperCase().trim() === 'SA'
+              ? 'SA'
+              : 'MCQ',
+          primary_topic_id: primaryTopicId,
+          secondary_topic_ids: secondaryTopicIds
+        };
+      });
+
+      return normalizedQuestions;
     } catch (error) {
       throw new Error(`EduAI question generation failed: ${error.message}`);
     }
