@@ -1,23 +1,22 @@
 # CI/CD Pipeline Documentation
 
-This document describes the GitHub Actions CI/CD pipeline for the Question Maker application.
+This document describes the GitHub Actions CI pipeline for the Question Maker application.
 
 ## Pipeline Overview
 
-The CI/CD pipeline consists of three separate workflows that run based on different branch triggers to ensure code quality, security, and successful deployment.
+The CI pipeline consists of two workflows that run based on branch triggers to ensure code quality and container build validity.
 
 ## Branch Strategy
 
 ```
-feature/* → dev → deploy → main
-    ↓        ↓       ↓        ↓
-  lint/test integration staging production
+feature/* → dev → release
+    ↓        ↓       ↓
+  lint/test integration CI build validation
 ```
 
 - **`feature/*`** - Development work (linting + testing)
 - **`dev`** - Integration branch (testing)
-- **`deploy`** - Deployment branch (staging environment)
-- **`main`** - Production releases (stable releases only)
+- **`release`** - Release validation (no deploy from CI)
 
 ## Workflow Files
 
@@ -25,24 +24,18 @@ feature/* → dev → deploy → main
 - **Triggers**: Push to `feature/*` branches, PRs to `dev`
 - **Purpose**: Quick feedback on code quality
 - **Jobs**:
-  - `lint-and-test` - Linting, testing, security audits
+  - `lint-and-test` - Linting, testing
   - `build-and-test-docker` - Docker build validation (PR only)
 
-### 2. Deploy to Staging (`deploy.yml`)
-- **Triggers**: Push to `deploy` branch, manual trigger
-- **Purpose**: Deploy to staging environment for testing
+### 2. Release Validation (`deploy.yml`)
+- **Triggers**: Push to `release` branch, manual trigger
+- **Purpose**: Validate images and Compose config (no deploy step)
 - **Jobs**:
   - `lint-and-test` - Code quality checks
   - `build-and-test-docker` - Docker validation
-  - `deploy-staging` - Deploy to UBC server (staging)
 
-### 3. Production Release (`main.yml`)
-- **Triggers**: Push to `main` branch, manual trigger
-- **Purpose**: Deploy to production environment
-- **Jobs**:
-  - `lint-and-test` - Code quality checks
-  - `build-and-test-docker` - Docker validation
-  - `deploy-production` - Deploy to UBC server (production)
+### Removed: Production Release (`main.yml`)
+- The production workflow was removed. Server-side deployment occurs behind VPN separately from CI.
 
 ## Workflow Triggers
 
@@ -50,41 +43,33 @@ feature/* → dev → deploy → main
 |--------|----------|-------------|---------|
 | `feature/*` | `feature-ci.yml` | CI only | Code quality |
 | `dev` | `feature-ci.yml` | CI only | Integration testing |
-| `deploy` | `deploy.yml` | Staging | Pre-production testing |
-| `main` | `main.yml` | Production | Stable releases |
+| `release` | `deploy.yml` | CI only | Build/Compose validation |
 
 ## Jobs Description
 
 ### Lint and Test Job
-- **Purpose**: Code quality and security enforcement
+- **Purpose**: Code quality enforcement
 - **Actions**:
-  - ESLint code analysis
+  - ESLint code analysis (if configured)
   - Unit test execution (Jest + Vitest)
-  - Security audit (npm audit)
   - Dependency caching for performance
 
 ### Build and Test Docker Job
 - **Purpose**: Container build validation
 - **Actions**:
   - Docker image builds
-  - Docker Compose configuration validation
-  - Container startup testing (staging only)
-  - Service health verification
+  - Docker Compose configuration validation (Compose V2: `docker compose`)
+  - CI-only `.env` creation step for `POSTGRES_PASSWORD_PRODUCTION` using GitHub Secrets
 
 ### Deploy Jobs
-- **Purpose**: Automated deployment to UBC server
-- **Actions**:
-  - SSH deployment to UBC server
-  - Docker Compose orchestration
-  - Health check verification
-  - Deployment notifications
+- Removed from CI. Deployment is handled by a server-side puller (e.g., systemd timer) that periodically pulls the repo and restarts containers behind VPN.
 
 ## Required Secrets
 
-Configure these secrets in your GitHub repository settings:
+Configure these secrets in your GitHub repository settings (as applicable):
 
 ### Repository Secrets
-- `UBC_SERVER_SSH_KEY`: SSH private key for UBC server access
+- (Optional) `UBC_SERVER_SSH_KEY`: Previously used for SSH deploys (now removed)
 - `DATABASE_URL`: Database connection string
 - `OPENAI_API_KEY`: OpenAI API key for AI features
 - `EDUAI_API_KEY`: EduAI API key for educational AI features
@@ -105,19 +90,13 @@ Configure these secrets in your GitHub repository settings:
 3. **Automatic CI**: Linting and testing run automatically
 4. **Create PR**: Merge to `dev` branch for integration testing
 
-### Staging Deployment Flow
-1. **Merge to deploy**: `git checkout deploy && git merge dev`
-2. **Push to deploy**: `git push origin deploy`
-3. **Automatic staging**: Deploy to staging environment
-4. **Test in staging**: Verify functionality in staging
-5. **Health checks**: Pipeline validates deployment success
+### Release Validation Flow
+1. **Merge to release**: `git checkout release && git merge dev`
+2. **Push to release**: `git push origin release`
+3. **CI validation**: Lint/tests, Docker builds, and Compose config validation
 
-### Production Release Flow
-1. **Merge to main**: `git checkout main && git merge deploy`
-2. **Push to main**: `git push origin main`
-3. **Automatic production**: Deploy to production environment
-4. **Health checks**: Pipeline validates production deployment
-5. **Release notification**: Success notification with release info
+### Server Deployment (out-of-band)
+Deployment occurs on the server via a scheduled puller that compares local vs remote commit and runs `docker compose down && docker compose up -d --build` when changes are detected.
 
 ## Monitoring and Debugging
 
@@ -129,7 +108,7 @@ Configure these secrets in your GitHub repository settings:
 ### Common Issues
 1. **Build Failures**: Check Dockerfile syntax and dependencies
 2. **Test Failures**: Review test output and coverage reports
-3. **Deployment Issues**: Check SSH key configuration and server access
+3. **Deployment Issues**: Check server-side puller logs and Docker status
 4. **Health Check Failures**: Verify application endpoints and server status
 
 ### Log Locations
@@ -146,7 +125,7 @@ Configure these secrets in your GitHub repository settings:
 
 ## Security Considerations
 
-- **Secret Management**: Sensitive data stored in GitHub Secrets
+- **Secret Management**: Sensitive data stored in GitHub Secrets (e.g., `POSTGRES_PASSWORD_PRODUCTION` for CI Compose config)
 - **SSH Key Rotation**: Regular key updates recommended
 - **Dependency Scanning**: Automated vulnerability detection
 - **Container Security**: Minimal base images and non-root users
@@ -158,14 +137,9 @@ Configure these secrets in your GitHub repository settings:
 - Previous container versions remain available
 
 ### Manual Rollback
+On the server, checkout a previous commit and restart containers:
 ```bash
-# SSH to UBC server
-ssh ssaada08@questionmaker.ok.ubc.ca
-
-# Navigate to project
 cd /srv/www/questionmaker.ok.ubc.ca
-
-# Rollback to previous version
 git checkout [previous-commit]
 docker compose down
 docker compose up -d
