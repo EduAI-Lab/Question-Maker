@@ -3,10 +3,12 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: eduquery-postgres
+    env_file:
+      - .env
     environment:
       POSTGRES_DB: eduquery
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: cHiky5MonKe
+      POSTGRES_PASSWORD_PRODUCTION: ${POSTGRES_PASSWORD_PRODUCTION}
     ports:
       - "55432:5432"
     volumes:
