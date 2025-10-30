@@ -89,18 +89,18 @@ jobs:
         
     - name: Test Docker Compose
       run: |
-        docker-compose -f docker-compose.dev.yml config
-        docker-compose config
+        docker compose -f docker-compose.dev.yml config
+        docker compose config
         
     - name: Test Docker Compose Build
       run: |
-        docker-compose -f docker-compose.dev.yml build
-        docker-compose build
+        docker compose -f docker-compose.dev.yml build
+        docker compose build
         
     - name: Test Docker Compose Up (Development)
       run: |
-        docker-compose -f docker-compose.dev.yml up -d
+        docker compose -f docker-compose.dev.yml up -d
         sleep 30
-        docker-compose -f docker-compose.dev.yml ps
-        docker-compose -f docker-compose.dev.yml logs --tail=50
-        docker-compose -f docker-compose.dev.yml down
+        docker compose -f docker-compose.dev.yml ps
+        docker compose -f docker-compose.dev.yml logs --tail=50
+        docker compose -f docker-compose.dev.yml down
