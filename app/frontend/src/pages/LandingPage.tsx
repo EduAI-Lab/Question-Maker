@@ -154,11 +154,6 @@ export const LandingPage = () => {
     setSelectedVariant(null);
   };
 
-  const handleEditVariant = (entry: QuestionVariantEntry) => {
-    console.log('Edit variant:', entry);
-    setSelectedVariant(null);
-  };
-
   const handleCreateVariant = (entry: QuestionVariantEntry) => {
     setPresetVariant(entry);
     setIsAddQuestionOpen(true);
@@ -380,7 +375,6 @@ export const LandingPage = () => {
         <QuestionDetailView
           entry={selectedVariant}
           onClose={handleCloseDetail}
-          onEdit={handleEditVariant}
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
         />
