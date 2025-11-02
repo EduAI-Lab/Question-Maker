@@ -1,13 +1,12 @@
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { X, Edit, Copy, Trash2 } from 'lucide-react';
+import { X, Copy, Trash2 } from 'lucide-react';
 import { QuestionVariantEntry } from '../../types/question';
 
 interface QuestionDetailViewProps {
   entry: QuestionVariantEntry;
   onClose: () => void;
-  onEdit: (entry: QuestionVariantEntry) => void;
   onCreateVariant: (entry: QuestionVariantEntry) => void;
   onDeleteVariant: (entry: QuestionVariantEntry) => void;
 }
@@ -15,7 +14,6 @@ interface QuestionDetailViewProps {
 export const QuestionDetailView = ({
   entry,
   onClose,
-  onEdit,
   onCreateVariant,
   onDeleteVariant
 }: QuestionDetailViewProps) => {
@@ -101,10 +99,6 @@ export const QuestionDetailView = ({
             )}
 
             <div className="flex justify-end space-x-3 pt-4 border-t">
-              <Button variant="outline" onClick={() => onEdit(entry)} className="flex items-center space-x-2">
-                <Edit className="h-4 w-4" />
-                <span>Edit</span>
-              </Button>
               <Button variant="outline" onClick={() => onCreateVariant(entry)} className="flex items-center space-x-2">
                 <Copy className="h-4 w-4" />
                 <span>Variant</span>
