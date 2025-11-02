@@ -162,19 +162,26 @@ export const LandingPage = () => {
 
   const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
     try {
-      await questionService.deleteVariant(entry.variant.id);
-      const updatedQuestion = await questionService.getQuestion(entry.questionId);
-      setQuestions((prev) => {
-        const index = prev.findIndex((question) => question.id === entry.questionId);
-        if (index === -1) return prev;
-        const next = [...prev];
-        if (updatedQuestion.variants && updatedQuestion.variants.length > 0) {
-          next[index] = updatedQuestion;
-        } else {
-          next.splice(index, 1);
-        }
-        return next;
-      });
+      const question = questions.find((item) => item.id === entry.questionId);
+      if (!question) {
+        return;
+      }
+
+      const isLastVariant = (question.variants?.length ?? 0) <= 1;
+
+      if (isLastVariant) {
+        await questionService.deleteQuestion(question.id);
+        setQuestions((prev) => prev.filter((item) => item.id !== question.id));
+      } else {
+        await questionService.deleteVariant(entry.variant.id);
+        setQuestions((prev) =>
+          prev.map((item) =>
+            item.id === question.id
+              ? { ...item, variants: item.variants?.filter((variant) => variant.id !== entry.variant.id) ?? [] }
+              : item
+          )
+        );
+      }
     } catch (error) {
       console.error('Failed to delete variant', error);
     } finally {
