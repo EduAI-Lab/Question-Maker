@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { DualRangeSlider } from '../ui/DualRangeSlider';
 import { courseService } from '../../services/courseService';
 import { Tooltip } from '../ui/tooltip';
-import { TopicDragDrop } from './TopicSelect';
+import { TopicSelect } from './TopicSelect';
 
 interface GenerateAssessmentModalProps {
   open: boolean;
@@ -262,9 +262,9 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId, i
             </div>
           </div>
 
-          {/* Topic Drag and Drop Section */}
+          {/* Topic Selection Section */}
           <div className="mt-6">
-            <TopicDragDrop
+            <TopicSelect
               availableTopics={availableTopics}
               primaryTopicIds={primaryTopicIds}
               secondaryTopicIds={secondaryTopicIds}

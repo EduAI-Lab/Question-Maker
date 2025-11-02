@@ -2,11 +2,12 @@ import * as React from 'react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { X } from 'lucide-react';
+import { Tooltip } from '../ui/tooltip';
 
 type Topic = { id: number; name: string };
 type TopicCategory = 'general' | 'primary' | 'secondary' | 'excluded';
 
-interface TopicDragDropProps {
+interface TopicSelectProps {
   availableTopics: Topic[];
   primaryTopicIds: number[];
   secondaryTopicIds: number[];
@@ -16,7 +17,7 @@ interface TopicDragDropProps {
   onExcludedChange: (ids: number[]) => void;
 }
 
-export const TopicDragDrop = ({
+export const TopicSelect = ({
   availableTopics,
   primaryTopicIds,
   secondaryTopicIds,
@@ -24,7 +25,7 @@ export const TopicDragDrop = ({
   onPrimaryChange,
   onSecondaryChange,
   onExcludedChange,
-}: TopicDragDropProps) => {
+}: TopicSelectProps) => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedTopicIds, setSelectedTopicIds] = React.useState<Set<number>>(new Set());
   const [flashCategory, setFlashCategory] = React.useState<TopicCategory | null>(null);
@@ -157,7 +158,7 @@ export const TopicDragDrop = ({
     );
   };
 
-  // Drop zone component
+  // Category zone component
   const CategoryZone = ({ 
     category, 
     label, 
@@ -187,6 +188,12 @@ export const TopicDragDrop = ({
       },
     };
 
+    const tooltipContent = {
+      primary: 'Focus of the assessment.',
+      secondary: 'Minor focus of the assessment.',
+      excluded: 'Topics to avoid completely.',
+    };
+
     const styles = categoryStyles[category] || categoryStyles.primary;
 
     return (
@@ -201,10 +208,14 @@ export const TopicDragDrop = ({
           ${isHovered ? `${styles.glow} cursor-pointer` : hasSelection ? 'cursor-pointer' : 'cursor-default'}
         `}
       >
-        <Label className="text-sm font-semibold mb-2 block">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </Label>
+        <div className="mb-2">
+          <Tooltip content={tooltipContent[category]} side="top">
+            <Label className="text-sm font-semibold cursor-help inline-block">
+              {label}
+              {required && <span className="text-red-500 ml-1">*</span>}
+            </Label>
+          </Tooltip>
+        </div>
         {topics.length === 0 ? (
           <div className="text-sm text-gray-400 text-center py-4">
             {hasSelection ? 'Click to assign selected topics' : '+ Click to assign topics here'}
@@ -263,7 +274,7 @@ export const TopicDragDrop = ({
 
         {/* Right: Categories */}
         <div className="space-y-4">
-          <CategoryZone category="primary" label="Primary Topics (Required)" required />
+          <CategoryZone category="primary" label="Primary Topics" required />
           <CategoryZone category="secondary" label="Secondary Topics" />
           <CategoryZone category="excluded" label="Excluded Topics" />
         </div>
