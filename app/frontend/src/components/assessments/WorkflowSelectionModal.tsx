@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader } from '../ui/card';
-import { Bot, Puzzle, Hand } from 'lucide-react';
+import { Puzzle, Settings } from 'lucide-react';
 
-export type WorkflowMode = 'auto' | 'hybrid' | 'manual';
+export type WorkflowMode = 'as-is' | 'generate';
 
 interface WorkflowSelectionModalProps {
   open: boolean;
@@ -21,22 +21,16 @@ interface WorkflowOption {
 export const WorkflowSelectionModal = ({ open, onClose, onSelect }: WorkflowSelectionModalProps) => {
   const workflows: WorkflowOption[] = [
     {
-      mode: 'auto',
-      icon: <Bot className="h-8 w-8" />,
-      label: 'AI builds your entire assessment.',
-      description: 'You set the parameters, AI generates the entire assessment instantly.'
-    },
-    {
-      mode: 'hybrid',
+      mode: 'as-is',
       icon: <Puzzle className="h-8 w-8" />,
-      label: 'AI suggests, you curate.',
-      description: 'AI proposes questions; you review and approve or regenerate.'
+      label: '🧩 As-Is',
+      description: 'Select existing questions from the question bank. Search and filter by topics, reasoning type, and difficulty. Build assessments with full control while allowing AI-assisted suggestions.'
     },
     {
-      mode: 'manual',
-      icon: <Hand className="h-8 w-8" />,
-      label: 'You pick everything.',
-      description: 'Browse and hand-pick questions manually.'
+      mode: 'generate',
+      icon: <Settings className="h-8 w-8" />,
+      label: '⚙️ Generate',
+      description: 'AI creates question variants automatically from existing assessments or selected topics. Review and approve variants, then compile into a finalized assessment. Approved variants are added to the question bank.'
     }
   ];
 
@@ -57,7 +51,7 @@ export const WorkflowSelectionModal = ({ open, onClose, onSelect }: WorkflowSele
           </p>
         </CardHeader>
         <CardContent className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {workflows.map((workflow) => (
               <Card
                 key={workflow.mode}

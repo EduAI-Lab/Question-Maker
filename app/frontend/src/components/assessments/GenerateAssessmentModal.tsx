@@ -13,7 +13,7 @@ interface GenerateAssessmentModalProps {
   onClose: () => void;
   onGenerate?: (params: AssessmentGenerationParams) => void;
   courseId: number;
-  initialMode?: 'auto' | 'manual' | 'hybrid';
+  initialMode?: 'as-is' | 'generate';
 }
 
 export interface AssessmentGenerationParams {
@@ -32,7 +32,7 @@ export interface AssessmentGenerationParams {
     application: number;
   };
   reasoningData: ReasoningDataState;
-  mode: 'auto' | 'manual' | 'hybrid';
+  mode: 'as-is' | 'generate';
 }
 
 type Topic = { id: number; name: string };
@@ -49,13 +49,13 @@ export type ReasoningDataState = {
   application: ReasoningProfile;
 };
 
-export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId, initialMode = 'auto' }: GenerateAssessmentModalProps) => {
+export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId, initialMode = 'as-is' }: GenerateAssessmentModalProps) => {
   const [numQuestions, setNumQuestions] = React.useState<number>(10);
   const [availableTopics, setAvailableTopics] = React.useState<Topic[]>([]);
   const [primaryTopicIds, setPrimaryTopicIds] = React.useState<number[]>([]);
   const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>([]);
   const [excludedTopicIds, setExcludedTopicIds] = React.useState<number[]>([]);
-  const [mode, setMode] = React.useState<'auto' | 'manual' | 'hybrid'>(initialMode);
+  const [mode, setMode] = React.useState<'as-is' | 'generate'>(initialMode);
 
   // Update mode when initialMode prop changes
   React.useEffect(() => {
@@ -217,31 +217,22 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId, i
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <span className="text-xs uppercase tracking-wide text-muted-foreground sm:hidden">Mode</span>
               <div className="flex items-center gap-2">
-                <Tooltip content="AI builds your entire assessment." side="bottom">
+                <Tooltip content="Select existing questions from the question bank." side="bottom">
                   <Button
-                    variant={mode === 'auto' ? 'default' : 'outline'}
+                    variant={mode === 'as-is' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setMode('auto')}
+                    onClick={() => setMode('as-is')}
                   >
-                    🤖 Fully Automated
+                    🧩 As-Is
                   </Button>
                 </Tooltip>
-                <Tooltip content="AI suggests, you curate." side="bottom">
+                <Tooltip content="AI generates question variants from assessments or topics." side="bottom">
                   <Button
-                    variant={mode === 'hybrid' ? 'default' : 'outline'}
+                    variant={mode === 'generate' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setMode('hybrid')}
+                    onClick={() => setMode('generate')}
                   >
-                    🧩 Hybrid
-                  </Button>
-                </Tooltip>
-                <Tooltip content="You pick everything." side="bottom">
-                  <Button
-                    variant={mode === 'manual' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setMode('manual')}
-                  >
-                    ✋ Manual
+                    ⚙️ Generate
                   </Button>
                 </Tooltip>
               </div>
