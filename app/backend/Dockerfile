@@ -8,10 +8,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # Copy source code
 COPY src/ ./src/
+
+# Copy environment file (if it exists)
+COPY .env* ./
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs
@@ -30,4 +33,3 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Start the application
 CMD ["node", "src/index.js"]
-

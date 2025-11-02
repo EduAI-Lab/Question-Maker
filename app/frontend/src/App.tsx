@@ -15,8 +15,10 @@ function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/landing" element={<LandingPage />} />
-              <Route path="/api-test" element={<ApiTestPage />} />
-              <Route path="/" element={<Navigate to="/landing" replace />} />
+              {process.env.NODE_ENV === 'development' && (
+                <Route path="/api-test" element={<ApiTestPage />} />
+              )}
+              <Route path="/" element={<Navigate to="/login" replace />} />
             </Routes>
             <Toaster />
           </div>
