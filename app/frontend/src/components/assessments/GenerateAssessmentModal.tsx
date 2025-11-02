@@ -8,12 +8,14 @@ import { DualRangeSlider } from '../ui/DualRangeSlider';
 import { courseService } from '../../services/courseService';
 import { Badge } from '../ui/badge';
 import { ChevronDown } from 'lucide-react';
+import { Tooltip } from '../ui/tooltip';
 
 interface GenerateAssessmentModalProps {
   open: boolean;
   onClose: () => void;
   onGenerate?: (params: AssessmentGenerationParams) => void;
   courseId: number;
+  initialMode?: 'auto' | 'manual' | 'hybrid';
 }
 
 export interface AssessmentGenerationParams {
@@ -49,14 +51,19 @@ export type ReasoningDataState = {
   application: ReasoningProfile;
 };
 
-export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }: GenerateAssessmentModalProps) => {
+export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId, initialMode = 'auto' }: GenerateAssessmentModalProps) => {
   const [numQuestions, setNumQuestions] = React.useState<number>(10);
   const [availableTopics, setAvailableTopics] = React.useState<Topic[]>([]);
   const [primaryTopicIds, setPrimaryTopicIds] = React.useState<number[]>([]);
   const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>([]);
   const [excludedTopicIds, setExcludedTopicIds] = React.useState<number[]>([]);
-  const [mode, setMode] = React.useState<'auto' | 'manual' | 'hybrid'>('auto');
+  const [mode, setMode] = React.useState<'auto' | 'manual' | 'hybrid'>(initialMode);
   const [openDropdown, setOpenDropdown] = React.useState<'primary' | 'secondary' | 'excluded' | null>(null);
+
+  // Update mode when initialMode prop changes
+  React.useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
   // Matrix data model: each reasoning type has its own difficulty distribution
   const [reasoningData, setReasoningData] = React.useState<ReasoningDataState>({
     factual: {
@@ -391,27 +398,33 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               <span className="text-xs uppercase tracking-wide text-muted-foreground sm:hidden">Mode</span>
               <div className="flex items-center gap-2">
-                <Button
-                  variant={mode === 'auto' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMode('auto')}
-                >
-                  Fully Automated
-                </Button>
-                <Button
-                  variant={mode === 'hybrid' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMode('hybrid')}
-                >
-                  Hybrid
-                </Button>
-                <Button
-                  variant={mode === 'manual' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMode('manual')}
-                >
-                  Manual
-                </Button>
+                <Tooltip content="AI builds your entire assessment." side="bottom">
+                  <Button
+                    variant={mode === 'auto' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setMode('auto')}
+                  >
+                    🤖 Fully Automated
+                  </Button>
+                </Tooltip>
+                <Tooltip content="AI suggests, you curate." side="bottom">
+                  <Button
+                    variant={mode === 'hybrid' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setMode('hybrid')}
+                  >
+                    🧩 Hybrid
+                  </Button>
+                </Tooltip>
+                <Tooltip content="You pick everything." side="bottom">
+                  <Button
+                    variant={mode === 'manual' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setMode('manual')}
+                  >
+                    ✋ Manual
+                  </Button>
+                </Tooltip>
               </div>
             </div>
           </div>

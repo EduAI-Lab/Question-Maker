@@ -7,6 +7,7 @@ import { Edit, Download, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { Assessment, Course } from '../../types/assessment';
 import { Question } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
+import WorkflowSelectionModal, { WorkflowMode } from './WorkflowSelectionModal';
 
 interface AssessmentSectionProps {
   assessments: Assessment[];
@@ -28,8 +29,9 @@ export const AssessmentSection = ({
   selectedCourseId
 }: AssessmentSectionProps) => {
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
-  const [openGenerateModalForId, setOpenGenerateModalForId] = useState<number | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isWorkflowSelectionOpen, setIsWorkflowSelectionOpen] = useState(false);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<WorkflowMode | null>(null);
+  const [pendingGenerateAction, setPendingGenerateAction] = useState<'create' | number | null>(null);
 
   const getAssessmentTypeColor = (type: string) => {
     switch (type) {
@@ -72,7 +74,12 @@ export const AssessmentSection = ({
           <p className="text-sm text-gray-600">Lab / Midterm / Quiz / Final</p>
         </div>
         <Button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => {
+            if (selectedCourseId) {
+              setPendingGenerateAction('create');
+              setIsWorkflowSelectionOpen(true);
+            }
+          }}
           className="flex items-center space-x-2"
           disabled={!selectedCourseId}
         >
@@ -136,7 +143,10 @@ export const AssessmentSection = ({
                     <Button
                       variant="default"
                       size="sm"
-                      onClick={() => setOpenGenerateModalForId(assessment.id)}
+                      onClick={() => {
+                        setPendingGenerateAction(assessment.id);
+                        setIsWorkflowSelectionOpen(true);
+                      }}
                       className="flex items-center space-x-1"
                     >
                       <span>Variants</span>
@@ -210,7 +220,12 @@ export const AssessmentSection = ({
         <div className="text-center py-8">
           <p className="text-gray-500 mb-4">No assessments created yet.</p>
           <Button
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => {
+              if (selectedCourseId) {
+                setPendingGenerateAction('create');
+                setIsWorkflowSelectionOpen(true);
+              }
+            }}
             className="flex items-center space-x-2"
             disabled={!selectedCourseId}
           >
@@ -220,24 +235,47 @@ export const AssessmentSection = ({
         </div>
       )}
 
-      {isCreateModalOpen && selectedCourseId && (
+      <WorkflowSelectionModal
+        open={isWorkflowSelectionOpen}
+        onClose={() => {
+          setIsWorkflowSelectionOpen(false);
+          setPendingGenerateAction(null);
+          setSelectedWorkflow(null);
+        }}
+        onSelect={(mode) => {
+          setSelectedWorkflow(mode);
+          setIsWorkflowSelectionOpen(false);
+          // Don't clear selectedWorkflow here - let GenerateAssessmentModal handle it
+        }}
+      />
+
+      {selectedWorkflow && pendingGenerateAction === 'create' && selectedCourseId && (
         <GenerateAssessmentModal
-          open={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
+          open={true}
+          onClose={() => {
+            setSelectedWorkflow(null);
+            setPendingGenerateAction(null);
+          }}
           courseId={selectedCourseId}
+          initialMode={selectedWorkflow}
           onGenerate={(params) => {
             console.log('Generate assessment params', params);
             onAddAssessment();
-            setIsCreateModalOpen(false);
+            setSelectedWorkflow(null);
+            setPendingGenerateAction(null);
           }}
         />
       )}
 
-      {!!openGenerateModalForId && (
+      {selectedWorkflow && typeof pendingGenerateAction === 'number' && (
         <GenerateAssessmentModal
           open={true}
-          onClose={() => setOpenGenerateModalForId(null)}
-          courseId={assessments.find(a => a.id === openGenerateModalForId)?.courseId || 0}
+          onClose={() => {
+            setSelectedWorkflow(null);
+            setPendingGenerateAction(null);
+          }}
+          courseId={assessments.find(a => a.id === pendingGenerateAction)?.courseId || 0}
+          initialMode={selectedWorkflow}
         />
       )}
     </div>
