@@ -27,13 +27,13 @@ export const courseService = {
         await api.delete(`/api/course/${id}`);
     },
 
-    async getCourseTopics(id: number): Promise<Array<{ id: number; name: string }>> {
-        const response = await api.get(`/api/course/${id}/topics`);
+    async getCourseTopics(courseId: number): Promise<Topic[]> {
+        const response = await api.get(`/api/course/${courseId}/topics`);
         return response.data.data;
     },
 
-    async getCourseTopics(courseId: number): Promise<Topic[]> {
-        const response = await api.get(`/api/course/${courseId}/topics`);
+    async createTopic(courseId: number, name: string): Promise<Topic> {
+        const response = await api.post(`/api/course/${courseId}/topics`, { name });
         return response.data.data;
     }
 };
