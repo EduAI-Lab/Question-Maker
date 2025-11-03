@@ -65,6 +65,11 @@ export interface Course {
     questionMetadata?: QuestionMetadata[];
 }
 
+export interface CourseCreate {
+    name: string;
+    courseCode?: string;
+}
+
 // Topic (matches backend Topics schema)
 export interface Topic {
     id: number;
