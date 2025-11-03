@@ -209,27 +209,6 @@ export const LandingPage = () => {
       return [question, ...prev];
     });
 
-    const latestVariant = question.variants?.[question.variants.length - 1];
-    if (latestVariant) {
-      const resolveTopicName = (topicId: number) => topicNameMap.get(topicId) ?? `Topic ${topicId}`;
-      const secondaryTopicNames = Array.isArray(latestVariant.secondaryTopicsId)
-        ? latestVariant.secondaryTopicsId.map((topicId) => resolveTopicName(topicId))
-        : [];
-
-      setSelectedVariant({
-        questionId: question.id,
-        questionDescription: question.description,
-        questionType: question.type,
-        primaryTopicId: question.primaryTopicId,
-        primaryTopicName: topicNameMap.get(question.primaryTopicId),
-        courseId: question.courseId,
-        courseName: question.course?.name,
-        courseCode: question.course?.code,
-        secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-        variant: latestVariant
-      });
-    }
-
     setPresetVariant(null);
     setIsAddQuestionOpen(false);
   };
