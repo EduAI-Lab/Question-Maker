@@ -10,7 +10,8 @@
     "build": "echo 'No build step required'",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "seed:questions": "node scripts/seedQuestions.js"
   },
   "dependencies": {
     "express": "^4.18.2",
