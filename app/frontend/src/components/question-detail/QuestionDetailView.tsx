@@ -1,40 +1,64 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Button } from '../ui/button';
-import { X, Copy, Trash2 } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import { X, Copy, Trash2, ArrowLeft } from 'lucide-react';
 import { QuestionVariantEntry } from '../../types/question';
 
 const DetailItem = ({
     label,
     value,
-    spanFull = false
+    spanFull = false,
+    onClick
 }: {
     label: string;
     value: ReactNode;
     spanFull?: boolean;
+    onClick?: () => void;
 }) => (
-    <div
-        className={`rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm ${spanFull ? 'sm:col-span-2' : ''}`}
-    >
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
-            {value}
-        </p>
-    </div>
+    <>
+        {onClick ? (
+            <button
+                type="button"
+                onClick={onClick}
+                className={`rounded-lg border border-gray-200 bg-gray-50 p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${spanFull ? 'sm:col-span-2' : ''}`}
+            >
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+                <p className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
+                    {value}
+                </p>
+                <p className="mt-3 text-xs font-medium text-blue-600">View all variants</p>
+            </button>
+        ) : (
+            <div
+                className={`rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm ${spanFull ? 'sm:col-span-2' : ''}`}
+            >
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+                <p className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
+                    {value}
+                </p>
+            </div>
+        )}
+    </>
 );
 
 interface QuestionDetailViewProps {
     entry: QuestionVariantEntry;
+    relatedVariants: QuestionVariantEntry[];
     onClose: () => void;
     onCreateVariant: (entry: QuestionVariantEntry) => void;
     onDeleteVariant: (entry: QuestionVariantEntry) => void;
+    onSelectVariant: (entry: QuestionVariantEntry) => void;
 }
 
 export const QuestionDetailView = ({
     entry,
+    relatedVariants,
     onClose,
     onCreateVariant,
-    onDeleteVariant
+    onDeleteVariant,
+    onSelectVariant
 }: QuestionDetailViewProps) => {
+    const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
     const { variant } = entry;
     const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
     const secondaryTopicsDisplay =
@@ -54,6 +78,37 @@ export const QuestionDetailView = ({
             ? new Date(createdTimestamp).toLocaleString()
             : '—';
 
+    const siblingVariants = useMemo(
+        () =>
+            relatedVariants
+                .slice()
+                .sort(
+                    (a, b) =>
+                        new Date(b.variant.createdAt || b.variant.updatedAt || 0).getTime() -
+                        new Date(a.variant.createdAt || a.variant.updatedAt || 0).getTime()
+                ),
+        [relatedVariants]
+    );
+
+    const formatTimestamp = (value?: string | null) => {
+        if (!value) return '—';
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
+    };
+
+    const handleViewAllVariants = () => {
+        setViewMode('variants');
+    };
+
+    const handleSelectVariant = (target: QuestionVariantEntry) => {
+        onSelectVariant(target);
+        setViewMode('detail');
+    };
+
+    useEffect(() => {
+        setViewMode('detail');
+    }, [entry.variant.id]);
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
             <div className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
@@ -67,12 +122,105 @@ export const QuestionDetailView = ({
                     <X className="h-4 w-4" />
                 </Button>
 
-                <div className="px-6 pt-10 pr-14 text-2xl font-semibold leading-8 text-gray-900">
-                    {variant.questionText || 'Untitled question'}
+                <div className="px-6 pt-10 pr-14">
+                    {viewMode === 'variants' ? (
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-semibold text-gray-900">All variants for this question</h2>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    {entry.questionDescription || 'Question metadata'}
+                                </p>
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="flex items-center gap-2"
+                                onClick={() => setViewMode('detail')}
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                                <span>Back to details</span>
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="text-2xl font-semibold leading-8 text-gray-900">
+                            {variant.questionText || 'Untitled question'}
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-6 py-6">
+                    {viewMode === 'variants' ? (
+                        <div className="space-y-6">
+                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-5 shadow-sm">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Question synopsis
+                                </p>
+                                <p className="mt-2 text-sm font-medium text-gray-900 leading-relaxed">
+                                    {entry.questionDescription || '—'}
+                                </p>
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    <Badge variant="outline">{entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`}</Badge>
+                                    <Badge variant="secondary" className="uppercase">{entry.questionType}</Badge>
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                {siblingVariants.map((item, index) => {
+                                    const isActive = item.variant.id === variant.id;
+                                    const timestamp =
+                                        item.variant.createdAt || item.variant.updatedAt || '';
+                                    return (
+                                        <button
+                                            key={`${item.questionId}-${item.variant.id}`}
+                                            type="button"
+                                            onClick={() => handleSelectVariant(item)}
+                                            className={`w-full rounded-lg border p-4 text-left shadow-sm transition ${
+                                                isActive
+                                                    ? 'border-blue-500 bg-blue-50'
+                                                    : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50'
+                                            }`}
+                                            >
+                                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                                    <div className="text-sm font-semibold text-gray-900">
+                                                    Variant {index + 1}
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                        <Badge variant="outline" className="capitalize">
+                                                            {item.variant.difficulty ?? 'medium'}
+                                                        </Badge>
+                                                    <span>{formatTimestamp(timestamp)}</span>
+                                                </div>
+                                            </div>
+                                            <p className="mt-2 text-sm text-gray-700 line-clamp-3 leading-relaxed">
+                                                {item.variant.questionText}
+                                            </p>
+                                        </button>
+                                    );
+                                })}
+
+                                {siblingVariants.length === 0 && (
+                                    <div className="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-muted-foreground">
+                                        No variants available for this question metadata yet.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
                     <div className="space-y-10">
+                        <section>
+                            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Synopsis
+                            </h3>
+                            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <DetailItem
+                                    label="Question synopsis"
+                                    value={entry.questionDescription || '—'}
+                                    spanFull
+                                    onClick={handleViewAllVariants}
+                                />
+                            </div>
+                        </section>
+
                         <section>
                             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 Topic coverage
@@ -107,19 +255,6 @@ export const QuestionDetailView = ({
                             </div>
                         </section>
 
-                        <section>
-                            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Synopsis
-                            </h3>
-                            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                    label="Question synopsis"
-                                    value={entry.questionDescription || '—'}
-                                    spanFull
-                                />
-                            </div>
-                        </section>
-
                         {variant.answer && (
                             <section>
                                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -133,6 +268,7 @@ export const QuestionDetailView = ({
                             </section>
                         )}
                     </div>
+                    )}
                 </div>
 
                 <div className="flex items-center justify-end gap-3 border-t bg-gray-50 px-6 py-4">

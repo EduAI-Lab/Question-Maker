@@ -321,6 +321,13 @@ export const LandingPage = () => {
     }
   }, [variantEntries, presetVariant]);
 
+  const relatedVariantsForSelected = useMemo(() => {
+    if (!selectedVariant) {
+      return [];
+    }
+    return variantEntries.filter((entry) => entry.questionId === selectedVariant.questionId);
+  }, [variantEntries, selectedVariant?.questionId]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNavigation
@@ -363,9 +370,11 @@ export const LandingPage = () => {
       {selectedVariant && (
         <QuestionDetailView
           entry={selectedVariant}
+          relatedVariants={relatedVariantsForSelected}
           onClose={handleCloseDetail}
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
+          onSelectVariant={handleViewVariant}
         />
       )}
 
