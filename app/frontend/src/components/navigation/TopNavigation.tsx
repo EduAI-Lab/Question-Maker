@@ -1,7 +1,7 @@
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
-import { User, ChevronDown } from 'lucide-react';
+import { User } from 'lucide-react';
 import { Class as Course } from '../../types/class';
 
 interface TopNavigationProps {
@@ -65,7 +65,6 @@ export const TopNavigation = ({
                                 )}
                             </SelectContent>
                         </Select>
-                        <ChevronDown className="h-5 w-5 text-gray-500" />
                     </div>
 
                     {/* Tabs */}
