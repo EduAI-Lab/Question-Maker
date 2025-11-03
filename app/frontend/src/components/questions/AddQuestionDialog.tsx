@@ -622,7 +622,7 @@ export const AddQuestionDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-            <DialogContent className="max-h-[90vh] overflow-hidden">
+            <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>{form.mode === 'new' ? 'Create Question' : 'Add Variant'}</DialogTitle>
                 </DialogHeader>
