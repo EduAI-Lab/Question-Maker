@@ -24,14 +24,14 @@ export interface QuestionVariant {
     id: number;
     questionText: string;
     difficulty: QuestionDifficulty;
-    reasoningLevel: ReasoningLevel;
-    questionMetadataId: number;
+    reasoningLevel?: ReasoningLevel;
+    questionMetadataId?: number;
     assessmentId: number | null;
     secondaryTopicsId: number[] | null;
     referenceId: number | null;
     answer: string | null;
-    createdAt: string;
-    updatedAt: string;
+    createdAt?: string;
+    updatedAt?: string;
     // Relations
     questionMetadata?: QuestionMetadata;
     assessment?: Assessment;
@@ -56,9 +56,9 @@ export interface Course {
     id: number;
     name: string;
     code: string | null;
-    userId: number;
-    createdAt: string;
-    updatedAt: string;
+    userId?: number;
+    createdAt?: string;
+    updatedAt?: string;
     // Relations
     user?: User;
     topics?: Topic[];
@@ -93,37 +93,14 @@ export interface User {
     courses?: Course[];
 }
 
-// Legacy types for backward compatibility (to be removed eventually)
-export interface Question {
-    id: number;
-    content: string;
-    difficulty: QuestionDifficulty;
-    bloomLevel: string;
-    createdAt: string;
-    updatedAt: string;
-    course?: {
-        id: number;
-        name: string;
-        code?: string | null;
-    };
-    variants?: QuestionVariant[];
-    /** Legacy fields maintained for backwards compatibility */
-    content?: string;
-    difficulty?: QuestionDifficulty;
-    bloomLevel?: BloomLevel;
-    classId?: number;
-    class?: {
-        id: number;
-        name: string;
-        subject?: string;
-    };
-}
+export interface Question extends QuestionMetadata {}
 
 export interface QuestionCreate {
-    content: string;
-    difficulty?: QuestionDifficulty;
-    bloomLevel?: string;
-    classId?: number;
+    description: string;
+    courseId: number;
+    primaryTopicId: number;
+    type: QuestionType;
+    questionOrder?: Record<number, number> | null;
 }
 
 export interface QuestionGenerationParams {
@@ -152,4 +129,28 @@ export interface QuestionStats {
         bloomLevel: string;
         count: number;
     }>;
+}
+
+export interface ExtractedQuestion {
+    summary: string;
+    question: string;
+    instructions?: string;
+    difficulty: QuestionDifficulty;
+    answer: string | null;
+    type: QuestionType;
+    primaryTopicId: number | null;
+    secondaryTopicIds: number[];
+}
+
+export interface QuestionVariantEntry {
+    questionId: number;
+    questionDescription: string | null;
+    questionType: QuestionType;
+    primaryTopicId: number;
+    primaryTopicName?: string;
+    courseId: number;
+    courseName?: string;
+    courseCode?: string | null;
+    secondaryTopicNames?: string[];
+    variant: QuestionVariant;
 }
