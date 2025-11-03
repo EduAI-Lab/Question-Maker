@@ -35,15 +35,6 @@ export const config = {
   eduaiApiUrl: process.env.EDUAI_API_URL || 'https://eduai.ok.ubc.ca',
   eduaiApiKey: process.env.EDUAI_API_KEY || '',
   
-  // File Upload
-  maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024, // 10MB
-  allowedFileTypes: process.env.ALLOWED_FILE_TYPES?.split(',') || [
-    'application/pdf',
-    'text/plain',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ],
-  
   // AI Settings
   defaultNumQuestions: parseInt(process.env.DEFAULT_NUM_QUESTIONS) || 15,
   maxQuestions: parseInt(process.env.MAX_QUESTIONS) || 50,

@@ -55,10 +55,6 @@ GROQ_API_KEY=your-groq-api-key
 OPENAI_API_KEY=your-openai-api-key
 DEEPSEEK_API_KEY=your-deepseek-api-key
 
-# File Upload
-MAX_FILE_SIZE=10485760
-ALLOWED_FILE_TYPES=application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document
-
 # AI Settings
 DEFAULT_NUM_QUESTIONS=15
 MAX_QUESTIONS=50
