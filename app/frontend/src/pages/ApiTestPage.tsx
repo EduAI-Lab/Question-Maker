@@ -91,6 +91,10 @@ export const ApiTestPage = () => {
 
   const [eduaiApiKeyResult, setEduaiApiKeyResult] = useState<ResultState>(defaultResult);
   const [isTestingApiKey, setIsTestingApiKey] = useState(false);
+  const [eduaiTopicsForm, setEduaiTopicsForm] = useState({
+    courseId: ''
+  });
+  const [eduaiTopicsResult, setEduaiTopicsResult] = useState<ResultState>(defaultResult);
 
   const handleApiCall = async (
     request: () => Promise<any>,
@@ -677,6 +681,56 @@ export const ApiTestPage = () => {
                 </Button>
                 <div>{renderResult(eduaiApiKeyResult)}</div>
               </div>
+
+            </CardContent>
+          </Card>
+        </section>
+
+        <section>
+          <Card>
+            <CardHeader>
+              <CardTitle>EduAI Course Topics</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Hit the live EduAI endpoint <code>/api/courses/:courseId/topics</code> to preview the topic list for a course.
+              </p>
+              <div className="space-y-1">
+                <Label htmlFor="eduai-topics-course-id">EduAI Course ID</Label>
+                <Input
+                  id="eduai-topics-course-id"
+                  placeholder="e.g. COSC211"
+                  value={eduaiTopicsForm.courseId}
+                  onChange={(event) =>
+                    setEduaiTopicsForm((prev) => ({ ...prev, courseId: event.target.value }))
+                  }
+                />
+              </div>
+              <Button
+                onClick={() => {
+                  const trimmedId = eduaiTopicsForm.courseId.trim();
+                  if (!trimmedId) {
+                    toast({
+                      variant: 'destructive',
+                      title: 'Missing course ID',
+                      description: 'Enter the EduAI course identifier you want to inspect.'
+                    });
+                    return;
+                  }
+
+                  handleApiCall(
+                    () => eduaiService.fetchCourseTopics(trimmedId),
+                    (data) => {
+                      setEduaiTopicsResult({ status: 'success', payload: data });
+                      toast({ title: 'Fetched course topics' });
+                    },
+                    (message) => setEduaiTopicsResult({ status: 'error', message })
+                  );
+                }}
+              >
+                Fetch EduAI Topics
+              </Button>
+              <div>{renderResult(eduaiTopicsResult)}</div>
             </CardContent>
           </Card>
         </section>
