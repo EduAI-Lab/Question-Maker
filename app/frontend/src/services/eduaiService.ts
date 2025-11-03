@@ -83,6 +83,11 @@ export interface EduAITopicOption {
     name: string;
 }
 
+export interface EduAITopicOption {
+    id: string;
+    name: string;
+}
+
 const MOCK_MODEL_OPTIONS: EduAIModelOption[] = [
     {
         id: 'ollama:gpt-oss:120b',
@@ -218,11 +223,19 @@ class EduAIService {
     }
 
     /**
-     * Mock: Return topic inventory for a specific course.
-     * Replace with real API call when endpoint is available.
+     * Mock: Return topic list for a course.
+     * Replace with live API call when endpoint is available.
      */
     async listCourseTopics(courseId: string): Promise<EduAITopicOption[]> {
         return MOCK_COURSE_TOPICS[courseId] ?? [];
+    }
+
+    /**
+     * Live: Fetch course topics from EduAI via backend proxy.
+     */
+    async fetchCourseTopics(courseId: string): Promise<any> {
+        const response = await api.get(`/api/eduai/courses/${courseId}/topics`);
+        return response.data;
     }
 
     /**
