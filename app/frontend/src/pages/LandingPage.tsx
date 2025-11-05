@@ -12,9 +12,10 @@ import { questionService } from '../services/questionService';
 import { courseService } from '../services/courseService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
+import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
 
 export const LandingPage = () => {
-  const { courses, isLoading: isCoursesLoading } = useCourses();
+  const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -26,6 +27,7 @@ export const LandingPage = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
 
   const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
     if (!courseId) {
@@ -154,11 +156,6 @@ export const LandingPage = () => {
     setSelectedVariant(null);
   };
 
-  const handleEditVariant = (entry: QuestionVariantEntry) => {
-    console.log('Edit variant:', entry);
-    setSelectedVariant(null);
-  };
-
   const handleCreateVariant = (entry: QuestionVariantEntry) => {
     setPresetVariant(entry);
     setIsAddQuestionOpen(true);
@@ -167,19 +164,26 @@ export const LandingPage = () => {
 
   const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
     try {
-      await questionService.deleteVariant(entry.variant.id);
-      const updatedQuestion = await questionService.getQuestion(entry.questionId);
-      setQuestions((prev) => {
-        const index = prev.findIndex((question) => question.id === entry.questionId);
-        if (index === -1) return prev;
-        const next = [...prev];
-        if (updatedQuestion.variants && updatedQuestion.variants.length > 0) {
-          next[index] = updatedQuestion;
-        } else {
-          next.splice(index, 1);
-        }
-        return next;
-      });
+      const question = questions.find((item) => item.id === entry.questionId);
+      if (!question) {
+        return;
+      }
+
+      const isLastVariant = (question.variants?.length ?? 0) <= 1;
+
+      if (isLastVariant) {
+        await questionService.deleteQuestion(question.id);
+        setQuestions((prev) => prev.filter((item) => item.id !== question.id));
+      } else {
+        await questionService.deleteVariant(entry.variant.id);
+        setQuestions((prev) =>
+          prev.map((item) =>
+            item.id === question.id
+              ? { ...item, variants: item.variants?.filter((variant) => variant.id !== entry.variant.id) ?? [] }
+              : item
+          )
+        );
+      }
     } catch (error) {
       console.error('Failed to delete variant', error);
     } finally {
@@ -206,27 +210,6 @@ export const LandingPage = () => {
       }
       return [question, ...prev];
     });
-
-    const latestVariant = question.variants?.[question.variants.length - 1];
-    if (latestVariant) {
-      const resolveTopicName = (topicId: number) => topicNameMap.get(topicId) ?? `Topic ${topicId}`;
-      const secondaryTopicNames = Array.isArray(latestVariant.secondaryTopicsId)
-        ? latestVariant.secondaryTopicsId.map((topicId) => resolveTopicName(topicId))
-        : [];
-
-      setSelectedVariant({
-        questionId: question.id,
-        questionDescription: question.description,
-        questionType: question.type,
-        primaryTopicId: question.primaryTopicId,
-        primaryTopicName: topicNameMap.get(question.primaryTopicId),
-        courseId: question.courseId,
-        courseName: question.course?.name,
-        courseCode: question.course?.code,
-        secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-        variant: latestVariant
-      });
-    }
 
     setPresetVariant(null);
     setIsAddQuestionOpen(false);
@@ -338,6 +321,13 @@ export const LandingPage = () => {
     }
   }, [variantEntries, presetVariant]);
 
+  const relatedVariantsForSelected = useMemo(() => {
+    if (!selectedVariant) {
+      return [];
+    }
+    return variantEntries.filter((entry) => entry.questionId === selectedVariant.questionId);
+  }, [variantEntries, selectedVariant?.questionId]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNavigation
@@ -347,6 +337,7 @@ export const LandingPage = () => {
         onTabChange={setActiveTab}
         courses={courses}
         isLoadingCourses={isCoursesLoading}
+        onProfileClick={() => setIsProfileDialogOpen(true)}
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -379,10 +370,11 @@ export const LandingPage = () => {
       {selectedVariant && (
         <QuestionDetailView
           entry={selectedVariant}
+          relatedVariants={relatedVariantsForSelected}
           onClose={handleCloseDetail}
-          onEdit={handleEditVariant}
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
+          onSelectVariant={handleViewVariant}
         />
       )}
 
@@ -406,6 +398,13 @@ export const LandingPage = () => {
         variants={variantEntries}
         onQuestionCreated={handleQuestionCreated}
         presetVariant={presetVariant}
+      />
+
+      <ProfileCoursesDialog
+        open={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        existingCourses={courses}
+        onCoursesAdded={fetchCourses}
       />
     </div>
   );

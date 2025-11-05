@@ -30,5 +30,10 @@ export const courseService = {
     async getCourseTopics(courseId: number): Promise<Topic[]> {
         const response = await api.get(`/api/course/${courseId}/topics`);
         return response.data.data;
+    },
+
+    async createTopic(courseId: number, name: string): Promise<Topic> {
+        const response = await api.post(`/api/course/${courseId}/topics`, { name });
+        return response.data.data;
     }
 };

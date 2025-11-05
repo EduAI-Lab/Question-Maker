@@ -253,6 +253,15 @@ export const AddQuestionDialog = ({
     );
 
     const handleFieldChange = <K extends keyof FormState>(field: K, value: FormState[K]) => {
+        if (field === 'primaryTopicId' && typeof value === 'string') {
+            setForm((prev) => ({
+                ...prev,
+                primaryTopicId: value,
+                variantSecondaryTopics: prev.variantSecondaryTopics.filter((topicId) => topicId.toString() !== value)
+            }));
+            return;
+        }
+
         setForm((prev) => ({ ...prev, [field]: value }));
     };
 
@@ -263,6 +272,10 @@ export const AddQuestionDialog = ({
 
     const toggleSecondaryTopic = (topicId: number, checked: boolean) => {
         setForm((prev) => {
+            if (prev.primaryTopicId && Number(prev.primaryTopicId) === topicId && checked) {
+                return prev;
+            }
+
             const set = new Set(prev.variantSecondaryTopics);
             if (checked) {
                 set.add(topicId);
@@ -609,7 +622,7 @@ export const AddQuestionDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-            <DialogContent className="max-h-[90vh] overflow-hidden">
+            <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-3xl">
                 <DialogHeader>
                     <DialogTitle>{form.mode === 'new' ? 'Create Question' : 'Add Variant'}</DialogTitle>
                 </DialogHeader>
@@ -1040,12 +1053,19 @@ export const AddQuestionDialog = ({
                                         ) : (
                                             topics.map((topic) => {
                                                 const checked = form.variantSecondaryTopics.includes(topic.id);
+                                                const isPrimary = form.primaryTopicId === topic.id.toString();
                                                 return (
-                                                    <label key={topic.id} className="flex items-center space-x-2 text-sm text-foreground">
+                                                    <label
+                                                        key={topic.id}
+                                                        className={`flex items-center space-x-2 text-sm ${
+                                                            isPrimary ? 'text-muted-foreground/70' : 'text-foreground'
+                                                        }`}
+                                                    >
                                                         <input
                                                             type="checkbox"
                                                             className="h-4 w-4"
                                                             checked={checked}
+                                                            disabled={isPrimary}
                                                             onChange={(event) => toggleSecondaryTopic(topic.id, event.target.checked)}
                                                         />
                                                         <span>{topic.name} (#{topic.id})</span>
