@@ -33,39 +33,39 @@ export const TopNavigation = ({
                     </div>
                 </div>
 
-                {/* Center: Course Selector and Tabs */}
-                <div className="flex items-center space-x-6">
-                    {/* Course Selector */}
-                    <div className="flex items-center">
-                        <Select
-                            value={selectedCourse?.id?.toString() || ''}
-                            onValueChange={(value) => {
-                                const course = courses.find(c => c.id.toString() === value);
-                                if (course) onCourseChange(course);
-                            }}
-                            disabled={isLoadingCourses || courses.length === 0}
-                        >
-                            <SelectTrigger className="w-80 min-w-80">
-                                <SelectValue
-                                    placeholder={isLoadingCourses ? 'Loading courses...' : 'Select Course'}
-                                    className="text-base font-bold"
-                                />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {courses.length === 0 ? (
-                                    <SelectItem value="__no_courses" disabled>
-                                        {isLoadingCourses ? 'Loading...' : 'No courses available'}
-                                    </SelectItem>
-                                ) : (
-                                    courses.map((course) => (
-                                        <SelectItem key={course.id} value={course.id.toString()} className="text-base font-semibold">
-                                            {course.code || '—'} - {course.name}
-                                        </SelectItem>
-                                    ))
-                                )}
-                            </SelectContent>
-                        </Select>
-                    </div>
+        {/* Center: Course Selector and Tabs */}
+        <div className="flex items-center space-x-6">
+          {/* Course Selector */}
+          <div className="flex items-center">
+            <Select
+              value={selectedCourse?.id?.toString() || ''}
+              onValueChange={(value) => {
+                const course = courses.find(c => c.id.toString() === value);
+                if (course) onCourseChange(course);
+              }}
+              disabled={isLoadingCourses || courses.length === 0}
+            >
+              <SelectTrigger className="w-80 min-w-80">
+                <SelectValue
+                  placeholder={isLoadingCourses ? 'Loading courses...' : 'Select Course'}
+                  className="text-base font-bold"
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {courses.length === 0 ? (
+                  <SelectItem value="__no_courses" disabled>
+                    {isLoadingCourses ? 'Loading...' : 'No courses available'}
+                  </SelectItem>
+                ) : (
+                  courses.map((course) => (
+                    <SelectItem key={course.id} value={course.id.toString()} className="text-base font-semibold">
+                      {course.code || '—'} - {course.name}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
 
                     {/* Tabs */}
                     <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as 'questions' | 'assessments')}>
