@@ -12,9 +12,10 @@ import { questionService } from '../services/questionService';
 import { courseService } from '../services/courseService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
+import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
 
 export const LandingPage = () => {
-  const { courses, isLoading: isCoursesLoading } = useCourses();
+  const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -26,6 +27,7 @@ export const LandingPage = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
 
   const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
     if (!courseId) {
@@ -335,6 +337,7 @@ export const LandingPage = () => {
         onTabChange={setActiveTab}
         courses={courses}
         isLoadingCourses={isCoursesLoading}
+        onProfileClick={() => setIsProfileDialogOpen(true)}
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -395,6 +398,13 @@ export const LandingPage = () => {
         variants={variantEntries}
         onQuestionCreated={handleQuestionCreated}
         presetVariant={presetVariant}
+      />
+
+      <ProfileCoursesDialog
+        open={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        existingCourses={courses}
+        onCoursesAdded={fetchCourses}
       />
     </div>
   );

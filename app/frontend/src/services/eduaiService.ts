@@ -83,6 +83,11 @@ export interface EduAITopicOption {
     name: string;
 }
 
+export interface EduAITopicOption {
+    id: string;
+    name: string;
+}
+
 const MOCK_MODEL_OPTIONS: EduAIModelOption[] = [
     {
         id: 'ollama:gpt-oss:120b',
@@ -140,32 +145,32 @@ const MOCK_COURSE_OPTIONS: EduAICourseOption[] = [
         id: 'COSC211',
         code: 'COSC 211',
         name: 'Machine Architecture',
-        description: 'Computer organization, instruction sets, performance optimization, and hardware trade-offs.'
+        description: 'Computer organization, performance, and instruction set design.'
     },
     {
         id: 'COSC121',
         code: 'COSC 121',
         name: 'Computer Programming II',
-        description: 'Intermediate programming with data structures, abstraction, and software design patterns.'
+        description: 'Intermediate programming with data structures and software design.'
     }
 ];
 
 const MOCK_COURSE_TOPICS: Record<string, EduAITopicOption[]> = {
     COSC211: [
-        { id: 'cosc211-1', name: 'Instruction Set Architecture' },
-        { id: 'cosc211-2', name: 'Pipeline Hazards' },
-        { id: 'cosc211-3', name: 'Cache Coherence' },
-        { id: 'cosc211-4', name: 'Memory Hierarchy Design' },
+        { id: 'cosc211-1', name: 'Instruction Set Architectures' },
+        { id: 'cosc211-2', name: 'Pipeline Design' },
+        { id: 'cosc211-3', name: 'Cache Coherence Strategies' },
+        { id: 'cosc211-4', name: 'Memory Hierarchy' },
         { id: 'cosc211-5', name: 'Parallel Execution Models' },
-        { id: 'cosc211-6', name: 'Benchmarking and Profiling' }
+        { id: 'cosc211-6', name: 'Performance Benchmarking' }
     ],
     COSC121: [
         { id: 'cosc121-1', name: 'Object-Oriented Design' },
-        { id: 'cosc121-2', name: 'Data Structures' },
+        { id: 'cosc121-2', name: 'Data Structures Fundamentals' },
         { id: 'cosc121-3', name: 'Algorithm Analysis' },
         { id: 'cosc121-4', name: 'Testing and Debugging' },
-        { id: 'cosc121-5', name: 'File I/O' },
-        { id: 'cosc121-6', name: 'Recursion' }
+        { id: 'cosc121-5', name: 'File I/O and Persistence' },
+        { id: 'cosc121-6', name: 'Recursion Patterns' }
     ]
 };
 
