@@ -28,8 +28,8 @@ export const AssessmentSection = ({
   selectedCourseId
 }: AssessmentSectionProps) => {
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
-  const [openGenerateModalForId, setOpenGenerateModalForId] = useState<number | null>(null);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [pendingGenerateAction, setPendingGenerateAction] = useState<'create' | number | null>(null);
 
   const getAssessmentTypeColor = (type: string) => {
     switch (type) {
@@ -72,7 +72,12 @@ export const AssessmentSection = ({
           <p className="text-sm text-gray-600">Lab / Midterm / Quiz / Final</p>
         </div>
         <Button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => {
+            if (selectedCourseId) {
+              setPendingGenerateAction('create');
+              setIsGenerateModalOpen(true);
+            }
+          }}
           className="flex items-center space-x-2"
           disabled={!selectedCourseId}
         >
@@ -136,7 +141,10 @@ export const AssessmentSection = ({
                     <Button
                       variant="default"
                       size="sm"
-                      onClick={() => setOpenGenerateModalForId(assessment.id)}
+                      onClick={() => {
+                        setPendingGenerateAction(assessment.id);
+                        setIsGenerateModalOpen(true);
+                      }}
                       className="flex items-center space-x-1"
                     >
                       <span>Variants</span>
@@ -210,7 +218,12 @@ export const AssessmentSection = ({
         <div className="text-center py-8">
           <p className="text-gray-500 mb-4">No assessments created yet.</p>
           <Button
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => {
+              if (selectedCourseId) {
+                setPendingGenerateAction('create');
+                setIsGenerateModalOpen(true);
+              }
+            }}
             className="flex items-center space-x-2"
             disabled={!selectedCourseId}
           >
@@ -220,24 +233,31 @@ export const AssessmentSection = ({
         </div>
       )}
 
-      {isCreateModalOpen && selectedCourseId && (
+      {pendingGenerateAction === 'create' && selectedCourseId && (
         <GenerateAssessmentModal
-          open={isCreateModalOpen}
-          onClose={() => setIsCreateModalOpen(false)}
+          open={isGenerateModalOpen}
+          onClose={() => {
+            setIsGenerateModalOpen(false);
+            setPendingGenerateAction(null);
+          }}
           courseId={selectedCourseId}
           onGenerate={(params) => {
             console.log('Generate assessment params', params);
             onAddAssessment();
-            setIsCreateModalOpen(false);
+            setIsGenerateModalOpen(false);
+            setPendingGenerateAction(null);
           }}
         />
       )}
 
-      {!!openGenerateModalForId && (
+      {typeof pendingGenerateAction === 'number' && (
         <GenerateAssessmentModal
-          open={true}
-          onClose={() => setOpenGenerateModalForId(null)}
-          courseId={assessments.find(a => a.id === openGenerateModalForId)?.courseId || 0}
+          open={isGenerateModalOpen}
+          onClose={() => {
+            setIsGenerateModalOpen(false);
+            setPendingGenerateAction(null);
+          }}
+          courseId={assessments.find(a => a.id === pendingGenerateAction)?.courseId || 0}
         />
       )}
     </div>
