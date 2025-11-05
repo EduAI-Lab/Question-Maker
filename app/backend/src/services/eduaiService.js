@@ -278,6 +278,58 @@ Please ensure the questions are appropriate for the course level and cover the k
   }
 
   /**
+   * Retrieve topics for a given course from EduAI
+   * @param {string} courseId - EduAI course identifier (e.g. COSC211)
+   * @returns {Promise<Object>} Raw response containing course topics
+   */
+  async getCourseTopics(courseId) {
+    if (!this.isConfigured()) {
+      throw new Error(
+        "EduAI service is not configured. Please set EDUAI_API_KEY environment variable."
+      );
+    }
+
+    if (!courseId) {
+      throw new Error("courseId is required to fetch EduAI topics");
+    }
+
+    const url = `${this.baseURL}/api/courses/${courseId}/topics`;
+
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+        },
+        timeout: 30000,
+      });
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        const errorMessage =
+          error.response.data?.error ||
+          error.response.data?.message ||
+          error.response.statusText;
+        const statusCode = error.response.status;
+        console.error("EduAI topics API error:", {
+          status: statusCode,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url,
+        });
+        throw new Error(`EduAI API error (${statusCode}): ${errorMessage}`);
+      } else if (error.request) {
+        console.error("EduAI topics request error:", error.request);
+        throw new Error("EduAI API request failed: No response received");
+      } else {
+        console.error("EduAI topics error:", error.message);
+        throw new Error(`EduAI API error: ${error.message}`);
+      }
+    }
+  }
+
+  /**
    * Test API key validity by making a simple chat request
    * @returns {Promise<Object>} API key test result
    */
