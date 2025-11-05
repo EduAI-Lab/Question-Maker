@@ -5,7 +5,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { DualRangeSlider } from '../ui/DualRangeSlider';
 import { courseService } from '../../services/courseService';
-import { Tooltip } from '../ui/tooltip';
 import { TopicSelect } from './TopicSelect';
 
 interface GenerateAssessmentModalProps {
@@ -13,7 +12,6 @@ interface GenerateAssessmentModalProps {
   onClose: () => void;
   onGenerate?: (params: AssessmentGenerationParams) => void;
   courseId: number;
-  initialMode?: 'as-is' | 'generate';
 }
 
 export interface AssessmentGenerationParams {
@@ -32,7 +30,6 @@ export interface AssessmentGenerationParams {
     application: number;
   };
   reasoningData: ReasoningDataState;
-  mode: 'as-is' | 'generate';
 }
 
 type Topic = { id: number; name: string };
@@ -49,18 +46,12 @@ export type ReasoningDataState = {
   application: ReasoningProfile;
 };
 
-export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId, initialMode = 'as-is' }: GenerateAssessmentModalProps) => {
+export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }: GenerateAssessmentModalProps) => {
   const [numQuestions, setNumQuestions] = React.useState<number>(10);
   const [availableTopics, setAvailableTopics] = React.useState<Topic[]>([]);
   const [primaryTopicIds, setPrimaryTopicIds] = React.useState<number[]>([]);
   const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>([]);
   const [excludedTopicIds, setExcludedTopicIds] = React.useState<number[]>([]);
-  const [mode, setMode] = React.useState<'as-is' | 'generate'>(initialMode);
-
-  // Update mode when initialMode prop changes
-  React.useEffect(() => {
-    setMode(initialMode);
-  }, [initialMode]);
   // Matrix data model: each reasoning type has its own difficulty distribution
   const [reasoningData, setReasoningData] = React.useState<ReasoningDataState>({
     factual: {
@@ -201,8 +192,7 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId, i
       excludedTopicIds,
       difficultyDistribution,
       reasoningDistribution,
-      reasoningData,
-      mode
+      reasoningData
     });
     onClose();
   };
@@ -212,32 +202,7 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId, i
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <Card className="relative flex w-full max-w-4xl max-h-[90vh] flex-col overflow-hidden">
         <CardHeader className="border-b">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle>Generate Assessment</CardTitle>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground sm:hidden">Mode</span>
-              <div className="flex items-center gap-2">
-                <Tooltip content="Select existing questions from the question bank." side="bottom">
-                  <Button
-                    variant={mode === 'as-is' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setMode('as-is')}
-                  >
-                    🧩 As-Is
-                  </Button>
-                </Tooltip>
-                <Tooltip content="AI generates question variants from assessments or topics." side="bottom">
-                  <Button
-                    variant={mode === 'generate' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setMode('generate')}
-                  >
-                    ⚙️ Generate
-                  </Button>
-                </Tooltip>
-              </div>
-            </div>
-          </div>
+          <CardTitle>Generate Assessment</CardTitle>
         </CardHeader>
         <CardContent className="flex-1 space-y-6 overflow-y-auto py-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
