@@ -4,7 +4,7 @@ import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
 import { mockAssessments } from '../data/mockData';
-import { Course } from '../types/class';
+import { Course } from '../types/question';
 import { Question, Assessment, QuestionVariantEntry } from '../types/question';
 import { Topic } from '../types/topic';
 import { useCourses } from '../hooks/useCourses';

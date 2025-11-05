@@ -24,7 +24,7 @@ import { assessmentService, AssessmentSummary } from '../../services/assessmentS
 import { Topic } from '../../types/topic';
 import { useToast } from '../ui/use-toast';
 import eduaiService, { EduAIModelOption, EduAICourseOption } from '../../services/eduaiService';
-import { Class } from '../../types/class';
+import { Course } from '../../types/question';
 
 interface AddQuestionDialogProps {
     open: boolean;
@@ -91,7 +91,7 @@ export const AddQuestionDialog = ({
     const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
     const [isAuxLoading, setIsAuxLoading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [courseDetails, setCourseDetails] = useState<Class | null>(null);
+    const [courseDetails, setCourseDetails] = useState<Course | null>(null);
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [availableEduCourses, setAvailableEduCourses] = useState<EduAICourseOption[]>([]);
     const { toast } = useToast();
@@ -319,7 +319,7 @@ export const AddQuestionDialog = ({
     };
 
     const resolveCourseCodeForEduAI = (): string | null => {
-        let code = courseDetails?.code ?? courseDetails?.courseCode ?? null;
+        let code = courseDetails?.code ?? null;
 
         if (!code) {
             const fallback = availableEduCourses.find((eduCourse) => {

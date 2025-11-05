@@ -1,24 +1,24 @@
 import api from './api';
-import { Class, ClassCreate } from '../types/class';
+import { Course, CourseCreate } from '../types/question';
 import { Topic } from '../types/topic';
 
 export const courseService = {
-    async getCourses(): Promise<Class[]> {
+    async getCourses(): Promise<Course[]> {
         const response = await api.get('/api/course');
         return response.data.data;
     },
 
-    async getCourse(id: number): Promise<Class> {
+    async getCourse(id: number): Promise<Course> {
         const response = await api.get(`/api/course/${id}`);
         return response.data.data;
     },
 
-    async createCourse(courseData: ClassCreate): Promise<Class> {
+    async createCourse(courseData: CourseCreate): Promise<Course> {
         const response = await api.post('/api/course', courseData);
         return response.data.data;
     },
 
-    async updateCourse(id: number, courseData: Partial<ClassCreate>): Promise<Class> {
+    async updateCourse(id: number, courseData: Partial<CourseCreate>): Promise<Course> {
         const response = await api.put(`/api/course/${id}`, courseData);
         return response.data.data;
     },

@@ -45,7 +45,6 @@ src/
 │   ├── auth.js             # Authentication routes
 │   ├── questions.js        # Question routes
 │   ├── classes.js          # Class routes
-│   └── upload.js           # File upload routes
 └── middleware/
     ├── auth.js             # JWT authentication
     └── errorHandler.js     # Error handling
@@ -111,8 +110,6 @@ The API will be available at `http://localhost:8000`
 - `PUT /api/classes/:id` - Update class
 - `DELETE /api/classes/:id` - Delete class
 
-### Upload
-- `POST /api/upload` - Upload files and generate questions
 
 ## Environment Variables
 

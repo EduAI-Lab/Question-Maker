@@ -1,8 +1,8 @@
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
+import { Course } from '../../types/question';
 import { User } from 'lucide-react';
-import { Class as Course } from '../../types/class';
 
 interface TopNavigationProps {
     selectedCourse: Course | null;

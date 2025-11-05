@@ -9,7 +9,6 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import questionRoutes from './routes/questions.js';
 import courseRoutes from './routes/course.js';
-import uploadRoutes from './routes/upload.js';
 import assessmentRoutes from './routes/assessments.js';
 import variantRoutes from './routes/variants.js';
 import eduaiRoutes from './routes/eduai.js';
@@ -60,7 +59,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/questions', variantRoutes);
 app.use('/api/course', courseRoutes);
-app.use('/api/upload', uploadRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/eduai', eduaiRoutes);
 
