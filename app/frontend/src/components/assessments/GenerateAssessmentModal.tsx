@@ -3,9 +3,12 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { DualRangeSlider } from '../ui/DualRangeSlider';
 import { courseService } from '../../services/courseService';
 import { TopicSelect } from './TopicSelect';
+import { AssessmentType } from '../../types/question';
 
 interface GenerateAssessmentModalProps {
   open: boolean;
@@ -15,14 +18,17 @@ interface GenerateAssessmentModalProps {
 }
 
 export interface AssessmentGenerationParams {
-  numQuestions: number;
+  name: string;
+  type: AssessmentType;
+  description: string;
+  semester: string;
   primaryTopicIds: number[];
   secondaryTopicIds: number[];
   excludedTopicIds: number[];
   difficultyDistribution: {
-    easy: number; // Factual
-    medium: number; // Analysis
-    hard: number; // Application
+    easy: number;
+    medium: number;
+    hard: number;
   };
   reasoningDistribution: {
     factual: number;
@@ -47,7 +53,13 @@ export type ReasoningDataState = {
 };
 
 export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }: GenerateAssessmentModalProps) => {
-  const [numQuestions, setNumQuestions] = React.useState<number>(10);
+  const [assessmentName, setAssessmentName] = React.useState('');
+  const [assessmentType, setAssessmentType] = React.useState<AssessmentType>('Assignment');
+  const [assessmentDescription, setAssessmentDescription] = React.useState('');
+  const [assessmentSemester, setAssessmentSemester] = React.useState(() => {
+    const now = new Date();
+    return `Fall ${now.getFullYear()}`;
+  });
   const [availableTopics, setAvailableTopics] = React.useState<Topic[]>([]);
   const [primaryTopicIds, setPrimaryTopicIds] = React.useState<number[]>([]);
   const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>([]);
@@ -169,10 +181,13 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
 
   if (!open) return null;
 
-  const canGenerate = primaryTopicIds.length > 0;
+  const canGenerate =
+    assessmentName.trim().length > 0 &&
+    assessmentDescription.trim().length > 0 &&
+    assessmentSemester.trim().length > 0 &&
+    primaryTopicIds.length > 0;
 
   const handleGenerate = () => {
-    // Convert to the format expected by the API
     const difficultyDistribution = {
       easy: overallTotals.easy,
       medium: overallTotals.medium,
@@ -186,7 +201,10 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
     };
 
     onGenerate?.({
-      numQuestions,
+      name: assessmentName.trim(),
+      type: assessmentType,
+      description: assessmentDescription.trim(),
+      semester: assessmentSemester.trim(),
       primaryTopicIds,
       secondaryTopicIds,
       excludedTopicIds,
@@ -202,18 +220,51 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <Card className="relative flex w-full max-w-4xl max-h-[90vh] flex-col overflow-hidden">
         <CardHeader className="border-b">
-          <CardTitle>Generate Assessment</CardTitle>
+          <CardTitle>Create Assessment Blueprint</CardTitle>
         </CardHeader>
         <CardContent className="flex-1 space-y-6 overflow-y-auto py-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-1 space-y-2">
-              <Label htmlFor="numQuestions">Number of questions</Label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="assessmentName">Assessment name</Label>
               <Input
-                id="numQuestions"
-                type="number"
-                min={1}
-                value={numQuestions}
-                onChange={(e) => setNumQuestions(parseInt(e.target.value || '0', 10))}
+                id="assessmentName"
+                value={assessmentName}
+                onChange={(e) => setAssessmentName(e.target.value)}
+                placeholder="e.g. Midterm 1"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="assessmentType">Assessment type</Label>
+              <Select value={assessmentType} onValueChange={(value) => setAssessmentType(value as AssessmentType)}>
+                <SelectTrigger id="assessmentType">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as AssessmentType[]).map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="assessmentSemester">Semester</Label>
+              <Input
+                id="assessmentSemester"
+                value={assessmentSemester}
+                onChange={(e) => setAssessmentSemester(e.target.value)}
+                placeholder="e.g. Fall 2024"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="assessmentDescription">Description</Label>
+              <Textarea
+                id="assessmentDescription"
+                value={assessmentDescription}
+                onChange={(e) => setAssessmentDescription(e.target.value)}
+                placeholder="What should this assessment cover?"
+                rows={3}
               />
             </div>
           </div>
@@ -406,7 +457,7 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
         <CardFooter className="flex justify-end gap-3 border-t bg-muted/40 py-4">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleGenerate} disabled={!canGenerate}>
-            Generate
+            Save Blueprint
           </Button>
         </CardFooter>
       </Card>
