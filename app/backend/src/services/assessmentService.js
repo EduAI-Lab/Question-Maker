@@ -1,5 +1,4 @@
 import { Assessments, Question_Metadata, Variants, AssessmentSections, SectionVariants, Course, sequelize } from '../schema/index.js';
-import { Course } from '../schema/Course.js';
 import { Op } from 'sequelize';
 
 export const createAssessment = async (userId, assessmentData) => {
