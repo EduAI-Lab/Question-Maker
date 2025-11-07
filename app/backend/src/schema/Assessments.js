@@ -7,6 +7,15 @@ export const Assessments = sequelize.define('Assessments', {
     primaryKey: true,
     autoIncrement: true
   },
+  courseId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'course_id',
+    references: {
+      model: 'courses',
+      key: 'id'
+    }
+  },
   type: {
     type: DataTypes.ENUM('Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'),
     allowNull: false
@@ -24,6 +33,15 @@ export const Assessments = sequelize.define('Assessments', {
     validate: {
       notEmpty: true
     }
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  blueprintConfig: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    field: 'blueprint_config'
   },
   createdAt: {
     type: DataTypes.DATE,

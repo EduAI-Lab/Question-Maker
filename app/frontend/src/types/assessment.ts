@@ -1,7 +1,23 @@
 // Import types from question.ts to avoid circular dependencies
-import { Assessment, AssessmentType, QuestionVariant } from './question';
+import { 
+  Assessment, 
+  AssessmentType, 
+  QuestionVariant, 
+  ReasoningProfile, 
+  ReasoningDataState,
+  AssessmentBlueprintConfig,
+  AssessmentGenerationParams
+} from './question';
 
-export { Assessment, AssessmentType, QuestionVariant };
+export { 
+  Assessment, 
+  AssessmentType, 
+  QuestionVariant,
+  ReasoningProfile,
+  ReasoningDataState,
+  AssessmentBlueprintConfig,
+  AssessmentGenerationParams
+};
 
 export interface AssessmentCreate {
   type: AssessmentType;

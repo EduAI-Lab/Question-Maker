@@ -1,18 +1,44 @@
 import api from './api';
+import { Assessment, AssessmentGenerationParams, AssessmentBlueprintConfig } from '../types/question';
 
-export interface AssessmentSummary {
-    id: number;
-    name: string;
-    type: string;
-    semester: string;
-    courseId?: number | null;
-    createdAt: string;
-    updatedAt: string;
-}
+type GetAssessmentsOptions = {
+  courseId?: number;
+};
+
+const toBlueprintConfig = (payload: AssessmentGenerationParams): AssessmentBlueprintConfig => ({
+  primaryTopicIds: payload.primaryTopicIds,
+  secondaryTopicIds: payload.secondaryTopicIds,
+  excludedTopicIds: payload.excludedTopicIds,
+  difficultyDistribution: payload.difficultyDistribution,
+  reasoningDistribution: payload.reasoningDistribution,
+  reasoningData: payload.reasoningData
+});
 
 export const assessmentService = {
-    async getAssessments(): Promise<AssessmentSummary[]> {
-        const response = await api.get('/api/assessments');
-        return response.data.data || [];
+  async getAssessments(options: GetAssessmentsOptions = {}): Promise<Assessment[]> {
+    const params: Record<string, number> = {};
+    if (options.courseId) {
+      params.courseId = options.courseId;
     }
+
+    const response = await api.get('/api/assessments', {
+      params: Object.keys(params).length ? params : undefined
+    });
+    return response.data.data || [];
+  },
+
+  async createAssessment(payload: AssessmentGenerationParams): Promise<Assessment> {
+    const response = await api.post('/api/assessments', {
+      type: payload.type,
+      name: payload.name,
+      semester: payload.semester,
+      description: payload.description,
+      courseId: payload.courseId,
+      blueprintConfig: toBlueprintConfig(payload)
+    });
+
+    return response.data.data;
+  }
 };
+
+export default assessmentService;

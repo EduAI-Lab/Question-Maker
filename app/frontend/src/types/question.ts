@@ -45,10 +45,14 @@ export interface Assessment {
     type: AssessmentType;
     name: string;
     semester: string;
+    courseId?: number | null;
+    description?: string | null;
     createdAt: string;
     updatedAt: string;
+    blueprintConfig?: AssessmentBlueprintConfig | null;
     // Relations
     variants?: QuestionVariant[];
+    course?: Course;
 }
 
 // Course (matches backend Course schema)
@@ -153,4 +157,41 @@ export interface QuestionVariantEntry {
     courseCode?: string | null;
     secondaryTopicNames?: string[];
     variant: QuestionVariant;
+}
+
+export type ReasoningProfile = {
+    total: number;
+    easyBoundary: number;
+    hardBoundary: number;
+};
+
+export type ReasoningDataState = {
+    factual: ReasoningProfile;
+    analytical: ReasoningProfile;
+    application: ReasoningProfile;
+};
+
+export interface AssessmentBlueprintConfig {
+    primaryTopicIds: number[];
+    secondaryTopicIds: number[];
+    excludedTopicIds: number[];
+    difficultyDistribution: {
+        easy: number;
+        medium: number;
+        hard: number;
+    };
+    reasoningDistribution: {
+        factual: number;
+        analytical: number;
+        application: number;
+    };
+    reasoningData: ReasoningDataState;
+}
+
+export interface AssessmentGenerationParams extends AssessmentBlueprintConfig {
+    courseId: number;
+    name: string;
+    type: AssessmentType;
+    description: string;
+    semester: string;
 }

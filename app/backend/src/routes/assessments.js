@@ -18,19 +18,22 @@ const router = express.Router();
 // @access  Private
 router.post('/', authenticateToken, async (req, res, next) => {
   try {
-    const { type, name, semester } = req.body;
+    const { type, name, semester, description, courseId, blueprintConfig } = req.body;
 
-    if (!type || !name || !semester) {
+    if (!type || !name || !semester || !courseId) {
       return res.status(400).json({
         success: false,
-        error: 'Type, name, and semester are required'
+        error: 'Type, name, semester, and courseId are required'
       });
     }
 
     const assessment = await createAssessment(req.user.id, {
       type,
       name,
-      semester
+      semester,
+      description,
+      courseId,
+      blueprintConfig
     });
 
     res.status(201).json({
@@ -48,11 +51,12 @@ router.post('/', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
-    const { limit, offset } = req.query;
+    const { limit, offset, courseId } = req.query;
 
     const assessments = await getAssessmentsByUser(req.user.id, {
       limit: parseInt(limit) || 50,
-      offset: parseInt(offset) || 0
+      offset: parseInt(offset) || 0,
+      courseId: courseId ? Number(courseId) : undefined
     });
 
     res.json({
@@ -85,12 +89,15 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const { type, name, semester } = req.body;
+    const { type, name, semester, description, courseId, blueprintConfig } = req.body;
 
     const assessment = await updateAssessment(req.params.id, {
       type,
       name,
-      semester
+      semester,
+      description,
+      courseId,
+      blueprintConfig
     }, req.user.id);
 
     res.json({

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { DualRangeSlider } from '../ui/DualRangeSlider';
 import { courseService } from '../../services/courseService';
 import { TopicSelect } from './TopicSelect';
-import { AssessmentType } from '../../types/question';
+import { AssessmentGenerationParams, AssessmentType, ReasoningDataState } from '../../types/question';
 
 interface GenerateAssessmentModalProps {
   open: boolean;
@@ -17,40 +17,7 @@ interface GenerateAssessmentModalProps {
   courseId: number;
 }
 
-export interface AssessmentGenerationParams {
-  name: string;
-  type: AssessmentType;
-  description: string;
-  semester: string;
-  primaryTopicIds: number[];
-  secondaryTopicIds: number[];
-  excludedTopicIds: number[];
-  difficultyDistribution: {
-    easy: number;
-    medium: number;
-    hard: number;
-  };
-  reasoningDistribution: {
-    factual: number;
-    analytical: number;
-    application: number;
-  };
-  reasoningData: ReasoningDataState;
-}
-
 type Topic = { id: number; name: string };
-
-export type ReasoningProfile = {
-  total: number;
-  easyBoundary: number;
-  hardBoundary: number;
-};
-
-export type ReasoningDataState = {
-  factual: ReasoningProfile;
-  analytical: ReasoningProfile;
-  application: ReasoningProfile;
-};
 
 export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }: GenerateAssessmentModalProps) => {
   const [assessmentName, setAssessmentName] = React.useState('');
@@ -182,6 +149,7 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
   if (!open) return null;
 
   const canGenerate =
+    courseId > 0 &&
     assessmentName.trim().length > 0 &&
     assessmentDescription.trim().length > 0 &&
     assessmentSemester.trim().length > 0 &&
@@ -201,6 +169,7 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
     };
 
     onGenerate?.({
+      courseId,
       name: assessmentName.trim(),
       type: assessmentType,
       description: assessmentDescription.trim(),
