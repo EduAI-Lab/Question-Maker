@@ -5,6 +5,8 @@ import { Topics } from './Topics.js';
 import { Question_Metadata } from './Question_Metadata.js';
 import { Assessments } from './Assessments.js';
 import { Variants } from './Variants.js';
+import { AssessmentSections } from './AssessmentSections.js';
+import { SectionVariants } from './SectionVariants.js';
 
 // Define associations
 
@@ -27,13 +29,21 @@ Question_Metadata.belongsTo(Topics, { foreignKey: 'primaryTopicId', as: 'primary
 Course.hasMany(Assessments, { foreignKey: 'courseId', as: 'assessments' });
 Assessments.belongsTo(Course, { foreignKey: 'courseId', as: 'course' });
 
-// Question_Metadata associations
 Question_Metadata.hasMany(Variants, { foreignKey: 'questionMetadataId', as: 'variants' });
 Variants.belongsTo(Question_Metadata, { foreignKey: 'questionMetadataId', as: 'questionMetadata' });
 
 // Assessments associations
 Assessments.hasMany(Variants, { foreignKey: 'assessmentId', as: 'variants' });
 Variants.belongsTo(Assessments, { foreignKey: 'assessmentId', as: 'assessment' });
+
+Assessments.hasMany(AssessmentSections, { foreignKey: 'assessmentId', as: 'sections' });
+AssessmentSections.belongsTo(Assessments, { foreignKey: 'assessmentId', as: 'assessment' });
+
+AssessmentSections.hasMany(SectionVariants, { foreignKey: 'sectionId', as: 'sectionVariants' });
+SectionVariants.belongsTo(AssessmentSections, { foreignKey: 'sectionId', as: 'section' });
+
+SectionVariants.belongsTo(Variants, { foreignKey: 'variantId', as: 'variant' });
+Variants.hasMany(SectionVariants, { foreignKey: 'variantId', as: 'sectionLinks' });
 
 // Variants self-reference for referenceId
 Variants.hasMany(Variants, { foreignKey: 'referenceId', as: 'referencedVariants' });
@@ -46,5 +56,7 @@ export {
   Topics,
   Question_Metadata,
   Assessments,
-  Variants
+  Variants,
+  AssessmentSections,
+  SectionVariants
 };

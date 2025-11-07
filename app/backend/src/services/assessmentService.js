@@ -1,4 +1,4 @@
-import { Assessments, Question_Metadata, Variants, sequelize } from '../schema/index.js';
+import { Assessments, Question_Metadata, Variants, AssessmentSections, SectionVariants, Course, sequelize } from '../schema/index.js';
 import { Course } from '../schema/Course.js';
 import { Op } from 'sequelize';
 
@@ -73,6 +73,40 @@ export const getAssessmentsByUser = async (userId, options = {}) => {
               ]
             }
           ]
+        },
+        {
+          model: AssessmentSections,
+          as: 'sections',
+          include: [
+            {
+              model: SectionVariants,
+              as: 'sectionVariants',
+              include: [
+                {
+                  model: Variants,
+                  as: 'variant',
+                  attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'questionMetadataId'],
+                  include: [
+                    {
+                      model: Question_Metadata,
+                      as: 'questionMetadata',
+                      attributes: ['id', 'description', 'type', 'questionOrder'],
+                      include: [
+                        {
+                          model: Course,
+                          as: 'course',
+                          attributes: ['id', 'name', 'code'],
+                          where: { userId },
+                          required: false
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          order: [['position', 'ASC']]
         }
       ],
       order: [['createdAt', 'DESC']],
@@ -113,6 +147,38 @@ export const getAssessmentById = async (assessmentId, userId) => {
                   as: 'course',
                   where: { userId: userId },
                   attributes: ['id', 'name', 'code']
+                }
+              ]
+            }
+          ]
+        },
+        {
+          model: AssessmentSections,
+          as: 'sections',
+          include: [
+            {
+              model: SectionVariants,
+              as: 'sectionVariants',
+              include: [
+                {
+                  model: Variants,
+                  as: 'variant',
+                  include: [
+                    {
+                      model: Question_Metadata,
+                      as: 'questionMetadata',
+                      attributes: ['id', 'description', 'type', 'questionOrder'],
+                      include: [
+                        {
+                          model: Course,
+                          as: 'course',
+                          where: { userId },
+                          attributes: ['id', 'name', 'code'],
+                          required: false
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
