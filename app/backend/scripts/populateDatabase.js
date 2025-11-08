@@ -153,249 +153,279 @@ const populateDatabase = async () => {
         semester: 'Fall 2024'
       },
       {
+        type: 'Quiz',
+        name: 'Quiz 2',
+        semester: 'Fall 2024'
+      },
+      {
+        type: 'Quiz',
+        name: 'Quiz 3',
+        semester: 'Fall 2024'
+      },
+      {
         type: 'Assignment',
         name: 'Assignment 1',
+        semester: 'Fall 2024'
+      },
+      {
+        type: 'Assignment',
+        name: 'Assignment 2',
         semester: 'Fall 2024'
       },
       {
         type: 'Lab',
         name: 'Lab 1',
         semester: 'Fall 2024'
+      },
+      {
+        type: 'Lab',
+        name: 'Lab 2',
+        semester: 'Fall 2024'
+      },
+      {
+        type: 'Midterm',
+        name: 'Midterm Exam 2',
+        semester: 'Winter 2025'
       }
     ]);
     console.log(`Created ${assessments.length} assessments.`);
 
-    // 5. Create Question_Metadata
+    // 5. Create Question_Metadata (100 questions)
     console.log('Creating question metadata...');
-    const questionMetadata = await Question_Metadata.bulkCreate([
-      // COSC 211 - Machine Architecture questions
-      {
-        description: 'Understanding instruction set architectures',
-        type: 'MCQ',
-        courseId: courses[0].id,
-        primaryTopicId: topics[0].id,
-        questionOrder: { [assessments[0].id]: 1, [assessments[2].id]: 1 }
-      },
-      {
-        description: 'Pipeline design principles',
-        type: 'SA',
-        courseId: courses[0].id,
-        primaryTopicId: topics[1].id,
-        questionOrder: { [assessments[0].id]: 2 }
-      },
-      {
-        description: 'Cache coherence strategies',
-        type: 'MCQ',
-        courseId: courses[0].id,
-        primaryTopicId: topics[2].id,
-        questionOrder: { [assessments[0].id]: 3 }
-      },
-      {
-        description: 'Memory hierarchy design',
-        type: 'SA',
-        courseId: courses[0].id,
-        primaryTopicId: topics[3].id,
-        questionOrder: { [assessments[1].id]: 1 }
-      },
-      {
-        description: 'Parallel execution models',
-        type: 'MCQ',
-        courseId: courses[0].id,
-        primaryTopicId: topics[4].id,
-        questionOrder: { [assessments[1].id]: 2 }
-      },
-      {
-        description: 'Performance benchmarking techniques',
-        type: 'SA',
-        courseId: courses[0].id,
-        primaryTopicId: topics[5].id,
-        questionOrder: { [assessments[1].id]: 3 }
-      },
-      // COSC 121 - Computer Programming II questions
-      {
-        description: 'Object-oriented design principles',
-        type: 'MCQ',
-        courseId: courses[1].id,
-        primaryTopicId: topics[6].id,
-        questionOrder: { [assessments[0].id]: 1 }
-      },
-      {
-        description: 'Data structures fundamentals',
-        type: 'SA',
-        courseId: courses[1].id,
-        primaryTopicId: topics[7].id,
-        questionOrder: { [assessments[0].id]: 2, [assessments[1].id]: 1 }
-      },
-      {
-        description: 'Algorithm analysis and complexity',
-        type: 'MCQ',
-        courseId: courses[1].id,
-        primaryTopicId: topics[8].id,
-        questionOrder: { [assessments[0].id]: 3 }
-      },
-      {
-        description: 'Testing and debugging strategies',
-        type: 'SA',
-        courseId: courses[1].id,
-        primaryTopicId: topics[9].id,
-        questionOrder: { [assessments[1].id]: 2 }
-      },
-      {
-        description: 'File I/O and persistence',
-        type: 'MCQ',
-        courseId: courses[1].id,
-        primaryTopicId: topics[10].id,
-        questionOrder: { [assessments[1].id]: 3 }
-      },
-      {
-        description: 'Recursion patterns and implementation',
-        type: 'SA',
-        courseId: courses[1].id,
-        primaryTopicId: topics[11].id,
-        questionOrder: { [assessments[2].id]: 1 }
+    
+    // Helper function to generate question order for assessments
+    const generateQuestionOrder = (questionIndex, totalQuestions) => {
+      const order = {};
+      // Distribute questions across assessments
+      const assessmentIndex = questionIndex % assessments.length;
+      const questionNum = Math.floor(questionIndex / assessments.length) + 1;
+      order[assessments[assessmentIndex].id] = questionNum;
+      // Some questions appear in multiple assessments
+      if (questionIndex % 3 === 0 && assessmentIndex + 1 < assessments.length) {
+        order[assessments[assessmentIndex + 1].id] = questionNum;
       }
+      return order;
+    };
+
+    // Generate questions for COSC 211 (Machine Architecture) - 50 questions
+    const cosc211Questions = [];
+    const cosc211Topics = topics.slice(0, 6); // First 6 topics are COSC 211
+    const cosc211QuestionTypes = ['MCQ', 'SA'];
+    const cosc211Descriptions = [
+      // Instruction Set Architectures (8 questions)
+      'Understanding instruction set architectures',
+      'RISC vs CISC architecture comparison',
+      'Instruction formats and encoding',
+      'Addressing modes in instruction sets',
+      'Instruction set design principles',
+      'Load-store architecture concepts',
+      'Instruction pipelining basics',
+      'Instruction-level parallelism',
+      // Pipeline Design (9 questions)
+      'Pipeline design principles',
+      'Pipeline stages and throughput',
+      'Pipeline hazards identification',
+      'Data forwarding techniques',
+      'Branch prediction strategies',
+      'Pipeline optimization methods',
+      'Superscalar pipeline design',
+      'Out-of-order execution',
+      'Pipeline stall handling',
+      // Cache Coherence (8 questions)
+      'Cache coherence strategies',
+      'MESI protocol implementation',
+      'Cache consistency models',
+      'Snooping vs directory protocols',
+      'Write-back vs write-through caches',
+      'Cache replacement policies',
+      'False sharing prevention',
+      'Cache performance optimization',
+      // Memory Hierarchy (9 questions)
+      'Memory hierarchy design',
+      'Cache memory organization',
+      'Virtual memory concepts',
+      'Page replacement algorithms',
+      'TLB (Translation Lookaside Buffer)',
+      'Memory access patterns',
+      'Cache locality principles',
+      'Memory bandwidth optimization',
+      'Multi-level cache design',
+      // Parallel Execution Models (8 questions)
+      'Parallel execution models',
+      'SIMD vs MIMD architectures',
+      'Vector processing units',
+      'Multithreading concepts',
+      'Symmetric multiprocessing',
+      'Distributed memory systems',
+      'Shared memory architectures',
+      'GPU computing fundamentals',
+      // Performance Benchmarking (8 questions)
+      'Performance benchmarking techniques',
+      'CPU performance metrics',
+      'Cache performance analysis',
+      'Memory bandwidth measurement',
+      'Benchmark suite design',
+      'Performance profiling tools',
+      'Amdahl\'s law application',
+      'Scalability analysis'
+    ];
+
+    for (let i = 0; i < 50; i++) {
+      const topicIndex = i % cosc211Topics.length;
+      const typeIndex = i % cosc211QuestionTypes.length;
+      cosc211Questions.push({
+        description: cosc211Descriptions[i] || `COSC 211 Question ${i + 1}`,
+        type: cosc211QuestionTypes[typeIndex],
+        courseId: courses[0].id,
+        primaryTopicId: cosc211Topics[topicIndex].id,
+        questionOrder: generateQuestionOrder(i, 50)
+      });
+    }
+
+    // Generate questions for COSC 121 (Computer Programming II) - 50 questions
+    const cosc121Questions = [];
+    const cosc121Topics = topics.slice(6, 12); // Last 6 topics are COSC 121
+    const cosc121QuestionTypes = ['MCQ', 'SA'];
+    const cosc121Descriptions = [
+      // Object-Oriented Design (9 questions)
+      'Object-oriented design principles',
+      'Class inheritance and composition',
+      'Polymorphism implementation',
+      'Encapsulation concepts',
+      'Design patterns application',
+      'Interface vs abstract classes',
+      'SOLID principles',
+      'UML class diagrams',
+      'Object relationships',
+      // Data Structures Fundamentals (9 questions)
+      'Data structures fundamentals',
+      'Array vs linked list comparison',
+      'Stack and queue operations',
+      'Binary tree traversal',
+      'Hash table implementation',
+      'Graph representation methods',
+      'Priority queue concepts',
+      'Tree balancing techniques',
+      'Data structure selection criteria',
+      // Algorithm Analysis (8 questions)
+      'Algorithm analysis and complexity',
+      'Big-O notation calculation',
+      'Time vs space complexity trade-offs',
+      'Recursive algorithm analysis',
+      'Sorting algorithm comparison',
+      'Search algorithm efficiency',
+      'Dynamic programming concepts',
+      'Greedy algorithm design',
+      // Testing and Debugging (8 questions)
+      'Testing and debugging strategies',
+      'Unit test design',
+      'Integration testing approaches',
+      'Test-driven development',
+      'Debugging techniques',
+      'Code coverage metrics',
+      'Exception handling patterns',
+      'Assertion usage',
+      // File I/O and Persistence (8 questions)
+      'File I/O and persistence',
+      'File reading and writing',
+      'Serialization concepts',
+      'JSON data handling',
+      'Database connectivity basics',
+      'File format selection',
+      'Error handling in I/O',
+      'Stream processing',
+      // Recursion Patterns (8 questions)
+      'Recursion patterns and implementation',
+      'Recursive vs iterative solutions',
+      'Tail recursion optimization',
+      'Recursive data structures',
+      'Backtracking algorithms',
+      'Divide and conquer patterns',
+      'Recursive tree algorithms',
+      'Memoization techniques'
+    ];
+
+    for (let i = 0; i < 50; i++) {
+      const topicIndex = i % cosc121Topics.length;
+      const typeIndex = i % cosc121QuestionTypes.length;
+      cosc121Questions.push({
+        description: cosc121Descriptions[i] || `COSC 121 Question ${i + 1}`,
+        type: cosc121QuestionTypes[typeIndex],
+        courseId: courses[1].id,
+        primaryTopicId: cosc121Topics[topicIndex].id,
+        questionOrder: generateQuestionOrder(i + 50, 50)
+      });
+    }
+
+    const questionMetadata = await Question_Metadata.bulkCreate([
+      ...cosc211Questions,
+      ...cosc121Questions
     ]);
     console.log(`Created ${questionMetadata.length} question metadata entries.`);
 
-    // 6. Create Variants
+    // 6. Create Variants (at least 1 per question, some have multiple)
     console.log('Creating variants...');
-    const variants = await Variants.bulkCreate([
-      // Variants for questionMetadata[0] - Instruction Set Architectures
-      {
-        questionText: 'What is the primary difference between RISC and CISC instruction set architectures?\nA) RISC has more instructions\nB) CISC has simpler instructions\nC) RISC uses simpler, fixed-length instructions\nD) CISC is always faster',
-        difficulty: 'medium',
-        reasoningLevel: 'factual',
-        questionMetadataId: questionMetadata[0].id,
-        assessmentId: assessments[0].id,
-        answer: 'C) RISC uses simpler, fixed-length instructions'
-      },
-      {
-        questionText: 'Which instruction set architecture typically has a larger number of addressing modes?\nA) RISC\nB) CISC\nC) Both have the same\nD) Neither uses addressing modes',
-        difficulty: 'easy',
-        reasoningLevel: 'factual',
-        questionMetadataId: questionMetadata[0].id,
-        assessmentId: assessments[2].id,
-        answer: 'B) CISC'
-      },
+    
+    // Helper function to generate question text and answer based on question metadata
+    const generateVariant = (qMeta, assessmentId, variantNum = 0) => {
+      const difficulties = ['easy', 'medium', 'hard'];
+      const reasoningLevels = ['factual', 'analytical', 'application'];
+      const difficulty = difficulties[qMeta.id % difficulties.length];
+      const reasoningLevel = reasoningLevels[qMeta.id % reasoningLevels.length];
       
-      // Variants for questionMetadata[1] - Pipeline Design
-      {
-        questionText: 'Explain the concept of pipeline hazards and describe the three main types of hazards in pipelined processors.',
-        difficulty: 'hard',
-        reasoningLevel: 'analytical',
-        questionMetadataId: questionMetadata[1].id,
-        assessmentId: assessments[0].id,
-        answer: 'Pipeline hazards are situations that prevent the next instruction from executing in its designated clock cycle. The three main types are: structural hazards (resource conflicts), data hazards (dependencies between instructions), and control hazards (branch instructions).'
-      },
+      let questionText, answer;
       
-      // Variants for questionMetadata[2] - Cache Coherence
-      {
-        questionText: 'Which cache coherence protocol uses write-invalidate strategy?\nA) MSI\nB) MESI\nC) MOESI\nD) All of the above',
-        difficulty: 'medium',
-        reasoningLevel: 'analytical',
-        questionMetadataId: questionMetadata[2].id,
-        assessmentId: assessments[0].id,
-        answer: 'D) All of the above'
-      },
-      
-      // Variants for questionMetadata[3] - Memory Hierarchy
-      {
-        questionText: 'Describe the memory hierarchy and explain why it is designed in this way. Include the typical levels from fastest to slowest.',
-        difficulty: 'medium',
-        reasoningLevel: 'analytical',
-        questionMetadataId: questionMetadata[3].id,
-        assessmentId: assessments[1].id,
-        answer: 'Memory hierarchy consists of registers (fastest), cache (L1, L2, L3), main memory (RAM), and secondary storage (disk). It is designed to balance speed and cost, with faster but smaller memory closer to the CPU.'
-      },
-      
-      // Variants for questionMetadata[4] - Parallel Execution Models
-      {
-        questionText: 'What is the difference between SIMD and MIMD parallel execution models?\nA) SIMD uses multiple data streams\nB) MIMD uses single instruction stream\nC) SIMD executes same instruction on multiple data, MIMD executes different instructions\nD) They are the same',
-        difficulty: 'medium',
-        reasoningLevel: 'analytical',
-        questionMetadataId: questionMetadata[4].id,
-        assessmentId: assessments[1].id,
-        answer: 'C) SIMD executes same instruction on multiple data, MIMD executes different instructions'
-      },
-      
-      // Variants for questionMetadata[5] - Performance Benchmarking
-      {
-        questionText: 'Explain the difference between throughput and latency in performance benchmarking. Provide an example scenario where each is more important.',
-        difficulty: 'hard',
-        reasoningLevel: 'analytical',
-        questionMetadataId: questionMetadata[5].id,
-        assessmentId: assessments[1].id,
-        answer: 'Throughput measures the amount of work completed per unit time, while latency measures the time to complete a single task. Throughput is important for batch processing, latency is critical for real-time systems.'
-      },
-      
-      // Variants for questionMetadata[6] - Object-Oriented Design
-      {
-        questionText: 'Which OOP principle allows a class to inherit properties and methods from another class?\nA) Encapsulation\nB) Inheritance\nC) Polymorphism\nD) Abstraction',
-        difficulty: 'easy',
-        reasoningLevel: 'factual',
-        questionMetadataId: questionMetadata[6].id,
-        assessmentId: assessments[0].id,
-        answer: 'B) Inheritance'
-      },
-      
-      // Variants for questionMetadata[7] - Data Structures Fundamentals
-      {
-        questionText: 'Implement a stack data structure with push, pop, and peek operations.',
-        difficulty: 'medium',
-        reasoningLevel: 'application',
-        questionMetadataId: questionMetadata[7].id,
-        assessmentId: assessments[0].id,
-        answer: 'class Stack { constructor() { this.items = []; } push(item) { this.items.push(item); } pop() { return this.items.pop(); } peek() { return this.items[this.items.length - 1]; } }'
-      },
-      {
-        questionText: 'What is the time complexity of inserting an element at the beginning of a linked list?\nA) O(n)\nB) O(log n)\nC) O(1)\nD) O(n²)',
-        difficulty: 'easy',
-        reasoningLevel: 'factual',
-        questionMetadataId: questionMetadata[7].id,
-        assessmentId: assessments[1].id,
-        answer: 'C) O(1)'
-      },
-      
-      // Variants for questionMetadata[8] - Algorithm Analysis
-      {
-        questionText: 'What is the Big-O time complexity of binary search on a sorted array?\nA) O(n)\nB) O(log n)\nC) O(n log n)\nD) O(n²)',
-        difficulty: 'easy',
-        reasoningLevel: 'factual',
-        questionMetadataId: questionMetadata[8].id,
-        assessmentId: assessments[0].id,
-        answer: 'B) O(log n)'
-      },
-      
-      // Variants for questionMetadata[9] - Testing and Debugging
-      {
-        questionText: 'Explain the difference between unit testing and integration testing. When would you use each approach?',
-        difficulty: 'medium',
-        reasoningLevel: 'analytical',
-        questionMetadataId: questionMetadata[9].id,
-        assessmentId: assessments[1].id,
-        answer: 'Unit testing tests individual components in isolation, while integration testing tests how multiple components work together. Use unit tests during development to catch bugs early, and integration tests to verify system behavior.'
-      },
-      
-      // Variants for questionMetadata[10] - File I/O and Persistence
-      {
-        questionText: 'What is the difference between text mode and binary mode when opening files?\nA) Text mode is faster\nB) Binary mode handles line endings automatically\nC) Text mode handles line endings, binary mode reads raw bytes\nD) They are identical',
-        difficulty: 'medium',
-        reasoningLevel: 'analytical',
-        questionMetadataId: questionMetadata[10].id,
-        assessmentId: assessments[1].id,
-        answer: 'C) Text mode handles line endings, binary mode reads raw bytes'
-      },
-      
-      // Variants for questionMetadata[11] - Recursion Patterns
-      {
-        questionText: 'Write a recursive function to calculate the factorial of a number n.',
-        difficulty: 'medium',
-        reasoningLevel: 'application',
-        questionMetadataId: questionMetadata[11].id,
-        assessmentId: assessments[2].id,
-        answer: 'function factorial(n) { if (n <= 1) return 1; return n * factorial(n - 1); }'
+      if (qMeta.type === 'MCQ') {
+        // Generate MCQ questions
+        const questionTemplates = [
+          `What is the primary concept related to ${qMeta.description.toLowerCase()}?\nA) Option A\nB) Option B\nC) Option C\nD) Option D`,
+          `Which statement best describes ${qMeta.description.toLowerCase()}?\nA) First option\nB) Second option\nC) Third option\nD) Fourth option`,
+          `In the context of ${qMeta.description.toLowerCase()}, which is correct?\nA) Answer A\nB) Answer B\nC) Answer C\nD) Answer D`
+        ];
+        questionText = questionTemplates[variantNum % questionTemplates.length];
+        answer = 'B) Option B'; // Default answer
+      } else {
+        // Generate SA (Short Answer) questions
+        const questionTemplates = [
+          `Explain ${qMeta.description.toLowerCase()}.`,
+          `Describe the key concepts of ${qMeta.description.toLowerCase()}.`,
+          `What are the main principles behind ${qMeta.description.toLowerCase()}?`,
+          `How does ${qMeta.description.toLowerCase()} work?`,
+          `Provide an example of ${qMeta.description.toLowerCase()}.`
+        ];
+        questionText = questionTemplates[variantNum % questionTemplates.length];
+        answer = `Sample answer for ${qMeta.description}. This would contain detailed explanation of the concept, including key points, examples, and relevant details.`;
       }
-    ]);
+      
+      return {
+        questionText,
+        difficulty,
+        reasoningLevel,
+        questionMetadataId: qMeta.id,
+        assessmentId,
+        answer
+      };
+    };
+
+    // Generate variants for all questions
+    const variantsToCreate = [];
+    
+    for (let i = 0; i < questionMetadata.length; i++) {
+      const qMeta = questionMetadata[i];
+      
+      // Each question gets at least 1 variant
+      // Distribute variants across assessments
+      const primaryAssessment = assessments[i % assessments.length];
+      variantsToCreate.push(generateVariant(qMeta, primaryAssessment.id, 0));
+      
+      // Some questions get additional variants (about 30% get 2 variants)
+      if (i % 3 === 0 && i < questionMetadata.length - 1) {
+        const secondaryAssessment = assessments[(i + 1) % assessments.length];
+        variantsToCreate.push(generateVariant(qMeta, secondaryAssessment.id, 1));
+      }
+    }
+
+    const variants = await Variants.bulkCreate(variantsToCreate);
     console.log(`Created ${variants.length} variants.`);
 
     // Create some variant references (self-referencing)
