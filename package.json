@@ -10,7 +10,9 @@
     "dev:build": "docker-compose -f docker-compose.dev.yml up --build",
     "prod:up": "docker-compose up -d",
     "prod:down": "docker-compose down",
-    "setup": "./setup.sh"
+    "setup": "./setup.sh",
+    "populate": "node scripts/populateDatabase.js",
+    "populate:backend": "cd app/backend && npm run populate"
   },
   "keywords": ["education", "ai", "questions", "react", "nodejs"],
   "author": "Your Name",
