@@ -10,7 +10,8 @@
     "build": "echo 'No build step required'",
     "test": "jest",
     "test:coverage": "jest --coverage",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "populate": "node scripts/populateDatabase.js"
   },
   "dependencies": {
     "express": "^4.18.2",

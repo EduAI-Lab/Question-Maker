@@ -14,6 +14,8 @@ import variantRoutes from './routes/variants.js';
 import eduaiRoutes from './routes/eduai.js';
 import { connectDatabase } from './config/database.js';
 import { config } from './config/settings.js';
+// Import models to ensure associations are set up
+import './schema/index.js';
 
 const app = express();
 const PORT = config.port;
