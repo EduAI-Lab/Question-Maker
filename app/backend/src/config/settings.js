@@ -2,10 +2,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Get the project root directory (3 levels up from this file)
+// Get the project root directory (4 levels up from app/backend/src/config/settings.js)
+// app/backend/src/config -> app/backend/src -> app/backend -> app -> root
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '../../../');
+const projectRoot = path.resolve(__dirname, '../../../../');
 
 // Load environment variables from project root
 dotenv.config({ path: path.join(projectRoot, '.env') });
