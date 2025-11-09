@@ -52,6 +52,7 @@ export interface Assessment {
     blueprintConfig?: AssessmentBlueprintConfig | null;
     // Relations
     variants?: QuestionVariant[];
+    sections?: AssessmentSection[];
     course?: Course;
 }
 
@@ -194,4 +195,40 @@ export interface AssessmentGenerationParams extends AssessmentBlueprintConfig {
     type: AssessmentType;
     description: string;
     semester: string;
+}
+
+export interface SectionVariantLink {
+    id: number;
+    sectionId: number;
+    variantId: number;
+    displayOrder: number;
+    metadata?: Record<string, unknown> | null;
+    variant?: QuestionVariant;
+}
+
+export interface AssessmentSection {
+    id: number;
+    assessmentId: number;
+    name: string;
+    description?: string | null;
+    sectionType?: string | null;
+    difficultySettings?: Record<string, unknown> | null;
+    topicFilters?: Record<string, unknown> | null;
+    metadata?: Record<string, unknown> | null;
+    position: number;
+    createdAt: string;
+    updatedAt: string;
+    sectionVariants?: SectionVariantLink[];
+}
+
+export interface AssessmentSectionCreateInput {
+    name: string;
+    description?: string;
+    sectionType?: string;
+    difficultySettings?: Record<string, unknown> | null;
+    topicFilters?: Record<string, unknown> | null;
+    metadata?: Record<string, unknown> | null;
+    position?: number;
+    questionTypes?: QuestionType[];
+    reasoningData?: ReasoningDataState;
 }

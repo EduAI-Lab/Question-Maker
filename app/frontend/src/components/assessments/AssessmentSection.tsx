@@ -1,16 +1,15 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
-import { Edit, Download, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { Plus, ChevronUp, ChevronDown, Eye } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
 interface AssessmentSectionProps {
   assessments: Assessment[];
-  onEditAssessment: (assessment: Assessment) => void;
-  onExportAssessment: (assessment: Assessment) => void;
   onAddAssessment: (params: AssessmentGenerationParams) => Promise<void> | void;
   selectedCourseId?: number | null;
   isLoading?: boolean;
@@ -71,13 +70,12 @@ const buildQuestionEntries = (assessment: Assessment): QuestionEntry[] => {
 
 export const AssessmentSection = ({
   assessments,
-  onEditAssessment,
-  onExportAssessment,
   onAddAssessment,
   selectedCourseId,
   isLoading = false,
   loadError
 }: AssessmentSectionProps) => {
+  const navigate = useNavigate();
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [pendingGenerateAction, setPendingGenerateAction] = useState<'create' | number | null>(null);
@@ -166,6 +164,15 @@ export const AssessmentSection = ({
                     </div>
                     <div className="flex items-center space-x-2">
                       <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/assessments/${assessment.id}`)}
+                        className="flex items-center space-x-1"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span>View</span>
+                      </Button>
+                      <Button
                         variant="ghost"
                         size="sm"
                         onClick={() =>
@@ -179,24 +186,6 @@ export const AssessmentSection = ({
                         ) : (
                           <ChevronDown className="h-4 w-4" />
                         )}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onEditAssessment(assessment)}
-                        className="flex items-center space-x-1"
-                      >
-                        <Edit className="h-4 w-4" />
-                        <span>Edit</span>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onExportAssessment(assessment)}
-                        className="flex items-center space-x-1"
-                      >
-                        <Download className="h-4 w-4" />
-                        <span>Export</span>
                       </Button>
                     </div>
                   </div>

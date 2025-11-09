@@ -241,14 +241,6 @@ export const LandingPage = () => {
     setIsUploadOpen(true);
   };
 
-  const handleEditAssessment = (assessment: Assessment) => {
-    console.log('Edit assessment:', assessment);
-  };
-
-  const handleExportAssessment = (assessment: Assessment) => {
-    console.log('Export assessment:', assessment);
-  };
-
   const handleCreateAssessment = async (params: AssessmentGenerationParams) => {
     try {
       const created = await assessmentService.createAssessment(params);
@@ -369,15 +361,13 @@ export const LandingPage = () => {
             disableUpload={!selectedCourse}
           />
         ) : (
-      <AssessmentSection
-        assessments={filteredAssessments}
-        onEditAssessment={handleEditAssessment}
-        onExportAssessment={handleExportAssessment}
-        onAddAssessment={handleCreateAssessment}
-        isLoading={isAssessmentsLoading}
-        loadError={assessmentsError}
-        selectedCourseId={selectedCourse?.id ?? null}
-      />
+        <AssessmentSection
+          assessments={filteredAssessments}
+          onAddAssessment={handleCreateAssessment}
+          isLoading={isAssessmentsLoading}
+          loadError={assessmentsError}
+          selectedCourseId={selectedCourse?.id ?? null}
+        />
         )}
       </div>
 
