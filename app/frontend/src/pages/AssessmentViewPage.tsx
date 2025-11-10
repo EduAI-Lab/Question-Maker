@@ -635,16 +635,6 @@ const CreateSectionPanel = ({
               onChange={(event) => setSectionName(event.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="question-target">Number of Questions</Label>
-            <Input
-              id="question-target"
-              type="number"
-              min={1}
-              value={questionTarget}
-              onChange={(event) => setQuestionTarget(Number(event.target.value))}
-            />
-          </div>
         </div>
         <div className="space-y-2">
           <Label>Question Types</Label>
@@ -741,6 +731,7 @@ interface MatchingQuestionsPanelProps {
   onClearSelection: () => void;
   onAddSelected: () => void;
   onCreateNewQuestion: () => void;
+  onAddVariant: (question: Question) => void;
   isSearching: boolean;
   isCreatingSection: boolean;
   searchError: string | null;
@@ -762,6 +753,7 @@ const MatchingQuestionsPanel = ({
   onClearSelection,
   onAddSelected,
   onCreateNewQuestion,
+  onAddVariant,
   isSearching,
   isCreatingSection,
   searchError,
@@ -823,9 +815,9 @@ const MatchingQuestionsPanel = ({
               .filter(Boolean) as string[];
 
             return (
-              <label
+              <div
                 key={question.id}
-                className={`flex cursor-pointer items-start gap-3 rounded border px-3 py-3 text-sm ${
+                className={`flex items-start gap-3 rounded border px-3 py-3 text-sm ${
                   isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
                 }`}
               >
@@ -833,12 +825,24 @@ const MatchingQuestionsPanel = ({
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => onToggleQuestion(question)}
-                  className="mt-1 h-4 w-4 rounded border-gray-300"
+                  className="mt-1 h-4 w-4 rounded border-gray-300 cursor-pointer"
                 />
-                <div className="space-y-1">
+                <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{question.type}</Badge>
-                    <p className="font-medium">{displayText}</p>
+                    <p className="font-medium flex-1">{displayText}</p>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddVariant(question);
+                      }}
+                      className="text-xs bg-black text-white hover:bg-gray-800"
+                    >
+                      Variant
+                    </Button>
                   </div>
                   {primaryVariant?.questionText && question.description && (
                     <p className="text-xs text-muted-foreground">{question.description}</p>
@@ -852,7 +856,7 @@ const MatchingQuestionsPanel = ({
                     </p>
                   )}
                 </div>
-              </label>
+              </div>
             );
           })}
         </div>
@@ -931,6 +935,7 @@ export const AssessmentViewPage = () => {
   const [editingSection, setEditingSection] = useState<AssessmentSection | null>(null);
   const [isDeletingAssessment, setIsDeletingAssessment] = useState(false);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
+  const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [lastFilters, setLastFilters] = useState<QuestionSearchFilters | null>(null);
 
   const resetBuilderContext = () => {
@@ -1123,6 +1128,48 @@ export const AssessmentViewPage = () => {
       });
       return;
     }
+    setPresetVariant(null);
+    setIsAddQuestionOpen(true);
+  };
+
+  const handleAddVariant = (question: Question) => {
+    if (!assessment?.course?.id) {
+      toast({
+        title: 'Select a course first',
+        description: 'Unable to add a variant without course context.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    const primaryVariant = question.variants?.[0];
+    if (!primaryVariant) {
+      toast({
+        title: 'No variant available',
+        description: 'This question has no variants to base a new variant on.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    // Create a variant entry with the current assessment preselected
+    const variantWithAssessment = {
+      ...primaryVariant,
+      assessmentId: assessment?.id ?? primaryVariant.assessmentId
+    };
+    const variantEntry: QuestionVariantEntry = {
+      questionId: question.id,
+      questionDescription: question.description,
+      questionType: question.type,
+      primaryTopicId: question.primaryTopicId,
+      primaryTopicName: availableTopics.find((t) => t.id === question.primaryTopicId)?.name,
+      courseId: question.courseId,
+      courseName: question.course?.name,
+      courseCode: question.course?.code,
+      secondaryTopicNames: primaryVariant.secondaryTopicsId
+        ?.map((id) => availableTopics.find((t) => t.id === id)?.name)
+        .filter(Boolean) as string[] | undefined,
+      variant: variantWithAssessment
+    };
+    setPresetVariant(variantEntry);
     setIsAddQuestionOpen(true);
   };
 
@@ -1470,6 +1517,7 @@ export const AssessmentViewPage = () => {
                     onClearSelection={clearQuestionSelection}
                     onAddSelected={handleFinalizeSection}
                     onCreateNewQuestion={handleCreateNewQuestion}
+                    onAddVariant={handleAddVariant}
                     isSearching={isSearchingQuestions}
                     isCreatingSection={isCreatingSection}
                     searchError={questionSearchError}
@@ -1485,11 +1533,14 @@ export const AssessmentViewPage = () => {
       </div>
       <AddQuestionDialog
         open={isAddQuestionOpen}
-        onClose={() => setIsAddQuestionOpen(false)}
+        onClose={() => {
+          setIsAddQuestionOpen(false);
+          setPresetVariant(null);
+        }}
         courseId={assessment?.course?.id ?? null}
         variants={questionVariantEntries}
         onQuestionCreated={handleQuestionCreated}
-        presetVariant={null}
+        presetVariant={presetVariant}
       />
     </div>
   );

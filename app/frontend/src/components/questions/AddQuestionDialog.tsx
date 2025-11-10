@@ -117,7 +117,8 @@ export const AddQuestionDialog = ({
                 variantReferenceId: referenceId ? referenceId.toString() : '',
                 variantDifficulty: presetVariant.variant.difficulty ?? 'medium',
                 variantSecondaryTopics: presetVariant.variant.secondaryTopicsId || [],
-                variantAssessmentId: presetVariant.variant.assessmentId ? presetVariant.variant.assessmentId.toString() : 'none'
+                variantAssessmentId: presetVariant.variant.assessmentId ? presetVariant.variant.assessmentId.toString() : 'none',
+                generationPrompt: 'Create a variant of this question...'
             });
         } else {
             setForm(defaultForm);
