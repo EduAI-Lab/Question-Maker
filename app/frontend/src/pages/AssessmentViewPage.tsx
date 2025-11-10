@@ -22,7 +22,6 @@ import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
-import { DualRangeSlider } from '../components/ui/DualRangeSlider';
 import { useToast } from '../components/ui/use-toast';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 
@@ -63,6 +62,7 @@ type QuestionSearchFilters = {
   primaryTopicIds: number[];
   secondaryTopicIds: number[];
   excludedTopicIds: number[];
+  difficulty?: 'easy' | 'medium' | 'hard' | null;
 };
 
 const toNumberArray = (value: unknown): number[] => {
@@ -165,11 +165,16 @@ const buildDraftFromSection = (
     difficultySettings
   };
 
+  const difficulty = metadata.difficulty && ['easy', 'medium', 'hard'].includes(metadata.difficulty as string)
+    ? (metadata.difficulty as 'easy' | 'medium' | 'hard')
+    : null;
+
   const filters: QuestionSearchFilters = {
     questionTypes,
     primaryTopicIds: topicFilters.primaryTopicIds,
     secondaryTopicIds: topicFilters.secondaryTopicIds,
-    excludedTopicIds: topicFilters.excludedTopicIds
+    excludedTopicIds: topicFilters.excludedTopicIds,
+    difficulty
   };
 
   return { filters, payload };
@@ -206,7 +211,12 @@ const questionMatchesFilters = (question: Question, filters: QuestionSearchFilte
     filters.excludedTopicIds.includes(question.primaryTopicId) ||
     secondaryIds.some((topicId) => filters.excludedTopicIds.includes(topicId));
 
-  return matchesType && matchesTopic && !isExcluded;
+  // Filter by difficulty if specified
+  const matchesDifficulty =
+    !filters.difficulty ||
+    (question.variants ?? []).some((variant) => variant.difficulty === filters.difficulty);
+
+  return matchesType && matchesTopic && !isExcluded && matchesDifficulty;
 };
 
 const MultiSelectDropdown = ({
@@ -425,6 +435,7 @@ const CreateSectionPanel = ({
   const [reasoningData, setReasoningData] = useState<ReasoningDataState>(defaultReasoningData());
   const [selectedReasoning, setSelectedReasoning] = useState<keyof ReasoningDataState>('factual');
   const [questionTarget, setQuestionTarget] = useState(10);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | null>(null);
 
   const primaryDisabledIds = useMemo(
     () => new Set([...secondaryTopicIds, ...excludedTopicIds]),
@@ -494,6 +505,10 @@ const CreateSectionPanel = ({
     const selected =
       (metadata.selectedReasoning as keyof ReasoningDataState) ?? 'factual';
     setSelectedReasoning(selected);
+    const difficulty = metadata.difficulty && ['easy', 'medium', 'hard'].includes(metadata.difficulty as string)
+      ? (metadata.difficulty as 'easy' | 'medium' | 'hard')
+      : null;
+    setSelectedDifficulty(difficulty);
     if (editingSection.reasoningData) {
       setReasoningData(editingSection.reasoningData);
     } else {
@@ -507,6 +522,7 @@ const CreateSectionPanel = ({
     setSelectedTypes(['MCQ']);
     setQuestionTarget(10);
     setSelectedReasoning('factual');
+    setSelectedDifficulty(null);
     setReasoningData(defaultReasoningData());
   }, [isEditing]);
 
@@ -572,7 +588,8 @@ const CreateSectionPanel = ({
       metadata: {
         questionTarget,
         selectedReasoning,
-        questionTypes: selectedTypes
+        questionTypes: selectedTypes,
+        difficulty: selectedDifficulty
       },
       reasoningData: normalizedReasoningData,
       difficultySettings: {
@@ -586,14 +603,18 @@ const CreateSectionPanel = ({
         questionTypes: selectedTypes,
         primaryTopicIds,
         secondaryTopicIds,
-        excludedTopicIds
+        excludedTopicIds,
+        difficulty: selectedDifficulty
       },
       payload,
       editingSection?.id
     );
   };
 
-  const activeReasoning = reasoningData[selectedReasoning];
+  const handleDifficultyChange = (difficulty: 'easy' | 'medium' | 'hard') => {
+    // Toggle: if clicking the same difficulty, deselect it
+    setSelectedDifficulty(selectedDifficulty === difficulty ? null : difficulty);
+  };
 
   return (
     <Card className="border border-gray-200">
@@ -685,27 +706,19 @@ const CreateSectionPanel = ({
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Difficulty Mix</Label>
-            <DualRangeSlider
-              min={0}
-              max={100}
-              easyBoundary={activeReasoning.easyBoundary}
-              hardBoundary={activeReasoning.hardBoundary}
-              onChange={(easyBoundary, hardBoundary) =>
-                setReasoningData((prev) => ({
-                  ...prev,
-                  [selectedReasoning]: {
-                    ...prev[selectedReasoning],
-                    easyBoundary,
-                    hardBoundary
-                  }
-                }))
-              }
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Easy: {activeReasoning.easyBoundary}%</span>
-              <span>Medium: {Math.max(0, activeReasoning.hardBoundary - activeReasoning.easyBoundary)}%</span>
-              <span>Hard: {Math.max(0, 100 - activeReasoning.hardBoundary)}%</span>
+            <Label>Difficulty Level</Label>
+            <div className="flex flex-wrap gap-2">
+              {(['easy', 'medium', 'hard'] as const).map((level) => (
+                <Button
+                  key={level}
+                  type="button"
+                  variant={selectedDifficulty === level ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => handleDifficultyChange(level)}
+                >
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </Button>
+              ))}
             </div>
           </div>
         </div>
