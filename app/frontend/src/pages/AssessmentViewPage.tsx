@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Layers3, Plus, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2 } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
@@ -322,11 +322,13 @@ const MultiSelectDropdown = ({
 const SectionCard = ({
   section,
   onEdit,
-  onDelete
+  onDelete,
+  onDeleteVariant
 }: {
   section: AssessmentSection;
   onEdit: (section: AssessmentSection) => void;
   onDelete: (section: AssessmentSection) => void;
+  onDeleteVariant: (sectionId: number, variantId: number) => void;
 }) => {
   const questionCount = section.sectionVariants?.length ?? 0;
 
@@ -370,9 +372,22 @@ const SectionCard = ({
                 .map((link: SectionVariantLink) => (
                   <div
                     key={link.id}
-                    className="rounded border border-gray-200 bg-white p-2 text-sm text-gray-700"
+                    className="flex items-center justify-between gap-2 rounded border border-gray-200 bg-white p-2 text-sm text-gray-700"
                   >
-                    {link.variant?.questionText ?? 'Untitled question'}
+                    <span className="flex-1">{link.variant?.questionText ?? 'Untitled question'}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (link.variantId) {
+                          onDeleteVariant(section.id, link.variantId);
+                        }
+                      }}
+                      className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 ))}
             </div>
@@ -817,7 +832,8 @@ const MatchingQuestionsPanel = ({
             return (
               <div
                 key={question.id}
-                className={`flex items-start gap-3 rounded border px-3 py-3 text-sm ${
+                onClick={() => onToggleQuestion(question)}
+                className={`flex items-start gap-3 rounded border px-3 py-3 text-sm cursor-pointer ${
                   isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
                 }`}
               >
@@ -825,6 +841,7 @@ const MatchingQuestionsPanel = ({
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => onToggleQuestion(question)}
+                  onClick={(e) => e.stopPropagation()}
                   className="mt-1 h-4 w-4 rounded border-gray-300 cursor-pointer"
                 />
                 <div className="flex-1 space-y-1">
@@ -891,15 +908,15 @@ const MatchingQuestionsPanel = ({
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={onCreateNewQuestion}>
+              Create New Question
+            </Button>
             <Button
               type="button"
               disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
               onClick={onAddSelected}
             >
-              {isCreatingSection ? 'Adding...' : 'Add Selected to Section'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCreateNewQuestion}>
-              Create New Question
+              {isCreatingSection ? 'Adding...' : 'Save to Section'}
             </Button>
           </div>
         </div>
@@ -1285,6 +1302,28 @@ export const AssessmentViewPage = () => {
     }
   };
 
+  const handleDeleteVariantFromSection = async (sectionId: number, variantId: number) => {
+    if (!assessment) return;
+    const confirmed = window.confirm(
+      'Remove this question from the section?'
+    );
+    if (!confirmed) return;
+    try {
+      await assessmentService.removeVariantFromSection(assessment.id, sectionId, variantId);
+      await refreshSections();
+      toast({
+        title: 'Question removed',
+        description: 'The question has been removed from this section.'
+      });
+    } catch (_error) {
+      toast({
+        title: 'Failed to remove question',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const handleFinalizeSection = async () => {
     if (!assessment) return;
     if (!pendingSectionDraft) {
@@ -1339,19 +1378,42 @@ export const AssessmentViewPage = () => {
       let sectionId = pendingSectionId ?? null;
       if (pendingSectionId) {
         await assessmentService.updateSection(assessment.id, pendingSectionId, payload);
-        const existingVariantIds =
-          editingSection?.sectionVariants?.map((link) => link.variantId).filter(Boolean) ?? [];
-        if (existingVariantIds.length > 0) {
-          await Promise.all(
-            existingVariantIds.map((variantId) =>
-              assessmentService.removeVariantFromSection(
-                assessment.id,
-                pendingSectionId,
-                variantId as number
-              )
-            )
-          );
-        }
+        // Get existing variant IDs to avoid duplicates
+        const existingVariantIds = new Set(
+          (editingSection?.sectionVariants ?? [])
+            .map((link) => link.variantId)
+            .filter((id): id is number => typeof id === 'number')
+        );
+        
+        // Only add variants that aren't already in the section (additive behavior)
+        const newVariantSelections = variantSelections.filter(
+          (entry) => entry.variantId !== undefined && !existingVariantIds.has(entry.variantId as number)
+        );
+        
+        // Calculate display order starting from the current max order
+        const maxDisplayOrder = Math.max(
+          ...(editingSection?.sectionVariants ?? []).map((link) => link.displayOrder ?? 0),
+          -1
+        );
+        
+        const successfulVariantAdds = await Promise.all(
+          newVariantSelections.map((entry, index) =>
+            assessmentService.addVariantToSection(assessment.id, pendingSectionId, {
+              variantId: entry.variantId as number,
+              displayOrder: maxDisplayOrder + 1 + index
+            })
+          )
+        );
+        
+        await refreshSections();
+        toast({
+          title: 'Section updated',
+          description: `${successfulVariantAdds.length} question${
+            successfulVariantAdds.length === 1 ? '' : 's'
+          } added to this section.`
+        });
+        handleCancelBuilder();
+        return;
       } else {
         const newSection = await assessmentService.createSection(assessment.id, payload);
         sectionId = newSection.id;
@@ -1487,6 +1549,7 @@ export const AssessmentViewPage = () => {
                       section={section}
                       onEdit={handleEditSection}
                       onDelete={handleDeleteSection}
+                      onDeleteVariant={handleDeleteVariantFromSection}
                     />
                   ))}
                 </div>
