@@ -7,6 +7,8 @@ import { Assessments } from './Assessments.js';
 import { Variants } from './Variants.js';
 import { AssessmentSections } from './AssessmentSections.js';
 import { SectionVariants } from './SectionVariants.js';
+import { CanvasIntegration } from './CanvasIntegration.js';
+import { CanvasCourseMapping } from './CanvasCourseMapping.js';
 
 // Define associations
 
@@ -49,6 +51,16 @@ Variants.hasMany(SectionVariants, { foreignKey: 'variantId', as: 'sectionLinks' 
 Variants.hasMany(Variants, { foreignKey: 'referenceId', as: 'referencedVariants' });
 Variants.belongsTo(Variants, { foreignKey: 'referenceId', as: 'originalVariant' });
 
+// Canvas Integration associations
+User.hasOne(CanvasIntegration, { foreignKey: 'userId', as: 'canvasIntegration' });
+CanvasIntegration.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+User.hasMany(CanvasCourseMapping, { foreignKey: 'userId', as: 'canvasCourseMappings' });
+CanvasCourseMapping.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+Course.hasOne(CanvasCourseMapping, { foreignKey: 'localCourseId', as: 'canvasMapping' });
+CanvasCourseMapping.belongsTo(Course, { foreignKey: 'localCourseId', as: 'localCourse' });
+
 export {
   sequelize,
   User,
@@ -58,5 +70,7 @@ export {
   Assessments,
   Variants,
   AssessmentSections,
-  SectionVariants
+  SectionVariants,
+  CanvasIntegration,
+  CanvasCourseMapping
 };

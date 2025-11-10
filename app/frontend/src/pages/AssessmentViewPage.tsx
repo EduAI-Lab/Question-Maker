@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2 } from 'lucide-react';
+import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
+import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
 import {
   Assessment,
   AssessmentSection,
@@ -953,6 +954,7 @@ export const AssessmentViewPage = () => {
   const [isDeletingAssessment, setIsDeletingAssessment] = useState(false);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
+  const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
   const [lastFilters, setLastFilters] = useState<QuestionSearchFilters | null>(null);
 
   const resetBuilderContext = () => {
@@ -1512,14 +1514,24 @@ export const AssessmentViewPage = () => {
                   </div>
                   {assessment.description && <p className="text-sm text-muted-foreground">{assessment.description}</p>}
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleDeleteAssessment}
-                  disabled={isDeletingAssessment}
-                >
-                  {isDeletingAssessment ? 'Deleting...' : 'Delete Assessment'}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => setIsCanvasExportOpen(true)}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Export to Canvas
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteAssessment}
+                    disabled={isDeletingAssessment}
+                  >
+                    {isDeletingAssessment ? 'Deleting...' : 'Delete Assessment'}
+                  </Button>
+                </div>
               </CardHeader>
             </Card>
 
@@ -1605,6 +1617,20 @@ export const AssessmentViewPage = () => {
         onQuestionCreated={handleQuestionCreated}
         presetVariant={presetVariant}
       />
+      {assessment && (
+        <CanvasExportDialog
+          open={isCanvasExportOpen}
+          onClose={() => setIsCanvasExportOpen(false)}
+          assessmentId={assessment.id}
+          assessmentName={assessment.name}
+          onExportSuccess={(result) => {
+            toast({
+              title: 'Export successful!',
+              description: `Assessment exported to Canvas. Quiz ID: ${result.quizId}`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 };
