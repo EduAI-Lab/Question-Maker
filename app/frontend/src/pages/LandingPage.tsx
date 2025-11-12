@@ -3,13 +3,12 @@ import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { mockAssessments } from '../data/mockData';
-import { Course } from '../types/question';
-import { Question, Assessment, QuestionVariantEntry } from '../types/question';
+import { Course, Question, Assessment, QuestionVariantEntry, AssessmentGenerationParams } from '../types/question';
 import { Topic } from '../types/topic';
 import { useCourses } from '../hooks/useCourses';
 import { questionService } from '../services/questionService';
 import { courseService } from '../services/courseService';
+import assessmentService from '../services/assessmentService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
 import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
@@ -22,7 +21,9 @@ export const LandingPage = () => {
   const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
   const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
-  const [assessments, setAssessments] = useState<Assessment[]>(mockAssessments);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [isAssessmentsLoading, setIsAssessmentsLoading] = useState(false);
+  const [assessmentsError, setAssessmentsError] = useState<string | null>(null);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
@@ -68,6 +69,24 @@ export const LandingPage = () => {
       void loadTopicsForCourse(selectedCourse.id);
     }
   }, [selectedCourse, loadTopicsForCourse]);
+
+  const fetchAssessments = useCallback(async () => {
+    try {
+      setIsAssessmentsLoading(true);
+      setAssessmentsError(null);
+      const data = await assessmentService.getAssessments();
+      setAssessments(data);
+    } catch (error: any) {
+      setAssessments([]);
+      setAssessmentsError(error?.response?.data?.error || 'Failed to load assessments');
+    } finally {
+      setIsAssessmentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAssessments();
+  }, [fetchAssessments]);
 
   const filteredQuestions = useMemo(() => {
     if (!selectedCourse) return questions;
@@ -222,26 +241,13 @@ export const LandingPage = () => {
     setIsUploadOpen(true);
   };
 
-  const handleEditAssessment = (assessment: Assessment) => {
-    console.log('Edit assessment:', assessment);
-  };
-
-  const handleExportAssessment = (assessment: Assessment) => {
-    console.log('Export assessment:', assessment);
-  };
-
-  const handleAddAssessment = () => {
-    console.log('Add new assessment');
-  };
-
-  const handleReorderQuestions = (assessmentId: number, questionIds: number[]) => {
-    setAssessments((prev) =>
-      prev.map((assessment) =>
-        assessment.id === assessmentId
-          ? { ...assessment, questions: questionIds }
-          : assessment
-      )
-    );
+  const handleCreateAssessment = async (params: AssessmentGenerationParams) => {
+    try {
+      const created = await assessmentService.createAssessment(params);
+      setAssessments((prev) => [created, ...prev]);
+    } catch (error) {
+      console.error('Failed to create assessment', error);
+    }
   };
 
   useEffect(() => {
@@ -355,15 +361,13 @@ export const LandingPage = () => {
             disableUpload={!selectedCourse}
           />
         ) : (
-          <AssessmentSection
-            assessments={filteredAssessments}
-            questions={questions}
-            onEditAssessment={handleEditAssessment}
-            onExportAssessment={handleExportAssessment}
-            onAddAssessment={handleAddAssessment}
-            onReorderQuestions={handleReorderQuestions}
-            selectedCourseId={selectedCourse?.id ?? null}
-          />
+        <AssessmentSection
+          assessments={filteredAssessments}
+          onAddAssessment={handleCreateAssessment}
+          isLoading={isAssessmentsLoading}
+          loadError={assessmentsError}
+          selectedCourseId={selectedCourse?.id ?? null}
+        />
         )}
       </div>
 

@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { LandingPage } from './pages/LandingPage';
 import { ApiTestPage } from './pages/ApiTestPage';
+import AssessmentViewPage from './pages/AssessmentViewPage';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
               {process.env.NODE_ENV === 'development' && (
                 <Route path="/api-test" element={<ApiTestPage />} />
               )}
+              <Route path="/assessments/:id" element={<AssessmentViewPage />} />
               <Route path="/" element={<Navigate to="/login" replace />} />
             </Routes>
             <Toaster />

@@ -9,6 +9,15 @@ import {
   removeQuestionFromAssessment,
   getQuestionsInAssessment
 } from '../services/assessmentService.js';
+import {
+  getSectionsForAssessment,
+  createAssessmentSection,
+  updateAssessmentSection,
+  deleteAssessmentSection,
+  addVariantToSection,
+  removeVariantFromSection,
+  updateVariantOrderInSection
+} from '../services/assessmentSectionService.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -18,19 +27,22 @@ const router = express.Router();
 // @access  Private
 router.post('/', authenticateToken, async (req, res, next) => {
   try {
-    const { type, name, semester } = req.body;
+    const { type, name, semester, description, courseId, blueprintConfig } = req.body;
 
-    if (!type || !name || !semester) {
+    if (!type || !name || !semester || !courseId) {
       return res.status(400).json({
         success: false,
-        error: 'Type, name, and semester are required'
+        error: 'Type, name, semester, and courseId are required'
       });
     }
 
     const assessment = await createAssessment(req.user.id, {
       type,
       name,
-      semester
+      semester,
+      description,
+      courseId,
+      blueprintConfig
     });
 
     res.status(201).json({
@@ -48,11 +60,12 @@ router.post('/', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
-    const { limit, offset } = req.query;
+    const { limit, offset, courseId } = req.query;
 
     const assessments = await getAssessmentsByUser(req.user.id, {
       limit: parseInt(limit) || 50,
-      offset: parseInt(offset) || 0
+      offset: parseInt(offset) || 0,
+      courseId: courseId ? Number(courseId) : undefined
     });
 
     res.json({
@@ -85,12 +98,15 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const { type, name, semester } = req.body;
+    const { type, name, semester, description, courseId, blueprintConfig } = req.body;
 
     const assessment = await updateAssessment(req.params.id, {
       type,
       name,
-      semester
+      semester,
+      description,
+      courseId,
+      blueprintConfig
     }, req.user.id);
 
     res.json({
@@ -181,6 +197,127 @@ router.get('/:id/questions', authenticateToken, async (req, res, next) => {
     res.json({
       success: true,
       data: questions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Section routes
+router.get('/:id/sections', authenticateToken, async (req, res, next) => {
+  try {
+    const sections = await getSectionsForAssessment(req.params.id, req.user.id);
+    res.json({ success: true, data: sections });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:id/sections', authenticateToken, async (req, res, next) => {
+  try {
+    const section = await createAssessmentSection(req.params.id, req.user.id, req.body);
+    res.status(201).json({
+      success: true,
+      message: 'Section created successfully',
+      data: section
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/:assessmentId/sections/:sectionId', authenticateToken, async (req, res, next) => {
+  try {
+    const section = await updateAssessmentSection(req.params.sectionId, req.user.id, req.body);
+    res.json({
+      success: true,
+      message: 'Section updated successfully',
+      data: section
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:assessmentId/sections/:sectionId', authenticateToken, async (req, res, next) => {
+  try {
+    await deleteAssessmentSection(req.params.sectionId, req.user.id);
+    res.json({
+      success: true,
+      message: 'Section deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/:assessmentId/sections/:sectionId/variants', authenticateToken, async (req, res, next) => {
+  try {
+    const { variantId, displayOrder, metadata } = req.body;
+
+    if (!variantId) {
+      return res.status(400).json({
+        success: false,
+        error: 'variantId is required'
+      });
+    }
+
+    const link = await addVariantToSection(
+      req.params.sectionId,
+      req.user.id,
+      Number(variantId),
+      { displayOrder, metadata }
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Variant added to section successfully',
+      data: link
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put('/:assessmentId/sections/:sectionId/variants/:variantId/order', authenticateToken, async (req, res, next) => {
+  try {
+    const { displayOrder } = req.body;
+
+    if (displayOrder === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'displayOrder is required'
+      });
+    }
+
+    const link = await updateVariantOrderInSection(
+      req.params.sectionId,
+      req.user.id,
+      Number(req.params.variantId),
+      Number(displayOrder)
+    );
+
+    res.json({
+      success: true,
+      message: 'Variant order updated successfully',
+      data: link
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete('/:assessmentId/sections/:sectionId/variants/:variantId', authenticateToken, async (req, res, next) => {
+  try {
+    await removeVariantFromSection(
+      req.params.sectionId,
+      req.user.id,
+      Number(req.params.variantId)
+    );
+
+    res.json({
+      success: true,
+      message: 'Variant removed from section successfully'
     });
   } catch (error) {
     next(error);

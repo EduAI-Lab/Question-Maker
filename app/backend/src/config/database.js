@@ -42,8 +42,9 @@ export const connectDatabase = async () => {
   try {
     await sequelize.authenticate();
     
-    // Sync database schema (create tables if they don't exist)
-    await sequelize.sync();
+    // Sync database schema (create tables if they don't exist, alter existing tables to add missing columns)
+    // Using alter: true will add missing columns without dropping existing data
+    await sequelize.sync({ alter: true });
   } catch (error) {
     throw error;
   }

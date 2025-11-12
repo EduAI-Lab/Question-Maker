@@ -20,7 +20,8 @@ import {
 } from '../../types/question';
 import { questionService } from '../../services/questionService';
 import { courseService } from '../../services/courseService';
-import { assessmentService, AssessmentSummary } from '../../services/assessmentService';
+import assessmentService from '../../services/assessmentService';
+import { Assessment } from '../../types/question';
 import { Topic } from '../../types/topic';
 import { useToast } from '../ui/use-toast';
 import eduaiService, { EduAIModelOption, EduAICourseOption } from '../../services/eduaiService';
@@ -88,7 +89,7 @@ export const AddQuestionDialog = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [topics, setTopics] = useState<Topic[]>([]);
-    const [assessments, setAssessments] = useState<AssessmentSummary[]>([]);
+    const [assessments, setAssessments] = useState<Assessment[]>([]);
     const [isAuxLoading, setIsAuxLoading] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [courseDetails, setCourseDetails] = useState<Course | null>(null);
@@ -116,7 +117,8 @@ export const AddQuestionDialog = ({
                 variantReferenceId: referenceId ? referenceId.toString() : '',
                 variantDifficulty: presetVariant.variant.difficulty ?? 'medium',
                 variantSecondaryTopics: presetVariant.variant.secondaryTopicsId || [],
-                variantAssessmentId: presetVariant.variant.assessmentId ? presetVariant.variant.assessmentId.toString() : 'none'
+                variantAssessmentId: presetVariant.variant.assessmentId ? presetVariant.variant.assessmentId.toString() : 'none',
+                generationPrompt: 'Create a variant of this question...'
             });
         } else {
             setForm(defaultForm);
@@ -135,7 +137,7 @@ export const AddQuestionDialog = ({
                 setIsAuxLoading(true);
                 const [topicsResponse, assessmentsResponse] = await Promise.all([
                     courseService.getCourseTopics(courseId),
-                    assessmentService.getAssessments()
+                    assessmentService.getAssessments({ courseId })
                 ]);
                 setTopics(topicsResponse);
                 setAssessments(assessmentsResponse);

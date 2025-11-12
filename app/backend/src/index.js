@@ -12,6 +12,7 @@ import courseRoutes from './routes/course.js';
 import assessmentRoutes from './routes/assessments.js';
 import variantRoutes from './routes/variants.js';
 import eduaiRoutes from './routes/eduai.js';
+import canvasRoutes from './routes/canvas.js';
 import { connectDatabase } from './config/database.js';
 import { config } from './config/settings.js';
 // Import models to ensure associations are set up
@@ -63,6 +64,7 @@ app.use('/api/questions', variantRoutes);
 app.use('/api/course', courseRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/eduai', eduaiRoutes);
+app.use('/api/canvas', canvasRoutes);
 
 // Error handling middleware
 app.use(notFound);
