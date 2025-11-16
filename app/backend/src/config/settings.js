@@ -23,6 +23,15 @@ export const config = {
   jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
   bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 12,
+  encryptionKey: process.env.ENCRYPTION_KEY || (() => {
+    // Generate a random key for development if not set
+    // WARNING: This should NEVER be used in production
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY must be set in production environment');
+    }
+    console.warn('⚠️  WARNING: ENCRYPTION_KEY not set. Using a temporary key for development only.');
+    return 'dev-encryption-key-change-in-production-' + Date.now();
+  })(),
   
   // CORS
   corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173'],
