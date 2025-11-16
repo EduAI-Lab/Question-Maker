@@ -17,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { Badge } from '../ui/badge';
 import { useToast } from '../ui/use-toast';
 import canvasService, { CanvasCourse, CanvasIntegration } from '../../services/canvasService';
 
@@ -48,7 +47,6 @@ export const CanvasExportDialog = ({
   const [showConnectForm, setShowConnectForm] = useState(false);
   const [canvasUrl, setCanvasUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [useTestMode, setUseTestMode] = useState(true);
 
   // Load integration status and courses
   useEffect(() => {
@@ -89,7 +87,7 @@ export const CanvasExportDialog = ({
   };
 
   const handleConnect = async () => {
-    if (!canvasUrl && !useTestMode) {
+    if (!canvasUrl) {
       toast({
         title: 'Canvas URL required',
         description: 'Please enter your Canvas instance URL.',
@@ -98,25 +96,21 @@ export const CanvasExportDialog = ({
       return;
     }
 
+    if (!apiKey) {
+      toast({
+        title: 'API Key required',
+        description: 'Please enter your Canvas API key.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     setIsConnecting(true);
     try {
-      const url = useTestMode ? 'https://canvas.instructure.com' : canvasUrl;
-      const key = useTestMode ? 'test-key' : apiKey;
-      
-      const result = await canvasService.connectCanvas(url, key, useTestMode);
+      const result = await canvasService.connectCanvas(canvasUrl, apiKey, false);
       setIntegration(result);
       setShowConnectForm(false);
-      
-      if (useTestMode) {
-        toast({
-          title: 'Test mode enabled',
-          description: 'You can now test Canvas export without a real Canvas account. Click "Load Courses" to see mock courses.',
-        });
-        // Auto-load mock courses in test mode
-        await loadCourses();
-      } else {
-        await loadCourses();
-      }
+      await loadCourses();
     } catch (error: any) {
       toast({
         title: 'Failed to connect Canvas',
@@ -179,100 +173,49 @@ export const CanvasExportDialog = ({
         {showConnectForm ? (
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="testMode"
-                  checked={useTestMode}
-                  onChange={(e) => setUseTestMode(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <Label htmlFor="testMode" className="cursor-pointer">
-                  Use Test Mode (no Canvas account needed)
-                </Label>
-              </div>
-              {useTestMode && (
-                <p className="text-xs text-muted-foreground ml-6">
-                  Test mode allows you to simulate Canvas export without connecting to a real Canvas instance.
-                </p>
-              )}
+              <Label htmlFor="canvasUrl">Canvas Instance URL</Label>
+              <Input
+                id="canvasUrl"
+                placeholder="https://canvas.instructure.com"
+                value={canvasUrl}
+                onChange={(e) => setCanvasUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Your Canvas LMS instance URL (e.g., https://canvas.ubc.ca)
+              </p>
             </div>
 
-            {!useTestMode && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="canvasUrl">Canvas Instance URL</Label>
-                  <Input
-                    id="canvasUrl"
-                    placeholder="https://canvas.instructure.com"
-                    value={canvasUrl}
-                    onChange={(e) => setCanvasUrl(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Your Canvas LMS instance URL (e.g., https://canvas.ubc.ca)
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="apiKey">API Key</Label>
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    placeholder="Enter your Canvas API key"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Generate an API key from your Canvas account settings
-                  </p>
-                </div>
-              </>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="apiKey">API Key</Label>
+              <Input
+                id="apiKey"
+                type="password"
+                placeholder="Enter your Canvas API key"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Generate an API key from your Canvas account settings
+              </p>
+            </div>
 
             <Button
               onClick={handleConnect}
-              disabled={isConnecting || (!useTestMode && (!canvasUrl || !apiKey))}
+              disabled={isConnecting || !canvasUrl || !apiKey}
               className="w-full"
             >
-              {isConnecting ? 'Connecting...' : useTestMode ? 'Enable Test Mode' : 'Connect Canvas'}
+              {isConnecting ? 'Connecting...' : 'Connect Canvas'}
             </Button>
           </div>
         ) : (
           <div className="space-y-4 py-4">
-            {integration?.isTestMode && (
-              <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="bg-yellow-100 text-yellow-800">
-                    Test Mode
-                  </Badge>
-                  <p className="text-sm text-yellow-800">
-                    Using test mode - exports will be simulated
-                  </p>
-                </div>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="canvasCourse">Select Canvas Course</Label>
               {isLoadingCourses ? (
                 <div className="text-sm text-muted-foreground">Loading courses...</div>
               ) : courses.length === 0 ? (
-                <div className="space-y-2">
-                  <div className="text-sm text-muted-foreground">
-                    {integration?.isTestMode 
-                      ? 'Test mode: Click "Load Courses" to see mock courses'
-                      : 'No courses found. Make sure you are enrolled as an instructor.'}
-                  </div>
-                  {integration?.isTestMode && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={loadCourses}
-                    >
-                      Load Courses
-                    </Button>
-                  )}
+                <div className="text-sm text-muted-foreground">
+                  No courses found. Make sure you are enrolled as an instructor.
                 </div>
               ) : (
                 <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>

@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, ChevronUp, ChevronDown, Eye } from 'lucide-react';
+import { Plus, ChevronUp, ChevronDown, Eye, Upload } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
@@ -14,6 +14,7 @@ interface AssessmentSectionProps {
   selectedCourseId?: number | null;
   isLoading?: boolean;
   loadError?: string | null;
+  onExportToCanvas?: (assessmentId: number, assessmentName: string) => void;
 }
 
 type QuestionEntry = {
@@ -73,7 +74,8 @@ export const AssessmentSection = ({
   onAddAssessment,
   selectedCourseId,
   isLoading = false,
-  loadError
+  loadError,
+  onExportToCanvas
 }: AssessmentSectionProps) => {
   const navigate = useNavigate();
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
@@ -172,6 +174,17 @@ export const AssessmentSection = ({
                         <Eye className="h-4 w-4" />
                         <span>View</span>
                       </Button>
+                      {onExportToCanvas && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onExportToCanvas(assessment.id, assessment.name)}
+                          className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                        >
+                          <Upload className="h-4 w-4" />
+                          <span>Export to Canvas</span>
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
