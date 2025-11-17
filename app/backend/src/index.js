@@ -9,12 +9,14 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.js';
 import questionRoutes from './routes/questions.js';
 import courseRoutes from './routes/course.js';
-import uploadRoutes from './routes/upload.js';
 import assessmentRoutes from './routes/assessments.js';
 import variantRoutes from './routes/variants.js';
 import eduaiRoutes from './routes/eduai.js';
+import canvasRoutes from './routes/canvas.js';
 import { connectDatabase } from './config/database.js';
 import { config } from './config/settings.js';
+// Import models to ensure associations are set up
+import './schema/index.js';
 
 const app = express();
 const PORT = config.port;
@@ -60,9 +62,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/questions', variantRoutes);
 app.use('/api/course', courseRoutes);
-app.use('/api/upload', uploadRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/eduai', eduaiRoutes);
+app.use('/api/canvas', canvasRoutes);
 
 // Error handling middleware
 app.use(notFound);

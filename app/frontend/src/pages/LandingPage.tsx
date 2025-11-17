@@ -1,29 +1,61 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { mockAssessments } from '../data/mockData';
-import { Course } from '../types/class';
-import { Question, Assessment, QuestionVariantEntry } from '../types/question';
+import { Course, Question, Assessment, QuestionVariantEntry, AssessmentGenerationParams } from '../types/question';
 import { Topic } from '../types/topic';
 import { useCourses } from '../hooks/useCourses';
 import { questionService } from '../services/questionService';
 import { courseService } from '../services/courseService';
+import assessmentService from '../services/assessmentService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
+import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
+import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
+import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
+import { useToast } from '../components/ui/use-toast';
 
 export const LandingPage = () => {
-  const { courses, isLoading: isCoursesLoading } = useCourses();
+  const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
   const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
   const [questionsError, setQuestionsError] = useState<string | null>(null);
-  const [assessments, setAssessments] = useState<Assessment[]>(mockAssessments);
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [isAssessmentsLoading, setIsAssessmentsLoading] = useState(false);
+  const [assessmentsError, setAssessmentsError] = useState<string | null>(null);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+  const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
+  const [selectedAssessmentForExport, setSelectedAssessmentForExport] = useState<{ id: number; name: string } | null>(null);
+  const { toast } = useToast();
+
+  const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
+    if (!courseId) {
+      return [] as Topic[];
+    }
+
+    if (!options.force && topicsByCourse[courseId]) {
+      return topicsByCourse[courseId];
+    }
+
+    try {
+      const topics = await courseService.getCourseTopics(courseId);
+      setTopicsByCourse((prev) => ({
+        ...prev,
+        [courseId]: topics
+      }));
+      return topics;
+    } catch (error) {
+      console.error('Failed to load topics for course', courseId, error);
+      return [];
+    }
+  }, [topicsByCourse]);
 
   useEffect(() => {
     if (courses.length === 0) {
@@ -38,22 +70,28 @@ export const LandingPage = () => {
   }, [courses, selectedCourse]);
 
   useEffect(() => {
-    const fetchTopicsForCourse = async (courseId: number) => {
-      try {
-        const topics = await courseService.getCourseTopics(courseId);
-        setTopicsByCourse((prev) => ({
-          ...prev,
-          [courseId]: topics
-        }));
-      } catch (error) {
-        console.error('Failed to load topics for course', courseId, error);
-      }
-    };
-
-    if (selectedCourse && !topicsByCourse[selectedCourse.id]) {
-      fetchTopicsForCourse(selectedCourse.id);
+    if (selectedCourse) {
+      void loadTopicsForCourse(selectedCourse.id);
     }
-  }, [selectedCourse, topicsByCourse]);
+  }, [selectedCourse, loadTopicsForCourse]);
+
+  const fetchAssessments = useCallback(async () => {
+    try {
+      setIsAssessmentsLoading(true);
+      setAssessmentsError(null);
+      const data = await assessmentService.getAssessments();
+      setAssessments(data);
+    } catch (error: any) {
+      setAssessments([]);
+      setAssessmentsError(error?.response?.data?.error || 'Failed to load assessments');
+    } finally {
+      setIsAssessmentsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAssessments();
+  }, [fetchAssessments]);
 
   const filteredQuestions = useMemo(() => {
     if (!selectedCourse) return questions;
@@ -102,12 +140,43 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
-  const handleCloseDetail = () => {
+  const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
+    if (createdQuestions.length === 0) {
+      setIsUploadOpen(false);
+      return;
+    }
+
+    const uniqueCourseIds = Array.from(new Set(createdQuestions.map((question) => question.courseId)));
+    const topicsMap = new Map<number, Topic[]>();
+
+    await Promise.all(
+      uniqueCourseIds.map(async (courseId) => {
+        const topics = await loadTopicsForCourse(courseId, { force: true });
+        topicsMap.set(courseId, topics);
+      })
+    );
+
+    setQuestions((prev) => {
+      const merged = new Map<number, Question>();
+      createdQuestions.forEach((question) => {
+        merged.set(question.id, question);
+      });
+      prev.forEach((question) => {
+        if (!merged.has(question.id)) {
+          merged.set(question.id, question);
+        }
+      });
+      return Array.from(merged.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    });
+
     setSelectedVariant(null);
+    setPresetVariant(null);
+    setIsUploadOpen(false);
   };
 
-  const handleEditVariant = (entry: QuestionVariantEntry) => {
-    console.log('Edit variant:', entry);
+  const handleCloseDetail = () => {
     setSelectedVariant(null);
   };
 
@@ -119,19 +188,26 @@ export const LandingPage = () => {
 
   const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
     try {
-      await questionService.deleteVariant(entry.variant.id);
-      const updatedQuestion = await questionService.getQuestion(entry.questionId);
-      setQuestions((prev) => {
-        const index = prev.findIndex((question) => question.id === entry.questionId);
-        if (index === -1) return prev;
-        const next = [...prev];
-        if (updatedQuestion.variants && updatedQuestion.variants.length > 0) {
-          next[index] = updatedQuestion;
-        } else {
-          next.splice(index, 1);
-        }
-        return next;
-      });
+      const question = questions.find((item) => item.id === entry.questionId);
+      if (!question) {
+        return;
+      }
+
+      const isLastVariant = (question.variants?.length ?? 0) <= 1;
+
+      if (isLastVariant) {
+        await questionService.deleteQuestion(question.id);
+        setQuestions((prev) => prev.filter((item) => item.id !== question.id));
+      } else {
+        await questionService.deleteVariant(entry.variant.id);
+        setQuestions((prev) =>
+          prev.map((item) =>
+            item.id === question.id
+              ? { ...item, variants: item.variants?.filter((variant) => variant.id !== entry.variant.id) ?? [] }
+              : item
+          )
+        );
+      }
     } catch (error) {
       console.error('Failed to delete variant', error);
     } finally {
@@ -145,6 +221,7 @@ export const LandingPage = () => {
   };
 
   const handleQuestionCreated = (question: Question) => {
+    void loadTopicsForCourse(question.courseId);
     const topicsForCourse = topicsByCourse[question.courseId] ?? [];
     const topicNameMap = new Map(topicsForCourse.map((topic) => [topic.id, topic.name]));
 
@@ -158,56 +235,24 @@ export const LandingPage = () => {
       return [question, ...prev];
     });
 
-    const latestVariant = question.variants?.[question.variants.length - 1];
-    if (latestVariant) {
-      const resolveTopicName = (topicId: number) => topicNameMap.get(topicId) ?? `Topic ${topicId}`;
-      const secondaryTopicNames = Array.isArray(latestVariant.secondaryTopicsId)
-        ? latestVariant.secondaryTopicsId.map((topicId) => resolveTopicName(topicId))
-        : [];
-
-      setSelectedVariant({
-        questionId: question.id,
-        questionDescription: question.description,
-        questionType: question.type,
-        primaryTopicId: question.primaryTopicId,
-        primaryTopicName: topicNameMap.get(question.primaryTopicId),
-        courseId: question.courseId,
-        courseName: question.course?.name,
-        courseCode: question.course?.code,
-        secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-        variant: latestVariant
-      });
-    }
-
     setPresetVariant(null);
     setIsAddQuestionOpen(false);
   };
 
   const handleUploadQuestions = () => {
-    console.log('Upload questions');
-    // TODO: Implement upload questions functionality
+    if (selectedCourse) {
+      void loadTopicsForCourse(selectedCourse.id);
+    }
+    setIsUploadOpen(true);
   };
 
-  const handleEditAssessment = (assessment: Assessment) => {
-    console.log('Edit assessment:', assessment);
-  };
-
-  const handleExportAssessment = (assessment: Assessment) => {
-    console.log('Export assessment:', assessment);
-  };
-
-  const handleAddAssessment = () => {
-    console.log('Add new assessment');
-  };
-
-  const handleReorderQuestions = (assessmentId: number, questionIds: number[]) => {
-    setAssessments((prev) =>
-      prev.map((assessment) =>
-        assessment.id === assessmentId
-          ? { ...assessment, questions: questionIds }
-          : assessment
-      )
-    );
+  const handleCreateAssessment = async (params: AssessmentGenerationParams) => {
+    try {
+      const created = await assessmentService.createAssessment(params);
+      setAssessments((prev) => [created, ...prev]);
+    } catch (error) {
+      console.error('Failed to create assessment', error);
+    }
   };
 
   useEffect(() => {
@@ -287,6 +332,13 @@ export const LandingPage = () => {
     }
   }, [variantEntries, presetVariant]);
 
+  const relatedVariantsForSelected = useMemo(() => {
+    if (!selectedVariant) {
+      return [];
+    }
+    return variantEntries.filter((entry) => entry.questionId === selectedVariant.questionId);
+  }, [variantEntries, selectedVariant?.questionId]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNavigation
@@ -296,6 +348,7 @@ export const LandingPage = () => {
         onTabChange={setActiveTab}
         courses={courses}
         isLoadingCourses={isCoursesLoading}
+        onProfileClick={() => setIsProfileDialogOpen(true)}
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -313,26 +366,40 @@ export const LandingPage = () => {
             disableUpload={!selectedCourse}
           />
         ) : (
-          <AssessmentSection
-            assessments={filteredAssessments}
-            questions={questions}
-            onEditAssessment={handleEditAssessment}
-            onExportAssessment={handleExportAssessment}
-            onAddAssessment={handleAddAssessment}
-            onReorderQuestions={handleReorderQuestions}
-          />
+        <AssessmentSection
+          assessments={filteredAssessments}
+          onAddAssessment={handleCreateAssessment}
+          isLoading={isAssessmentsLoading}
+          loadError={assessmentsError}
+          selectedCourseId={selectedCourse?.id ?? null}
+          onExportToCanvas={(assessmentId, assessmentName) => {
+            setSelectedAssessmentForExport({ id: assessmentId, name: assessmentName });
+            setIsCanvasExportOpen(true);
+          }}
+        />
         )}
       </div>
 
       {selectedVariant && (
         <QuestionDetailView
           entry={selectedVariant}
+          relatedVariants={relatedVariantsForSelected}
           onClose={handleCloseDetail}
-          onEdit={handleEditVariant}
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
+          onSelectVariant={handleViewVariant}
         />
       )}
+
+      <QuestionUploadDialog
+        open={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        courseId={selectedCourse?.id ?? null}
+        courseName={selectedCourse?.name}
+        topics={selectedCourse ? (topicsByCourse[selectedCourse.id] ?? []) : []}
+        onEnsureTopics={loadTopicsForCourse}
+        onQuestionsSaved={handleQuestionsUploaded}
+      />
 
       <AddQuestionDialog
         open={isAddQuestionOpen}
@@ -345,6 +412,31 @@ export const LandingPage = () => {
         onQuestionCreated={handleQuestionCreated}
         presetVariant={presetVariant}
       />
+
+      <ProfileCoursesDialog
+        open={isProfileDialogOpen}
+        onClose={() => setIsProfileDialogOpen(false)}
+        existingCourses={courses}
+        onCoursesAdded={fetchCourses}
+      />
+
+      {selectedAssessmentForExport && (
+        <CanvasExportDialog
+          open={isCanvasExportOpen}
+          onClose={() => {
+            setIsCanvasExportOpen(false);
+            setSelectedAssessmentForExport(null);
+          }}
+          assessmentId={selectedAssessmentForExport.id}
+          assessmentName={selectedAssessmentForExport.name}
+          onExportSuccess={(result) => {
+            toast({
+              title: 'Export successful!',
+              description: `Assessment exported to Canvas. Quiz ID: ${result.quizId}`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

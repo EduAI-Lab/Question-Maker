@@ -1,19 +1,34 @@
-import { Assessments, Question_Metadata, Variants, sequelize } from '../schema/index.js';
-import { Course } from '../schema/Course.js';
+import { Assessments, Question_Metadata, Variants, AssessmentSections, SectionVariants, Course, sequelize } from '../schema/index.js';
 import { Op } from 'sequelize';
 
 export const createAssessment = async (userId, assessmentData) => {
   try {
-    const { type, name, semester } = assessmentData;
+    const { type, name, semester, courseId, description, blueprintConfig } = assessmentData;
 
     if (!type || !name || !semester) {
       throw new Error('Type, name, and semester are required');
     }
 
+    if (!courseId) {
+      throw new Error('Course ID is required');
+    }
+
+    const course = await Course.findOne({
+      where: { id: courseId, userId },
+      attributes: ['id']
+    });
+
+    if (!course) {
+      throw new Error('Course not found');
+    }
+
     const assessment = await Assessments.create({
       type,
       name,
-      semester
+      semester,
+      courseId,
+      description: description?.trim() || null,
+      blueprintConfig: blueprintConfig || null
     });
 
     return assessment;
@@ -24,14 +39,24 @@ export const createAssessment = async (userId, assessmentData) => {
 
 export const getAssessmentsByUser = async (userId, options = {}) => {
   try {
-    const { limit = 50, offset = 0 } = options;
+    const { limit = 50, offset = 0, courseId } = options;
 
     const assessments = await Assessments.findAll({
+      where: {
+        ...(courseId && { courseId })
+      },
       include: [
+        {
+          model: Course,
+          as: 'course',
+          attributes: ['id', 'name', 'code'],
+          where: { userId },
+          required: true
+        },
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'answer'],
+          attributes: ['id', 'questionText', 'difficulty', 'answer', 'questionMetadataId'],
           include: [
             {
               model: Question_Metadata,
@@ -47,6 +72,40 @@ export const getAssessmentsByUser = async (userId, options = {}) => {
               ]
             }
           ]
+        },
+        {
+          model: AssessmentSections,
+          as: 'sections',
+          include: [
+            {
+              model: SectionVariants,
+              as: 'sectionVariants',
+              include: [
+                {
+                  model: Variants,
+                  as: 'variant',
+                  attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'questionMetadataId'],
+                  include: [
+                    {
+                      model: Question_Metadata,
+                      as: 'questionMetadata',
+                      attributes: ['id', 'description', 'type', 'questionOrder'],
+                      include: [
+                        {
+                          model: Course,
+                          as: 'course',
+                          attributes: ['id', 'name', 'code'],
+                          where: { userId },
+                          required: false
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          order: [['position', 'ASC']]
         }
       ],
       order: [['createdAt', 'DESC']],
@@ -66,9 +125,16 @@ export const getAssessmentById = async (assessmentId, userId) => {
       where: { id: assessmentId },
       include: [
         {
+          model: Course,
+          as: 'course',
+          attributes: ['id', 'name', 'code'],
+          where: { userId },
+          required: true
+        },
+        {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'answer'],
+          attributes: ['id', 'questionText', 'difficulty', 'answer', 'questionMetadataId'],
           include: [
             {
               model: Question_Metadata,
@@ -80,6 +146,38 @@ export const getAssessmentById = async (assessmentId, userId) => {
                   as: 'course',
                   where: { userId: userId },
                   attributes: ['id', 'name', 'code']
+                }
+              ]
+            }
+          ]
+        },
+        {
+          model: AssessmentSections,
+          as: 'sections',
+          include: [
+            {
+              model: SectionVariants,
+              as: 'sectionVariants',
+              include: [
+                {
+                  model: Variants,
+                  as: 'variant',
+                  include: [
+                    {
+                      model: Question_Metadata,
+                      as: 'questionMetadata',
+                      attributes: ['id', 'description', 'type', 'questionOrder'],
+                      include: [
+                        {
+                          model: Course,
+                          as: 'course',
+                          where: { userId },
+                          attributes: ['id', 'name', 'code'],
+                          required: false
+                        }
+                      ]
+                    }
+                  ]
                 }
               ]
             }
@@ -104,6 +202,12 @@ export const updateAssessment = async (assessmentId, updateData, userId) => {
       where: { id: assessmentId },
       include: [
         {
+          model: Course,
+          as: 'course',
+          where: { userId },
+          required: true
+        },
+        {
           model: Variants,
           as: 'variants',
           include: [
@@ -127,7 +231,28 @@ export const updateAssessment = async (assessmentId, updateData, userId) => {
       throw new Error('Assessment not found');
     }
 
-    await assessment.update(updateData);
+    if (updateData.courseId) {
+      const targetCourse = await Course.findOne({
+        where: { id: updateData.courseId, userId },
+        attributes: ['id']
+      });
+
+      if (!targetCourse) {
+        throw new Error('Course not found');
+      }
+    }
+
+    const normalizedUpdates = {
+      ...updateData,
+      description: updateData.description !== undefined
+        ? (updateData.description?.trim() || null)
+        : assessment.description,
+      blueprintConfig: updateData.blueprintConfig !== undefined
+        ? updateData.blueprintConfig
+        : assessment.blueprintConfig
+    };
+
+    await assessment.update(normalizedUpdates);
     return assessment;
   } catch (error) {
     throw error;
@@ -139,6 +264,12 @@ export const deleteAssessment = async (assessmentId, userId) => {
     const assessment = await Assessments.findOne({
       where: { id: assessmentId },
       include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId },
+          required: true
+        },
         {
           model: Variants,
           as: 'variants',
@@ -188,8 +319,18 @@ export const addQuestionToAssessment = async (assessmentId, questionId, orderNum
       throw new Error('Question not found');
     }
 
-    // Verify assessment exists
-    const assessment = await Assessments.findByPk(assessmentId);
+    // Verify assessment exists and belongs to user
+    const assessment = await Assessments.findOne({
+      where: { id: assessmentId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId },
+          attributes: ['id']
+        }
+      ]
+    });
     if (!assessment) {
       throw new Error('Assessment not found');
     }
@@ -224,6 +365,23 @@ export const removeQuestionFromAssessment = async (assessmentId, questionId, use
       throw new Error('Question not found');
     }
 
+    // Verify assessment belongs to the user
+    const assessment = await Assessments.findOne({
+      where: { id: assessmentId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId },
+          attributes: ['id']
+        }
+      ]
+    });
+
+    if (!assessment) {
+      throw new Error('Assessment not found');
+    }
+
     // Remove from question order
     const currentOrder = question.questionOrder || {};
     delete currentOrder[assessmentId];
@@ -238,8 +396,18 @@ export const removeQuestionFromAssessment = async (assessmentId, questionId, use
 
 export const getQuestionsInAssessment = async (assessmentId, userId) => {
   try {
-    // Verify assessment exists
-    const assessment = await Assessments.findByPk(assessmentId);
+    // Verify assessment exists and belongs to user
+    const assessment = await Assessments.findOne({
+      where: { id: assessmentId },
+      include: [
+        {
+          model: Course,
+          as: 'course',
+          where: { userId },
+          attributes: ['id']
+        }
+      ]
+    });
     if (!assessment) {
       throw new Error('Assessment not found');
     }

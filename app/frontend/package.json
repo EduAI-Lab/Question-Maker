@@ -16,11 +16,13 @@
     "axios": "^1.13.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
+    "pdfjs-dist": "^4.6.82",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.3.3",
     "react-markdown": "^9.0.1",
     "react-router-dom": "^7.0.0",
+    "tesseract.js": "^5.1.0",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7"
   },

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Class, ClassCreate } from '../types/class';
+import { Course, CourseCreate } from '../types/question';
 import { courseService } from '../services/courseService';
 
 export const useCourses = () => {
-  const [courses, setCourses] = useState<Class[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,7 +20,7 @@ export const useCourses = () => {
     }
   }, []);
 
-  const createCourse = useCallback(async (courseData: ClassCreate) => {
+  const createCourse = useCallback(async (courseData: CourseCreate) => {
     try {
       const newCourse = await courseService.createCourse(courseData);
       setCourses(prev => [newCourse, ...prev]);
@@ -33,7 +33,7 @@ export const useCourses = () => {
     }
   }, []);
 
-  const updateCourse = useCallback(async (id: number, courseData: Partial<ClassCreate>) => {
+  const updateCourse = useCallback(async (id: number, courseData: Partial<CourseCreate>) => {
     try {
       const updatedCourse = await courseService.updateCourse(id, courseData);
       setCourses(prev => 

@@ -20,7 +20,6 @@ A modern, full-stack application for generating educational questions using AI. 
 - **Database**: PostgreSQL with Sequelize ORM
 - **Authentication**: JWT + bcrypt
 - **AI Integration**: Multiple AI providers with fallback support
-- **File Processing**: Multer for file uploads
 - **Security**: Helmet, CORS, rate limiting
 
 ### Frontend (React/TypeScript)
@@ -183,8 +182,6 @@ VITE_APP_VERSION=1.0.0
 - `PUT /api/classes/:id` - Update class
 - `DELETE /api/classes/:id` - Delete class
 
-### Upload
-- `POST /api/upload` - Upload files and generate questions
 
 ## 🛠️ Development
 
@@ -301,5 +298,4 @@ For support and questions:
 - React frontend with TypeScript
 - AI question generation
 - Class management
-- File upload support
 - Docker containerization

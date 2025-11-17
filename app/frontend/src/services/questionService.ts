@@ -6,29 +6,35 @@ import {
   QuestionGenerationParams,
   QuestionStats,
   QuestionVariant,
-  QuestionDifficulty
+  QuestionDifficulty,
+  ExtractedQuestion
 } from '../types/question';
 
 const mapVariant = (variant: any): QuestionVariant => ({
   id: variant.id,
   questionText: variant.questionText,
   difficulty: variant.difficulty ?? 'medium',
+  reasoningLevel: variant.reasoningLevel ?? variant.reasoning_level ?? undefined,
   answer: variant.answer ?? null,
+  questionMetadataId: variant.questionMetadataId ?? variant.question_metadata_id ?? undefined,
   assessmentId: variant.assessmentId ?? null,
-  secondaryTopicsId: Array.isArray(variant.secondaryTopicsId) ? variant.secondaryTopicsId : [],
-  referenceId: variant.referenceId ?? null,
-  baseReferenceId: variant.referenceId ?? variant.id ?? null,
-  createdAt: variant.createdAt,
-  updatedAt: variant.updatedAt
+  secondaryTopicsId: Array.isArray(variant.secondaryTopicsId)
+    ? variant.secondaryTopicsId
+    : Array.isArray(variant.secondary_topics_id)
+      ? variant.secondary_topics_id
+      : [],
+  referenceId: variant.referenceId ?? variant.reference_id ?? null,
+  createdAt: variant.createdAt ?? variant.created_at,
+  updatedAt: variant.updatedAt ?? variant.updated_at
 });
 
 const mapQuestion = (item: any): Question => ({
   id: item.id,
-  description: item.description,
+  description: item.description ?? null,
   type: item.type,
   courseId: item.courseId,
   primaryTopicId: item.primaryTopicId,
-  questionOrder: item.questionOrder || null,
+  questionOrder: item.questionOrder ?? null,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
   course: item.course
@@ -38,18 +44,7 @@ const mapQuestion = (item: any): Question => ({
         code: item.course.code
       }
     : undefined,
-  variants: Array.isArray(item.variants) ? item.variants.map(mapVariant) : [],
-  content: item.description,
-  difficulty: item.variants && item.variants[0] ? item.variants[0].difficulty : 'medium',
-  bloomLevel: 'understand',
-  classId: item.courseId,
-  class: item.course
-    ? {
-        id: item.course.id,
-        name: item.course.name,
-        subject: item.course.code || ''
-      }
-    : undefined
+  variants: Array.isArray(item.variants) ? item.variants.map(mapVariant) : []
 });
 
 export const questionService = {
@@ -117,5 +112,25 @@ export const questionService = {
   async getQuestionStats(): Promise<QuestionStats> {
     const response = await api.get('/api/questions/stats');
     return response.data.data;
+  },
+
+  async extractQuestionsFromText(payload: { text: string; courseId: number }): Promise<ExtractedQuestion[]> {
+    const response = await api.post('/api/questions/extract', payload);
+    return response.data.data || [];
+  },
+
+  async saveExtractedQuestions(payload: {
+    courseId: number;
+    primaryTopicId?: number;
+    topicName?: string;
+    questions: ExtractedQuestion[];
+    assessment?: {
+      type: string;
+      name: string;
+      semester: string;
+    };
+  }): Promise<Question[]> {
+    const response = await api.post('/api/questions/extract/save', payload);
+    return (response.data.data || []).map(mapQuestion);
   }
 };

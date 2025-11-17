@@ -1,47 +1,39 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-export const Assessments = sequelize.define('Assessments', {
+export const SectionVariants = sequelize.define('SectionVariants', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  courseId: {
+  sectionId: {
     type: DataTypes.INTEGER,
-    allowNull: true,
-    field: 'course_id',
+    allowNull: false,
+    field: 'section_id',
     references: {
-      model: 'courses',
+      model: 'assessment_sections',
       key: 'id'
     }
   },
-  type: {
-    type: DataTypes.ENUM('Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'),
-    allowNull: false
-  },
-  name: {
-    type: DataTypes.STRING,
+  variantId: {
+    type: DataTypes.INTEGER,
     allowNull: false,
-    validate: {
-      notEmpty: true
+    field: 'variant_id',
+    references: {
+      model: 'variants',
+      key: 'id'
     }
   },
-  semester: {
-    type: DataTypes.STRING,
+  displayOrder: {
+    type: DataTypes.INTEGER,
     allowNull: false,
-    validate: {
-      notEmpty: true
-    }
+    defaultValue: 0,
+    field: 'display_order'
   },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  blueprintConfig: {
+  metadata: {
     type: DataTypes.JSONB,
-    allowNull: true,
-    field: 'blueprint_config'
+    allowNull: true
   },
   createdAt: {
     type: DataTypes.DATE,
@@ -56,7 +48,13 @@ export const Assessments = sequelize.define('Assessments', {
     field: 'updated_at'
   }
 }, {
-  tableName: 'assessments',
+  tableName: 'section_variants',
   timestamps: true,
-  underscored: true
+  underscored: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['section_id', 'variant_id']
+    }
+  ]
 });

@@ -1,47 +1,39 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
-export const Assessments = sequelize.define('Assessments', {
+export const CanvasCourseMapping = sequelize.define('CanvasCourseMapping', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  courseId: {
+  userId: {
     type: DataTypes.INTEGER,
-    allowNull: true,
-    field: 'course_id',
+    allowNull: false,
+    field: 'user_id',
+    references: {
+      model: 'users',
+      key: 'id'
+    }
+  },
+  localCourseId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    field: 'local_course_id',
     references: {
       model: 'courses',
       key: 'id'
     }
   },
-  type: {
-    type: DataTypes.ENUM('Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'),
-    allowNull: false
-  },
-  name: {
-    type: DataTypes.STRING,
+  canvasCourseId: {
+    type: DataTypes.INTEGER,
     allowNull: false,
-    validate: {
-      notEmpty: true
-    }
+    field: 'canvas_course_id'
   },
-  semester: {
+  canvasCourseName: {
     type: DataTypes.STRING,
-    allowNull: false,
-    validate: {
-      notEmpty: true
-    }
-  },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true
-  },
-  blueprintConfig: {
-    type: DataTypes.JSONB,
     allowNull: true,
-    field: 'blueprint_config'
+    field: 'canvas_course_name'
   },
   createdAt: {
     type: DataTypes.DATE,
@@ -56,7 +48,14 @@ export const Assessments = sequelize.define('Assessments', {
     field: 'updated_at'
   }
 }, {
-  tableName: 'assessments',
+  tableName: 'canvas_course_mappings',
   timestamps: true,
-  underscored: true
+  underscored: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['user_id', 'local_course_id']
+    }
+  ]
 });
+
