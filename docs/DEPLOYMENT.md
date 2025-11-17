@@ -75,6 +75,51 @@ Add these secrets in GitHub repository settings:
 - **Server Logs**: SSH to server and run `docker compose logs`
 - **Health Checks**: Pipeline automatically tests endpoints after deployment
 
+## Server-Side Auto-Deployment
+
+The server automatically checks for updates on the `main` branch and deploys when changes are detected.
+
+### How It Works
+
+- **Polling**: Systemd timer runs every 5 minutes
+- **Smart Checking**: Uses `git fetch` to check for updates (lightweight)
+- **Efficient**: Only deploys when changes are detected
+- **Automatic**: Rebuilds Docker images and restarts containers
+
+### Setup
+
+1. **Copy systemd files to server:**
+   ```bash
+   sudo cp question-maker-deploy.service /etc/systemd/system/
+   sudo cp question-maker-deploy.timer /etc/systemd/system/
+   ```
+
+2. **Make script executable:**
+   ```bash
+   chmod +x /srv/www/questionmaker.ok.ubc.ca/pull-and-deploy.sh
+   ```
+
+3. **Enable and start timer:**
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable question-maker-deploy.timer
+   sudo systemctl start question-maker-deploy.timer
+   ```
+
+### Monitoring
+
+- **Check timer status**: `sudo systemctl status question-maker-deploy.timer`
+- **View deployment logs**: `tail -f /var/log/question-maker/deploy.log`
+- **View service logs**: `sudo journalctl -u question-maker-deploy.service -f`
+
+### Manual Deployment Trigger
+
+To manually trigger deployment without waiting for the timer:
+```bash
+cd /srv/www/questionmaker.ok.ubc.ca
+./pull-and-deploy.sh
+```
+
 ## SSH Connection
 
 ### 1. Connect to UBC Server
