@@ -12,6 +12,8 @@ import assessmentService from '../services/assessmentService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
 import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
+import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
+import { useToast } from '../components/ui/use-toast';
 
 export const LandingPage = () => {
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
@@ -29,6 +31,9 @@ export const LandingPage = () => {
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
+  const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
+  const [selectedAssessmentForExport, setSelectedAssessmentForExport] = useState<{ id: number; name: string } | null>(null);
+  const { toast } = useToast();
 
   const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
     if (!courseId) {
@@ -367,6 +372,10 @@ export const LandingPage = () => {
           isLoading={isAssessmentsLoading}
           loadError={assessmentsError}
           selectedCourseId={selectedCourse?.id ?? null}
+          onExportToCanvas={(assessmentId, assessmentName) => {
+            setSelectedAssessmentForExport({ id: assessmentId, name: assessmentName });
+            setIsCanvasExportOpen(true);
+          }}
         />
         )}
       </div>
@@ -410,6 +419,24 @@ export const LandingPage = () => {
         existingCourses={courses}
         onCoursesAdded={fetchCourses}
       />
+
+      {selectedAssessmentForExport && (
+        <CanvasExportDialog
+          open={isCanvasExportOpen}
+          onClose={() => {
+            setIsCanvasExportOpen(false);
+            setSelectedAssessmentForExport(null);
+          }}
+          assessmentId={selectedAssessmentForExport.id}
+          assessmentName={selectedAssessmentForExport.name}
+          onExportSuccess={(result) => {
+            toast({
+              title: 'Export successful!',
+              description: `Assessment exported to Canvas. Quiz ID: ${result.quizId}`,
+            });
+          }}
+        />
+      )}
     </div>
   );
 };
