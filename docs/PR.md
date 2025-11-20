@@ -8,6 +8,7 @@
 ## Added tooltip to show missing fields
 - Generate assessment modal
 - Upload question
+- Save to section
 
 TODO
 - Delete assessment + constraints
@@ -23,10 +24,10 @@ TODO
 - **Needed**: Tooltip explaining why disabled (no base question selected for variant mode)
 - **Priority**: Medium
 
-### 5. AssessmentViewPage - "Save to Section" Button
+### 5. AssessmentViewPage - "Save to Section" Button ✅
 - **Location**: `app/frontend/src/pages/AssessmentViewPage.tsx`
-- **Current**: Button disabled when `selectedCount === 0 || !canFinalizeSection` but no tooltip
-- **Needed**: Tooltip explaining why disabled (no questions selected or section not configured)
+- **Status**: ✅ Completed
+- **Implementation**: Added tooltip explaining why disabled (no questions selected or section not configured)
 - **Priority**: High
 
 ### 6. AssessmentSection - "Add Assessment" Button

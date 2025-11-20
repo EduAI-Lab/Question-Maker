@@ -780,6 +780,22 @@ const MatchingQuestionsPanel = ({
 }: MatchingQuestionsPanelProps) => {
   const selectedCount = selectedQuestionIds.size;
 
+  const getDisabledReason = (): string | null => {
+    if (isCreatingSection) return null; // Don't show tooltip while creating
+    if (selectedCount === 0 && !canFinalizeSection) {
+      return 'Select at least one question and configure section';
+    }
+    if (selectedCount === 0) {
+      return 'Select at least one question';
+    }
+    if (!canFinalizeSection) {
+      return 'Configure section details first (run "Search Questions")';
+    }
+    return null;
+  };
+
+  const disabledReason = getDisabledReason();
+
   const renderContent = () => {
     if (isSearching) {
       return (
@@ -913,13 +929,27 @@ const MatchingQuestionsPanel = ({
             <Button type="button" variant="outline" onClick={onCreateNewQuestion}>
               Create New Question
             </Button>
-            <Button
-              type="button"
-              disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
-              onClick={onAddSelected}
-            >
-              {isCreatingSection ? 'Adding...' : 'Save to Section'}
-            </Button>
+            {disabledReason ? (
+              <Tooltip content={disabledReason} multiline>
+                <span className="inline-block">
+                  <Button
+                    type="button"
+                    disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
+                    onClick={onAddSelected}
+                  >
+                    {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                  </Button>
+                </span>
+              </Tooltip>
+            ) : (
+              <Button
+                type="button"
+                disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
+                onClick={onAddSelected}
+              >
+                {isCreatingSection ? 'Adding...' : 'Save to Section'}
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
