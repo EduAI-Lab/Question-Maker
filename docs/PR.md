@@ -4,26 +4,18 @@
 - Added tooltip "No questions in assessment" on hover when button is disabled
 - Applied to both AssessmentSection component and AssessmentViewPage
 
-## Generate assessment modal
-- Added tooltip to show missing fields
-- Tooltip makes a new line to prevent being cutoff
+
+## Added tooltip to show missing fields
+- Generate assessment modal
+- Upload question
 
 TODO
 - Delete assessment + constraints
 - Toggle darkmode on landing page
 ## Areas Needing Constraints & Tooltips
 
-### 2. QuestionUploadDialog - "Create Questions" Button
-- **Location**: `app/frontend/src/components/question-bank/QuestionUploadDialog.tsx`
-- **Current**: Button disabled when `!canSave` but no tooltip
-- **Needed**: Tooltip explaining why disabled (no questions selected, missing assessment info, or no course)
-- **Priority**: High
 
-### 3. CanvasExportDialog - "Export to Canvas" Button
-- **Location**: `app/frontend/src/components/canvas/CanvasExportDialog.tsx`
-- **Current**: Button disabled when `!selectedCourseId || courses.length === 0` but no tooltip
-- **Needed**: Tooltip explaining why disabled (no course selected or no courses available)
-- **Priority**: Medium
+
 
 ### 4. AddQuestionDialog - Submit Button
 - **Location**: `app/frontend/src/components/questions/AddQuestionDialog.tsx`
