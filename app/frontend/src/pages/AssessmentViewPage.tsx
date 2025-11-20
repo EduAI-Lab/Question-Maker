@@ -23,6 +23,7 @@ import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
+import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 
@@ -1467,6 +1468,20 @@ export const AssessmentViewPage = () => {
     [sections]
   );
 
+  const hasQuestions = useMemo(() => {
+    // Count unique questions (questionMetadata IDs) across all sections
+    const uniqueQuestionIds = new Set<number>();
+    sections.forEach((section) => {
+      (section.sectionVariants ?? []).forEach((sectionVariant) => {
+        const questionMetadataId = sectionVariant.variant?.questionMetadata?.id;
+        if (questionMetadataId) {
+          uniqueQuestionIds.add(questionMetadataId);
+        }
+      });
+    });
+    return uniqueQuestionIds.size > 0;
+  }, [sections]);
+
   if (Number.isNaN(assessmentId)) {
     return (
       <div className="p-6">
@@ -1515,14 +1530,29 @@ export const AssessmentViewPage = () => {
                   {assessment.description && <p className="text-sm text-muted-foreground">{assessment.description}</p>}
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setIsCanvasExportOpen(true)}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Export to Canvas
-                  </Button>
+                  {hasQuestions ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setIsCanvasExportOpen(true)}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Export to Canvas
+                    </Button>
+                  ) : (
+                    <Tooltip content="No questions in assessment">
+                      <span className="inline-block">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          disabled
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Export to Canvas
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
                   <Button
                     variant="destructive"
                     size="sm"
