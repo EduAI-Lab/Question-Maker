@@ -26,6 +26,7 @@ import { Input } from '../components/ui/input';
 import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
+import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
 const QUESTION_TYPES: QuestionType[] = ['MCQ', 'SA'];
 
@@ -1046,6 +1047,13 @@ export const AssessmentViewPage = () => {
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
   const [lastFilters, setLastFilters] = useState<QuestionSearchFilters | null>(null);
+  
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteAction, setDeleteAction] = useState<{
+    type: 'assessment' | 'section' | 'variant';
+    item?: AssessmentSection | { sectionId: number; variantId: number };
+  } | null>(null);
 
   const resetBuilderContext = () => {
     setMatchingQuestions([]);
@@ -1294,12 +1302,14 @@ export const AssessmentViewPage = () => {
     });
   };
 
-  const handleDeleteAssessment = async () => {
+  const handleDeleteAssessment = () => {
     if (!assessment) return;
-    const confirmed = window.confirm(
-      `Delete assessment "${assessment.name}"? This action cannot be undone.`
-    );
-    if (!confirmed) return;
+    setDeleteAction({ type: 'assessment' });
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteAssessment = async () => {
+    if (!assessment) return;
     try {
       setIsDeletingAssessment(true);
       await assessmentService.deleteAssessment(assessment.id);
@@ -1369,12 +1379,15 @@ export const AssessmentViewPage = () => {
     }
   };
 
-  const handleDeleteSection = async (section: AssessmentSection) => {
+  const handleDeleteSection = (section: AssessmentSection) => {
     if (!assessment) return;
-    const confirmed = window.confirm(
-      `Delete section "${section.name}"? This cannot be undone.`
-    );
-    if (!confirmed) return;
+    setDeleteAction({ type: 'section', item: section });
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteSection = async () => {
+    if (!assessment || !deleteAction || deleteAction.type !== 'section' || !deleteAction.item) return;
+    const section = deleteAction.item as AssessmentSection;
     try {
       await assessmentService.deleteSection(assessment.id, section.id);
       if (editingSection?.id === section.id) {
@@ -1394,12 +1407,15 @@ export const AssessmentViewPage = () => {
     }
   };
 
-  const handleDeleteVariantFromSection = async (sectionId: number, variantId: number) => {
+  const handleDeleteVariantFromSection = (sectionId: number, variantId: number) => {
     if (!assessment) return;
-    const confirmed = window.confirm(
-      'Remove this question from the section?'
-    );
-    if (!confirmed) return;
+    setDeleteAction({ type: 'variant', item: { sectionId, variantId } });
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteVariant = async () => {
+    if (!assessment || !deleteAction || deleteAction.type !== 'variant' || !deleteAction.item) return;
+    const { sectionId, variantId } = deleteAction.item as { sectionId: number; variantId: number };
     try {
       await assessmentService.removeVariantFromSection(assessment.id, sectionId, variantId);
       await refreshSections();
@@ -1750,6 +1766,36 @@ export const AssessmentViewPage = () => {
           }}
         />
       )}
+      <DeleteConfirmationModal
+        open={deleteModalOpen}
+        onOpenChange={setDeleteModalOpen}
+        onConfirm={async () => {
+          if (!deleteAction) return;
+          if (deleteAction.type === 'assessment') {
+            await confirmDeleteAssessment();
+          } else if (deleteAction.type === 'section') {
+            await confirmDeleteSection();
+          } else if (deleteAction.type === 'variant') {
+            await confirmDeleteVariant();
+          }
+        }}
+        title={
+          deleteAction?.type === 'assessment'
+            ? `Delete assessment "${assessment?.name}"?`
+            : deleteAction?.type === 'section'
+            ? `Delete section "${(deleteAction.item as AssessmentSection)?.name}"?`
+            : 'Remove question from section?'
+        }
+        message={
+          deleteAction?.type === 'assessment'
+            ? 'This action cannot be undone. All sections and questions in this assessment will be removed.'
+            : deleteAction?.type === 'section'
+            ? 'This cannot be undone. All questions in this section will be removed from the assessment.'
+            : 'This question will be removed from the section. This action cannot be undone.'
+        }
+        confirmLabel="Delete"
+        isLoading={isDeletingAssessment}
+      />
     </div>
   );
 };

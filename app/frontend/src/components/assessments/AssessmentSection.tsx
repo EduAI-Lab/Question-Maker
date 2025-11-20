@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Tooltip } from '../ui/tooltip';
-import { Plus, ChevronUp, ChevronDown, Eye, Upload } from 'lucide-react';
+import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2 } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
@@ -16,6 +16,7 @@ interface AssessmentSectionProps {
   isLoading?: boolean;
   loadError?: string | null;
   onExportToCanvas?: (assessmentId: number, assessmentName: string) => void;
+  onDeleteAssessment?: (assessmentId: number, assessmentName: string) => void;
 }
 
 type QuestionEntry = {
@@ -103,7 +104,8 @@ export const AssessmentSection = ({
   selectedCourseId,
   isLoading = false,
   loadError,
-  onExportToCanvas
+  onExportToCanvas,
+  onDeleteAssessment
 }: AssessmentSectionProps) => {
   const navigate = useNavigate();
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
@@ -229,6 +231,16 @@ export const AssessmentSection = ({
                             <span>Export to Canvas</span>
                           </Button>
                         )
+                      )}
+                      {onDeleteAssessment && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onDeleteAssessment(assessment.id, assessment.name)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       )}
                       <Button
                         variant="ghost"

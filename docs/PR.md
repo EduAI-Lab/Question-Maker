@@ -4,6 +4,9 @@
 - Added tooltip "No questions in assessment" on hover when button is disabled
 - Applied to both AssessmentSection component and AssessmentViewPage
 
+## Added delete confirmation modal
+- On delete question variant, assessment, section, question in section
+
 
 ## Added tooltip to show missing fields
 - Generate assessment modal
