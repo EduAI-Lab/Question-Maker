@@ -64,7 +64,7 @@ type QuestionSearchFilters = {
   primaryTopicIds: number[];
   secondaryTopicIds: number[];
   excludedTopicIds: number[];
-  difficulty?: 'easy' | 'medium' | 'hard' | null;
+  difficulty?: Array<'easy' | 'medium' | 'hard'> | null;
 };
 
 const toNumberArray = (value: unknown): number[] => {
@@ -136,20 +136,25 @@ const buildDraftFromSection = (
   section: AssessmentSection
 ): { filters: QuestionSearchFilters; payload: AssessmentSectionCreateInput } => {
   const topicFilters = extractTopicFiltersFromSection(section);
-  const questionTypes =
-    deriveQuestionTypesFromSection(section).length > 0
-      ? deriveQuestionTypesFromSection(section)
-      : ['MCQ'];
+  const questionTypes: QuestionType[] = deriveQuestionTypesFromSection(section);
   const metadata = (section.metadata as Record<string, unknown>) || {};
-  const selectedReasoning =
-    (metadata.selectedReasoning as keyof ReasoningDataState) ?? 'factual';
+  const selectedReasoningRaw = metadata.selectedReasoning;
+  const selectedReasoning: Array<keyof ReasoningDataState> = Array.isArray(selectedReasoningRaw)
+    ? selectedReasoningRaw.filter((r): r is keyof ReasoningDataState => 
+        ['factual', 'analytical', 'application'].includes(r as string)
+      )
+    : selectedReasoningRaw && ['factual', 'analytical', 'application'].includes(selectedReasoningRaw as string)
+    ? [selectedReasoningRaw as keyof ReasoningDataState]
+    : [];
+  
   const questionTarget =
     typeof metadata.questionTarget === 'number' ? metadata.questionTarget : 10;
-  const reasoningData = section.reasoningData ?? defaultReasoningData();
+  const reasoningData = (section as any).reasoningData ?? defaultReasoningData();
+  const primaryReasoning = selectedReasoning.length > 0 ? selectedReasoning[0] : 'factual';
   const difficultySettings =
     section.difficultySettings ?? {
-      easyBoundary: reasoningData[selectedReasoning].easyBoundary,
-      hardBoundary: reasoningData[selectedReasoning].hardBoundary
+      easyBoundary: reasoningData[primaryReasoning].easyBoundary,
+      hardBoundary: reasoningData[primaryReasoning].hardBoundary
     };
 
   const payload: AssessmentSectionCreateInput = {
@@ -167,8 +172,13 @@ const buildDraftFromSection = (
     difficultySettings
   };
 
-  const difficulty = metadata.difficulty && ['easy', 'medium', 'hard'].includes(metadata.difficulty as string)
-    ? (metadata.difficulty as 'easy' | 'medium' | 'hard')
+  const difficultyRaw = metadata.difficulty;
+  const difficulty: Array<'easy' | 'medium' | 'hard'> | null = Array.isArray(difficultyRaw)
+    ? difficultyRaw.filter((d): d is 'easy' | 'medium' | 'hard' =>
+        ['easy', 'medium', 'hard'].includes(d as string)
+      )
+    : difficultyRaw && ['easy', 'medium', 'hard'].includes(difficultyRaw as string)
+    ? [difficultyRaw as 'easy' | 'medium' | 'hard']
     : null;
 
   const filters: QuestionSearchFilters = {
@@ -214,9 +224,12 @@ const questionMatchesFilters = (question: Question, filters: QuestionSearchFilte
     secondaryIds.some((topicId) => filters.excludedTopicIds.includes(topicId));
 
   // Filter by difficulty if specified
+  // Filter by difficulty if specified
   const matchesDifficulty =
-    !filters.difficulty ||
-    (question.variants ?? []).some((variant) => variant.difficulty === filters.difficulty);
+    !filters.difficulty || filters.difficulty.length === 0 ||
+    (question.variants ?? []).some((variant) => 
+      filters.difficulty!.includes(variant.difficulty)
+    );
 
   return matchesType && matchesTopic && !isExcluded && matchesDifficulty;
 };
@@ -445,14 +458,14 @@ const CreateSectionPanel = ({
   } = sanitizedDefaults;
   const [sectionName, setSectionName] = useState('');
   const [sectionTypeOptions] = useState<QuestionType[]>(QUESTION_TYPES);
-  const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>(['MCQ']);
+  const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>([]);
   const [primaryTopicIds, setPrimaryTopicIds] = useState<number[]>(primaryDefaults);
   const [secondaryTopicIds, setSecondaryTopicIds] = useState<number[]>(secondaryDefaults);
   const [excludedTopicIds, setExcludedTopicIds] = useState<number[]>(excludedDefaults);
   const [reasoningData, setReasoningData] = useState<ReasoningDataState>(defaultReasoningData());
-  const [selectedReasoning, setSelectedReasoning] = useState<keyof ReasoningDataState>('factual');
+  const [selectedReasoning, setSelectedReasoning] = useState<Array<keyof ReasoningDataState>>([]);
   const [questionTarget, setQuestionTarget] = useState(10);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Array<'easy' | 'medium' | 'hard'>>([]);
 
   const primaryDisabledIds = useMemo(
     () => new Set([...secondaryTopicIds, ...excludedTopicIds]),
@@ -492,10 +505,10 @@ const CreateSectionPanel = ({
           (totals[key] ?? 0) > (totals[best] ?? 0) ? key : best,
         'factual' as keyof ReasoningDataState
       );
-      setSelectedReasoning(favored || 'factual');
+      setSelectedReasoning(favored ? [favored] : []);
     } else {
       setReasoningData(defaultReasoningData());
-      setSelectedReasoning('factual');
+      setSelectedReasoning([]);
     }
   }, [blueprint, isEditing]);
 
@@ -511,7 +524,7 @@ const CreateSectionPanel = ({
     const topicFilters = extractTopicFiltersFromSection(editingSection);
     setSectionName(editingSection.name ?? '');
     const typesFromSection = deriveQuestionTypesFromSection(editingSection);
-    setSelectedTypes(typesFromSection.length > 0 ? typesFromSection : ['MCQ']);
+    setSelectedTypes(typesFromSection);
     setPrimaryTopicIds(topicFilters.primaryTopicIds);
     setSecondaryTopicIds(topicFilters.secondaryTopicIds);
     setExcludedTopicIds(topicFilters.excludedTopicIds);
@@ -519,15 +532,29 @@ const CreateSectionPanel = ({
     const target =
       typeof metadata.questionTarget === 'number' ? metadata.questionTarget : 10;
     setQuestionTarget(target);
-    const selected =
-      (metadata.selectedReasoning as keyof ReasoningDataState) ?? 'factual';
-    setSelectedReasoning(selected);
-    const difficulty = metadata.difficulty && ['easy', 'medium', 'hard'].includes(metadata.difficulty as string)
-      ? (metadata.difficulty as 'easy' | 'medium' | 'hard')
-      : null;
-    setSelectedDifficulty(difficulty);
-    if (editingSection.reasoningData) {
-      setReasoningData(editingSection.reasoningData);
+    const selected = metadata.selectedReasoning;
+    if (Array.isArray(selected)) {
+      setSelectedReasoning(selected.filter((r): r is keyof ReasoningDataState => 
+        ['factual', 'analytical', 'application'].includes(r as string)
+      ));
+    } else if (selected && ['factual', 'analytical', 'application'].includes(selected as string)) {
+      setSelectedReasoning([selected as keyof ReasoningDataState]);
+    } else {
+      setSelectedReasoning([]);
+    }
+    
+    const difficulty = metadata.difficulty;
+    if (Array.isArray(difficulty)) {
+      setSelectedDifficulty(difficulty.filter((d): d is 'easy' | 'medium' | 'hard' =>
+        ['easy', 'medium', 'hard'].includes(d as string)
+      ));
+    } else if (difficulty && ['easy', 'medium', 'hard'].includes(difficulty as string)) {
+      setSelectedDifficulty([difficulty as 'easy' | 'medium' | 'hard']);
+    } else {
+      setSelectedDifficulty([]);
+    }
+    if ((editingSection as any).reasoningData) {
+      setReasoningData((editingSection as any).reasoningData);
     } else {
       setReasoningData(defaultReasoningData());
     }
@@ -536,16 +563,28 @@ const CreateSectionPanel = ({
   useEffect(() => {
     if (isEditing) return;
     setSectionName('');
-    setSelectedTypes(['MCQ']);
+    setSelectedTypes([]);
     setQuestionTarget(10);
-    setSelectedReasoning('factual');
-    setSelectedDifficulty(null);
+    setSelectedReasoning([]);
+    setSelectedDifficulty([]);
     setReasoningData(defaultReasoningData());
   }, [isEditing]);
 
   const toggleType = (type: QuestionType) => {
     setSelectedTypes((prev) =>
       prev.includes(type) ? prev.filter((item) => item !== type) : [...prev, type]
+    );
+  };
+
+  const toggleReasoning = (reasoning: keyof ReasoningDataState) => {
+    setSelectedReasoning((prev) =>
+      prev.includes(reasoning) ? prev.filter((item) => item !== reasoning) : [...prev, reasoning]
+    );
+  };
+
+  const toggleDifficulty = (difficulty: 'easy' | 'medium' | 'hard') => {
+    setSelectedDifficulty((prev) =>
+      prev.includes(difficulty) ? prev.filter((item) => item !== difficulty) : [...prev, difficulty]
     );
   };
 
@@ -578,20 +617,25 @@ const CreateSectionPanel = ({
   const handleSubmit = async () => {
     if (!sectionName.trim()) return;
 
+    // Normalize reasoning data - distribute evenly if multiple selected, or use first one
+    const reasoningCount = selectedReasoning.length;
     const normalizedReasoningData: ReasoningDataState = {
       factual: {
         ...reasoningData.factual,
-        total: selectedReasoning === 'factual' ? 100 : 0
+        total: selectedReasoning.includes('factual') ? (reasoningCount > 0 ? 100 / reasoningCount : 0) : 0
       },
       analytical: {
         ...reasoningData.analytical,
-        total: selectedReasoning === 'analytical' ? 100 : 0
+        total: selectedReasoning.includes('analytical') ? (reasoningCount > 0 ? 100 / reasoningCount : 0) : 0
       },
       application: {
         ...reasoningData.application,
-        total: selectedReasoning === 'application' ? 100 : 0
+        total: selectedReasoning.includes('application') ? (reasoningCount > 0 ? 100 / reasoningCount : 0) : 0
       }
     };
+
+    // Use first selected reasoning for difficulty settings boundaries, or default to factual
+    const primaryReasoning = selectedReasoning.length > 0 ? selectedReasoning[0] : 'factual';
 
     const payload: AssessmentSectionCreateInput = {
       name: sectionName.trim(),
@@ -610,8 +654,8 @@ const CreateSectionPanel = ({
       },
       reasoningData: normalizedReasoningData,
       difficultySettings: {
-        easyBoundary: normalizedReasoningData[selectedReasoning].easyBoundary,
-        hardBoundary: normalizedReasoningData[selectedReasoning].hardBoundary
+        easyBoundary: normalizedReasoningData[primaryReasoning].easyBoundary,
+        hardBoundary: normalizedReasoningData[primaryReasoning].hardBoundary
       }
     };
 
@@ -621,17 +665,13 @@ const CreateSectionPanel = ({
         primaryTopicIds,
         secondaryTopicIds,
         excludedTopicIds,
-        difficulty: selectedDifficulty
+        difficulty: selectedDifficulty.length > 0 ? selectedDifficulty : null
       },
       payload,
       editingSection?.id
     );
   };
 
-  const handleDifficultyChange = (difficulty: 'easy' | 'medium' | 'hard') => {
-    // Toggle: if clicking the same difficulty, deselect it
-    setSelectedDifficulty(selectedDifficulty === difficulty ? null : difficulty);
-  };
 
   return (
     <Card className="border border-gray-200">
@@ -644,7 +684,9 @@ const CreateSectionPanel = ({
       <CardContent className="space-y-5">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="section-name">Section Name</Label>
+            <Label htmlFor="section-name">
+              Section Name <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="section-name"
               placeholder="e.g., Multiple Choice Questions"
@@ -703,9 +745,9 @@ const CreateSectionPanel = ({
                 <Button
                   key={type}
                   type="button"
-                  variant={selectedReasoning === type ? 'default' : 'outline'}
+                  variant={selectedReasoning.includes(type) ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedReasoning(type)}
+                  onClick={() => toggleReasoning(type)}
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </Button>
@@ -719,9 +761,9 @@ const CreateSectionPanel = ({
                 <Button
                   key={level}
                   type="button"
-                  variant={selectedDifficulty === level ? 'default' : 'outline'}
+                  variant={selectedDifficulty.includes(level) ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => handleDifficultyChange(level)}
+                  onClick={() => toggleDifficulty(level)}
                 >
                   {level.charAt(0).toUpperCase() + level.slice(1)}
                 </Button>
@@ -729,13 +771,30 @@ const CreateSectionPanel = ({
             </div>
           </div>
         </div>
-        <Button
-          className="w-full"
-          disabled={isSearching || !sectionName.trim()}
-          onClick={handleSubmit}
-        >
-          {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
-        </Button>
+        {isSearching || !sectionName.trim() ? (
+          <Tooltip 
+            content={isSearching ? 'Searching for questions...' : 'Section name is required'} 
+            multiline
+          >
+            <span className="inline-block w-full">
+              <Button
+                className="w-full"
+                disabled={isSearching || !sectionName.trim()}
+                onClick={handleSubmit}
+              >
+                {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
+              </Button>
+            </span>
+          </Tooltip>
+        ) : (
+          <Button
+            className="w-full"
+            disabled={isSearching || !sectionName.trim()}
+            onClick={handleSubmit}
+          >
+            {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

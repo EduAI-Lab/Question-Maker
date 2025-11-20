@@ -10,6 +10,9 @@
 - Upload question
 - Save to section
 
+## Refactored create field buttons to use multi select functionality
+- You can filter by either one of, multiple or none of the button filters 
+- Create/Edit Section widget - "Search Questions" button
 TODO
 - Delete assessment + constraints
 - Toggle darkmode on landing page
