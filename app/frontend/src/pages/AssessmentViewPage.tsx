@@ -1043,6 +1043,7 @@ export const AssessmentViewPage = () => {
           courseCode: question.course?.code,
           secondaryTopicNames:
             secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+          isAiGenerated: question.isAiGenerated,
           variant
         };
       })
@@ -1186,6 +1187,7 @@ export const AssessmentViewPage = () => {
       secondaryTopicNames: primaryVariant.secondaryTopicsId
         ?.map((id) => availableTopics.find((t) => t.id === id)?.name)
         .filter(Boolean) as string[] | undefined,
+      isAiGenerated: question.isAiGenerated,
       variant: variantWithAssessment
     };
     setPresetVariant(variantEntry);

@@ -95,6 +95,7 @@ export const AddQuestionDialog = ({
     const [courseDetails, setCourseDetails] = useState<Course | null>(null);
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [availableEduCourses, setAvailableEduCourses] = useState<EduAICourseOption[]>([]);
+    const [isAiGenerated, setIsAiGenerated] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -105,6 +106,7 @@ export const AddQuestionDialog = ({
             setAssessments([]);
             setCourseDetails(null);
             setIsGenerating(false);
+            setIsAiGenerated(false);
             return;
         }
 
@@ -510,6 +512,7 @@ export const AddQuestionDialog = ({
                 };
             });
 
+            setIsAiGenerated(true);
             toast({
                 title: 'Question generated',
                 description: 'Review the generated text and adjust any details before saving.'
@@ -596,7 +599,8 @@ export const AddQuestionDialog = ({
                 courseId,
                 primaryTopicId,
                 type: form.questionType,
-                questionOrder
+                questionOrder,
+                isAiGenerated
             });
 
             await questionService.createVariant(createdQuestion.id, {

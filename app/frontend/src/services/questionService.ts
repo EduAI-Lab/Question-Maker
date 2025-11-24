@@ -35,6 +35,7 @@ const mapQuestion = (item: any): Question => ({
   courseId: item.courseId,
   primaryTopicId: item.primaryTopicId,
   questionOrder: item.questionOrder ?? null,
+  isAiGenerated: item.isAiGenerated ?? item.is_ai_generated ?? false,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
   course: item.course

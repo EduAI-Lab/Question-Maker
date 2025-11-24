@@ -28,6 +28,11 @@ export const QuestionCard = ({ entry, questionNumber, onView, onCreateVariant }:
                                 {entry.variant.difficulty ?? 'medium'}
                             </Badge>
                             <Badge variant="outline">{primaryTopicLabel}</Badge>
+                            {entry.isAiGenerated && (
+                                <Badge variant="default" className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-300">
+                                    AI Generated
+                                </Badge>
+                            )}
                         </div>
 
                         <div className="mb-3 space-y-2">

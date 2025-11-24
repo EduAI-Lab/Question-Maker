@@ -1,8 +1,10 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { X, Copy, Trash2, ArrowLeft } from 'lucide-react';
+import { X, Copy, Trash2, ArrowLeft, Sparkles } from 'lucide-react';
 import { QuestionVariantEntry } from '../../types/question';
+import { questionService } from '../../services/questionService';
+import { useToast } from '../ui/use-toast';
 
 const DetailItem = ({
     label,
@@ -59,6 +61,8 @@ export const QuestionDetailView = ({
     onSelectVariant
 }: QuestionDetailViewProps) => {
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
+    const [isToggling, setIsToggling] = useState(false);
+    const { toast } = useToast();
     const { variant } = entry;
     const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
     const secondaryTopicsDisplay =
@@ -103,6 +107,36 @@ export const QuestionDetailView = ({
     const handleSelectVariant = (target: QuestionVariantEntry) => {
         onSelectVariant(target);
         setViewMode('detail');
+    };
+ //mock for AI generated questions
+    const handleToggleAiTag = async () => {
+        try {
+            setIsToggling(true);
+            const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
+                isAiGenerated: !entry.isAiGenerated
+            });
+            
+            // Update the entry with the new value
+            const updatedEntry: QuestionVariantEntry = {
+                ...entry,
+                isAiGenerated: updatedQuestion.isAiGenerated
+            };
+            
+            onSelectVariant(updatedEntry);
+            
+            toast({
+                title: 'AI tag toggled',
+                description: `Question is now ${updatedQuestion.isAiGenerated ? 'marked as' : 'unmarked from'} AI-generated.`
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Failed to toggle AI tag',
+                description: error?.message || 'An error occurred'
+            });
+        } finally {
+            setIsToggling(false);
+        }
     };
 
     useEffect(() => {
@@ -161,6 +195,11 @@ export const QuestionDetailView = ({
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
                                     <Badge variant="outline">{entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`}</Badge>
                                     <Badge variant="secondary" className="uppercase">{entry.questionType}</Badge>
+                                    {entry.isAiGenerated && (
+                                        <Badge variant="default" className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-300">
+                                            AI Generated
+                                        </Badge>
+                                    )}
                                 </div>
                             </div>
 
@@ -239,6 +278,13 @@ export const QuestionDetailView = ({
                                 <DetailItem label="Question type" value={entry.questionType} />
                                 <DetailItem label="Difficulty" value={variant.difficulty ?? '—'} />
                                 <DetailItem label="Created" value={createdAtDisplay} />
+                                {entry.isAiGenerated && (
+                                    <DetailItem label="AI Generated" value={
+                                        <Badge variant="default" className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-300">
+                                            Yes
+                                        </Badge>
+                                    } />
+                                )}
                             </div>
                         </section>
 
@@ -271,7 +317,18 @@ export const QuestionDetailView = ({
                     )}
                 </div>
 
-                <div className="flex items-center justify-end gap-3 border-t bg-gray-50 px-6 py-4">
+                <div className="flex items-center justify-between border-t bg-gray-50 px-6 py-4">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleToggleAiTag}
+                        disabled={isToggling}
+                        className="flex items-center gap-2 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                        title="Test: Toggle AI Generated tag"
+                    >
+                        <Sparkles className="h-3 w-3" />
+                        <span>{entry.isAiGenerated ? 'Remove AI Tag' : 'Add AI Tag'}</span>
+                    </Button>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={() => onCreateVariant(entry)} className="flex items-center gap-2">
                             <Copy className="h-4 w-4" />

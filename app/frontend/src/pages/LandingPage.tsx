@@ -119,6 +119,7 @@ export const LandingPage = () => {
           courseName: question.course?.name,
           courseCode: question.course?.code,
           secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+          isAiGenerated: question.isAiGenerated,
           variant
         };
       });

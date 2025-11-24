@@ -11,6 +11,7 @@ export interface QuestionMetadata {
     courseId: number;
     primaryTopicId: number;
     questionOrder: Record<number, number> | null; // Maps assessment IDs to order numbers
+    isAiGenerated?: boolean; // Indicates if this question was generated using AI
     createdAt: string;
     updatedAt: string;
     // Relations
@@ -106,6 +107,7 @@ export interface QuestionCreate {
     primaryTopicId: number;
     type: QuestionType;
     questionOrder?: Record<number, number> | null;
+    isAiGenerated?: boolean;
 }
 
 export interface QuestionGenerationParams {
@@ -157,6 +159,7 @@ export interface QuestionVariantEntry {
     courseName?: string;
     courseCode?: string | null;
     secondaryTopicNames?: string[];
+    isAiGenerated?: boolean;
     variant: QuestionVariant;
 }
 
