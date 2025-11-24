@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Tesseract from 'tesseract.js';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker?url';
@@ -85,6 +86,7 @@ export const QuestionUploadDialog = ({
     onQuestionsSaved
 }: QuestionUploadDialogProps) => {
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     const [topics, setTopics] = useState<Topic[]>(providedTopics);
     const [primaryTopicId, setPrimaryTopicId] = useState<string>('');
@@ -445,7 +447,7 @@ export const QuestionUploadDialog = ({
             const fallbackTopicName =
                 topics.length === 0 ? (newTopicName.trim() || 'Uploaded Questions') : undefined;
 
-            const saved = await questionService.saveExtractedQuestions({
+            const result = await questionService.saveExtractedQuestions({
                 courseId,
                 primaryTopicId: fallbackPrimaryTopicId,
                 topicName: fallbackTopicName,
@@ -457,12 +459,17 @@ export const QuestionUploadDialog = ({
                 }
             });
 
-            onQuestionsSaved(saved);
+            onQuestionsSaved(result.questions);
             toast({
                 title: 'Questions added',
-                description: `${saved.length} question${saved.length === 1 ? '' : 's'} saved successfully.`
+                description: `${result.questions.length} question${result.questions.length === 1 ? '' : 's'} saved successfully.`
             });
             onClose();
+
+            // Navigate to the newly created assessment
+            if (result.assessmentId) {
+                navigate(`/assessments/${result.assessmentId}`);
+            }
         } catch (err: any) {
             console.error('Failed to save extracted questions', err);
             const message = err?.response?.data?.error || err?.message || 'Failed to save questions.';

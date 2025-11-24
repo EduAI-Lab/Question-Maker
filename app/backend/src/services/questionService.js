@@ -1,4 +1,4 @@
-import { Question_Metadata, Variants, Topics, Assessments } from '../schema/index.js';
+import { Question_Metadata, Variants, Topics, Assessments, AssessmentSections, SectionVariants } from '../schema/index.js';
 import { Course } from '../schema/Course.js';
 
 const normalizeSecondaryTopics = (value) => {
@@ -394,6 +394,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
     };
 
     let createdAssessment = null;
+    let createdSection = null;
     if (assessment) {
       const { type, name, semester } = assessment;
       if (!type || !name || !semester) {
@@ -402,7 +403,16 @@ export const saveExtractedQuestions = async (userId, payload) => {
       createdAssessment = await Assessments.create({
         type,
         name,
-        semester
+        semester,
+        courseId
+      }, { transaction });
+
+      // Create a default section for the uploaded questions
+      createdSection = await AssessmentSections.create({
+        assessmentId: createdAssessment.id,
+        name: 'Uploaded Questions',
+        description: 'Questions extracted from uploaded document',
+        position: 0
       }, { transaction });
     }
 
@@ -461,7 +471,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
         questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {}
       }, { transaction });
 
-      await Variants.create({
+      const variant = await Variants.create({
         questionMetadataId: metadata.id,
         questionText,
         difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
@@ -470,6 +480,15 @@ export const saveExtractedQuestions = async (userId, payload) => {
         secondaryTopicsId: secondaryTopics,
         referenceId: null
       }, { transaction });
+
+      // Link variant to section if assessment and section were created
+      if (createdSection) {
+        await SectionVariants.create({
+          sectionId: createdSection.id,
+          variantId: variant.id,
+          displayOrder: orderCounter - 1
+        }, { transaction });
+      }
 
       createdIds.push(metadata.id);
       if (createdAssessment) {
@@ -501,7 +520,10 @@ export const saveExtractedQuestions = async (userId, payload) => {
       order: [['createdAt', 'DESC']]
     });
 
-    return savedQuestions.map((question) => question.toJSON());
+    return {
+      questions: savedQuestions.map((question) => question.toJSON()),
+      assessmentId: createdAssessment ? createdAssessment.id : null
+    };
   } catch (error) {
     await transaction.rollback();
     throw error;

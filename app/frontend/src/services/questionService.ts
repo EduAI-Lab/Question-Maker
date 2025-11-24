@@ -139,8 +139,12 @@ export const questionService = {
       name: string;
       semester: string;
     };
-  }): Promise<Question[]> {
+  }): Promise<{ questions: Question[]; assessmentId: number | null }> {
     const response = await api.post('/api/questions/extract/save', payload);
-    return (response.data.data || []).map(mapQuestion);
+    const data = response.data.data;
+    return {
+      questions: (data.questions || []).map(mapQuestion),
+      assessmentId: data.assessmentId || null
+    };
   }
 };
