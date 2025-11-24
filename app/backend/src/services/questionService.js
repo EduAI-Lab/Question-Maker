@@ -123,7 +123,14 @@ export const getQuestionsByUser = async (userId, options = {}) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'answer', 'assessmentId', 'secondaryTopicsId']
+          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'createdAt', 'updatedAt'],
+          include: [
+            {
+              model: Assessments,
+              as: 'assessment',
+              attributes: ['id', 'name', 'type', 'semester']
+            }
+          ]
         }
       ],
       order: [['createdAt', 'DESC']],
@@ -159,7 +166,14 @@ export const getQuestionById = async (questionId, userId) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'answer', 'assessmentId', 'secondaryTopicsId']
+          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'createdAt', 'updatedAt'],
+          include: [
+            {
+              model: Assessments,
+              as: 'assessment',
+              attributes: ['id', 'name', 'type', 'semester']
+            }
+          ]
         }
       ]
     });

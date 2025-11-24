@@ -193,6 +193,16 @@ const VariantContent = ({ variant }: { variant: QuestionVariant }) => {
           </span>
         )}
       </div>
+      {variant.assessment && (
+        <div className="mt-2 pt-2 border-t border-gray-100">
+          <p className="text-xs text-muted-foreground">
+            Previously used in:{' '}
+            <span className="font-medium text-gray-900">
+              {variant.assessment.name} ({variant.assessment.semester})
+            </span>
+          </p>
+        </div>
+      )}
       {variant.answer && (
         <div className="mt-2 pt-2 border-t border-gray-100">
           <p className="text-xs font-medium text-muted-foreground mb-1">Answer:</p>

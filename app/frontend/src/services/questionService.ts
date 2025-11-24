@@ -25,7 +25,17 @@ const mapVariant = (variant: any): QuestionVariant => ({
       : [],
   referenceId: variant.referenceId ?? variant.reference_id ?? null,
   createdAt: variant.createdAt ?? variant.created_at,
-  updatedAt: variant.updatedAt ?? variant.updated_at
+  updatedAt: variant.updatedAt ?? variant.updated_at,
+  assessment: variant.assessment
+    ? {
+        id: variant.assessment.id,
+        name: variant.assessment.name,
+        type: variant.assessment.type,
+        semester: variant.assessment.semester,
+        createdAt: variant.assessment.createdAt ?? '',
+        updatedAt: variant.assessment.updatedAt ?? ''
+      }
+    : undefined
 });
 
 const mapQuestion = (item: any): Question => ({
