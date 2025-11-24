@@ -5,9 +5,9 @@ import './index.css'
 import { ThemeProvider } from './components/theme-provider'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <ThemeProvider defaultTheme="dark" storageKey="eduquery-theme">
-      <App />
-    </ThemeProvider>
-  </React.StrictMode>,
+    <React.StrictMode>
+        <ThemeProvider defaultTheme="light" storageKey="eduquery-theme">
+            <App />
+        </ThemeProvider>
+    </React.StrictMode>,
 ) 
