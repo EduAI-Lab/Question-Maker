@@ -198,3 +198,88 @@ export const updateVariantOrderInSection = async (sectionId, userId, variantId, 
 
   return link;
 };
+
+/**
+ * Remove all section variant links for a question across all assessments
+ * This is used when marking a question as draft to remove it from all assessments
+ * @param {number} questionId - The question metadata ID
+ * @param {number} userId - The user ID for authorization
+ * @returns {Promise<{removedLinks: number, affectedAssessments: number[]}>} - Number of links removed and affected assessment IDs
+ */
+export const removeQuestionFromAllSections = async (questionId, userId) => {
+  // Verify user owns the question
+  const question = await Question_Metadata.findOne({
+    where: { id: questionId },
+    include: [
+      {
+        model: Course,
+        as: 'course',
+        where: { userId },
+        attributes: ['id']
+      }
+    ]
+  });
+
+  if (!question) {
+    throw new Error('Question not found');
+  }
+
+  // Find all variants of this question
+  const variants = await Variants.findAll({
+    where: { questionMetadataId: questionId }
+  });
+
+  if (variants.length === 0) {
+    return { removedLinks: 0, affectedAssessments: [] };
+  }
+
+  const variantIds = variants.map((v) => v.id);
+
+  // Find all section variant links for these variants
+  const sectionVariantLinks = await SectionVariants.findAll({
+    where: { variantId: variantIds },
+    include: [
+      {
+        model: AssessmentSections,
+        as: 'section',
+        attributes: ['id', 'assessmentId'],
+        include: [
+          {
+            model: Assessments,
+            as: 'assessment',
+            attributes: ['id']
+          }
+        ]
+      }
+    ]
+  });
+
+  if (sectionVariantLinks.length === 0) {
+    return { removedLinks: 0, affectedAssessments: [] };
+  }
+
+  // Get unique assessment IDs
+  const affectedAssessmentIds = new Set();
+  sectionVariantLinks.forEach((link) => {
+    if (link.section?.assessment?.id) {
+      affectedAssessmentIds.add(link.section.assessment.id);
+    }
+  });
+
+  // Delete all section variant links
+  const deletedCount = await SectionVariants.destroy({
+    where: { variantId: variantIds }
+  });
+
+  // Update questionOrder for each affected assessment
+  const currentOrder = question.questionOrder || {};
+  affectedAssessmentIds.forEach((assessmentId) => {
+    delete currentOrder[assessmentId];
+  });
+  await question.update({ questionOrder: currentOrder });
+
+  return {
+    removedLinks: deletedCount,
+    affectedAssessments: Array.from(affectedAssessmentIds)
+  };
+};

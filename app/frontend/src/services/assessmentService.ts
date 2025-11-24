@@ -99,6 +99,15 @@ export const assessmentService = {
     await api.delete(
       `/api/assessments/${assessmentId}/sections/${sectionId}/variants/${variantId}`
     );
+  },
+
+  async removeQuestionFromAssessment(assessmentId: number, questionId: number): Promise<void> {
+    await api.delete(`/api/assessments/${assessmentId}/questions/${questionId}`);
+  },
+
+  async removeQuestionFromAllSections(questionId: number): Promise<{ removedLinks: number; affectedAssessments: number[] }> {
+    const response = await api.delete(`/api/assessments/questions/${questionId}/remove-from-all-sections`);
+    return response.data.data;
   }
 };
 

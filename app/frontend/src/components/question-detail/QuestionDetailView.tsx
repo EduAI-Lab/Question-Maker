@@ -4,6 +4,7 @@ import { Badge } from '../ui/badge';
 import { X, Copy, Trash2, ArrowLeft, Sparkles, FileEdit } from 'lucide-react';
 import { QuestionVariantEntry } from '../../types/question';
 import { questionService } from '../../services/questionService';
+import { assessmentService } from '../../services/assessmentService';
 import { useToast } from '../ui/use-toast';
 
 const DetailItem = ({
@@ -143,6 +144,46 @@ export const QuestionDetailView = ({
     const handleToggleDraft = async () => {
         try {
             setIsTogglingDraft(true);
+            
+            // If marking as draft, check if question is in any assessments
+            if (!entry.isDraft) {
+                // Fetch the full question to get questionOrder
+                const fullQuestion = await questionService.getQuestion(entry.questionId);
+                const questionOrder = fullQuestion.questionOrder || {};
+                const assessmentIds = Object.keys(questionOrder)
+                    .map((id) => Number(id))
+                    .filter((id) => Number.isInteger(id) && id > 0);
+                
+                if (assessmentIds.length > 0) {
+                    // Fetch assessment names
+                    const assessmentNames: string[] = [];
+                    for (const assessmentId of assessmentIds) {
+                        try {
+                            const assessment = await assessmentService.getAssessment(assessmentId);
+                            assessmentNames.push(assessment.name);
+                        } catch (error) {
+                            assessmentNames.push(`Assessment #${assessmentId}`);
+                        }
+                    }
+                    
+                    const assessmentList = assessmentNames.length === 1
+                        ? assessmentNames[0]
+                        : assessmentNames.join(', ');
+                    
+                    const confirmMessage = assessmentNames.length === 1
+                        ? `Question is in assessment ${assessmentList}. Do you wish to continue? This will remove the question from the assessment ${assessmentList}.`
+                        : `Question is in assessments ${assessmentList}. Do you wish to continue? This will remove the question from these assessments.`;
+                    
+                    if (!window.confirm(confirmMessage)) {
+                        setIsTogglingDraft(false);
+                        return;
+                    }
+                    
+                    // Remove question from all sections across all assessments
+                    await assessmentService.removeQuestionFromAllSections(entry.questionId);
+                }
+            }
+            
             const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
                 isDraft: !entry.isDraft
             });

@@ -25,6 +25,7 @@ import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
 import { useToast } from '../components/ui/use-toast';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
+import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
 
 const QUESTION_TYPES: QuestionType[] = ['MCQ', 'SA'];
 
@@ -748,6 +749,7 @@ interface MatchingQuestionsPanelProps {
   onAddSelected: () => void;
   onCreateNewQuestion: () => void;
   onAddVariant: (question: Question) => void;
+  onViewQuestion?: (question: Question) => void;
   isSearching: boolean;
   isCreatingSection: boolean;
   searchError: string | null;
@@ -770,6 +772,7 @@ const MatchingQuestionsPanel = ({
   onAddSelected,
   onCreateNewQuestion,
   onAddVariant,
+  onViewQuestion,
   isSearching,
   isCreatingSection,
   searchError,
@@ -817,6 +820,7 @@ const MatchingQuestionsPanel = ({
         <div className="max-h-[480px] space-y-3 overflow-y-auto pr-1">
           {questions.map((question) => {
             const isSelected = selectedQuestionIds.has(question.id);
+            const isDraft = question.isDraft ?? false;
             const primaryVariant = question.variants?.[0];
             const displayText =
               primaryVariant?.questionText ||
@@ -833,9 +837,13 @@ const MatchingQuestionsPanel = ({
             return (
               <div
                 key={question.id}
-                onClick={() => onToggleQuestion(question)}
-                className={`flex items-start gap-3 rounded border px-3 py-3 text-sm cursor-pointer ${
-                  isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
+                onClick={() => !isDraft && onToggleQuestion(question)}
+                className={`flex items-start gap-3 rounded border px-3 py-3 text-sm ${
+                  isDraft
+                    ? 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
+                    : isSelected
+                      ? 'border-primary bg-primary/5 cursor-pointer'
+                      : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
                 }`}
               >
                 <input
@@ -843,24 +851,40 @@ const MatchingQuestionsPanel = ({
                   checked={isSelected}
                   onChange={() => onToggleQuestion(question)}
                   onClick={(e) => e.stopPropagation()}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 cursor-pointer"
+                  disabled={isDraft}
+                  className={`mt-1 h-4 w-4 rounded border-gray-300 ${isDraft ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                 />
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{question.type}</Badge>
                     <p className="font-medium flex-1">{displayText}</p>
-                    <Button
-                      type="button"
-                      variant="default"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddVariant(question);
-                      }}
-                      className="text-xs bg-black text-white hover:bg-gray-800"
-                    >
-                      Variant
-                    </Button>
+                    {isDraft ? (
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewQuestion?.(question);
+                        }}
+                        className="text-xs bg-green-600 text-white hover:bg-green-700"
+                      >
+                        Review
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAddVariant(question);
+                        }}
+                        className="text-xs bg-black text-white hover:bg-gray-800"
+                      >
+                        Variant
+                      </Button>
+                    )}
                   </div>
                   {primaryVariant?.questionText && question.description && (
                     <p className="text-xs text-muted-foreground">{question.description}</p>
@@ -956,6 +980,7 @@ export const AssessmentViewPage = () => {
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
   const [lastFilters, setLastFilters] = useState<QuestionSearchFilters | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
 
   const resetBuilderContext = () => {
     setMatchingQuestions([]);
@@ -1112,6 +1137,10 @@ export const AssessmentViewPage = () => {
   };
 
   const handleToggleQuestionSelection = (question: Question) => {
+    // Don't allow selecting draft questions
+    if (question.isDraft) {
+      return;
+    }
     const questionId = question.id;
     const isSelected = selectedQuestionIds.has(questionId);
     const defaultVariantId = question.variants?.[0]?.id;
@@ -1133,6 +1162,98 @@ export const AssessmentViewPage = () => {
       }
       return next;
     });
+  };
+
+  const handleViewQuestion = (question: Question) => {
+    // Convert Question to QuestionVariantEntry
+    const primaryVariant = question.variants?.[0];
+    if (!primaryVariant) {
+      toast({
+        variant: 'destructive',
+        title: 'No variant found',
+        description: 'This question has no variants to display.'
+      });
+      return;
+    }
+
+    const resolveTopicName = (topicId: number) => topicsById[topicId]?.name ?? `Topic ${topicId}`;
+    const secondaryTopicNames = Array.isArray(primaryVariant.secondaryTopicsId)
+      ? (primaryVariant.secondaryTopicsId
+          .map((topicId) => resolveTopicName(topicId))
+          .filter(Boolean) as string[])
+      : undefined;
+
+    const entry: QuestionVariantEntry = {
+      questionId: question.id,
+      questionDescription: question.description,
+      questionType: question.type,
+      primaryTopicId: question.primaryTopicId,
+      primaryTopicName: resolveTopicName(question.primaryTopicId),
+      courseId: question.courseId,
+      courseName: question.course?.name,
+      courseCode: question.course?.code,
+      secondaryTopicNames:
+        secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+      isAiGenerated: question.isAiGenerated,
+      isDraft: question.isDraft,
+      variant: primaryVariant
+    };
+
+    setSelectedVariant(entry);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedVariant(null);
+  };
+
+  const handleViewVariant = async (entry: QuestionVariantEntry) => {
+    setSelectedVariant(entry);
+    // Refresh the question in the matching questions list if it was updated
+    const question = matchingQuestions.find((q) => q.id === entry.questionId);
+    if (question) {
+      try {
+        const updatedQuestion = await questionService.getQuestion(entry.questionId);
+        setMatchingQuestions((prev) =>
+          prev.map((q) => (q.id === entry.questionId ? updatedQuestion : q))
+        );
+      } catch (error) {
+        console.error('Failed to refresh question', error);
+      }
+    }
+  };
+
+  const handleCreateVariant = (entry: QuestionVariantEntry) => {
+    setPresetVariant(entry);
+    setIsAddQuestionOpen(true);
+    setSelectedVariant(null);
+  };
+
+  const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
+    try {
+      const question = matchingQuestions.find((item) => item.id === entry.questionId);
+      if (!question) {
+        return;
+      }
+
+      const isLastVariant = (question.variants?.length ?? 0) <= 1;
+      if (isLastVariant) {
+        await questionService.deleteQuestion(question.id);
+        setMatchingQuestions((prev) => prev.filter((item) => item.id !== question.id));
+      } else {
+        await questionService.deleteVariant(entry.variant.id);
+        setMatchingQuestions((prev) =>
+          prev.map((item) =>
+            item.id === question.id
+              ? { ...item, variants: item.variants?.filter((variant) => variant.id !== entry.variant.id) ?? [] }
+              : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Failed to delete variant', error);
+    } finally {
+      setSelectedVariant(null);
+    }
   };
 
   const clearQuestionSelection = () => {
@@ -1597,6 +1718,7 @@ export const AssessmentViewPage = () => {
                     onAddSelected={handleFinalizeSection}
                     onCreateNewQuestion={handleCreateNewQuestion}
                     onAddVariant={handleAddVariant}
+                    onViewQuestion={handleViewQuestion}
                     isSearching={isSearchingQuestions}
                     isCreatingSection={isCreatingSection}
                     searchError={questionSearchError}
@@ -1633,6 +1755,18 @@ export const AssessmentViewPage = () => {
               description: `Assessment exported to Canvas. Quiz ID: ${result.quizId}`,
             });
           }}
+        />
+      )}
+      {selectedVariant && (
+        <QuestionDetailView
+          entry={selectedVariant}
+          relatedVariants={questionVariantEntries.filter(
+            (entry) => entry.questionId === selectedVariant.questionId
+          )}
+          onClose={handleCloseDetail}
+          onCreateVariant={handleCreateVariant}
+          onDeleteVariant={handleDeleteVariant}
+          onSelectVariant={handleViewVariant}
         />
       )}
     </div>
