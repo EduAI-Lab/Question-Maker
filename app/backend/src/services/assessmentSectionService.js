@@ -200,6 +200,78 @@ export const updateVariantOrderInSection = async (sectionId, userId, variantId, 
 };
 
 /**
+ * Check if a question is linked to any assessment sections
+ * @param {number} questionId - The question metadata ID
+ * @param {number} userId - The user ID for authorization
+ * @returns {Promise<{isInAssessments: boolean, assessmentIds: number[]}>} - Whether question is in assessments and which assessment IDs
+ */
+export const checkQuestionInAssessments = async (questionId, userId) => {
+  // Verify user owns the question
+  const question = await Question_Metadata.findOne({
+    where: { id: questionId },
+    include: [
+      {
+        model: Course,
+        as: 'course',
+        where: { userId },
+        attributes: ['id']
+      }
+    ]
+  });
+
+  if (!question) {
+    throw new Error('Question not found');
+  }
+
+  // Find all variants of this question
+  const variants = await Variants.findAll({
+    where: { questionMetadataId: questionId }
+  });
+
+  if (variants.length === 0) {
+    return { isInAssessments: false, assessmentIds: [] };
+  }
+
+  const variantIds = variants.map((v) => v.id);
+
+  // Find all section variant links for these variants
+  const sectionVariantLinks = await SectionVariants.findAll({
+    where: { variantId: variantIds },
+    include: [
+      {
+        model: AssessmentSections,
+        as: 'section',
+        attributes: ['id', 'assessmentId'],
+        include: [
+          {
+            model: Assessments,
+            as: 'assessment',
+            attributes: ['id']
+          }
+        ]
+      }
+    ]
+  });
+
+  if (sectionVariantLinks.length === 0) {
+    return { isInAssessments: false, assessmentIds: [] };
+  }
+
+  // Get unique assessment IDs
+  const assessmentIds = new Set();
+  sectionVariantLinks.forEach((link) => {
+    if (link.section?.assessment?.id) {
+      assessmentIds.add(link.section.assessment.id);
+    }
+  });
+
+  return {
+    isInAssessments: assessmentIds.size > 0,
+    assessmentIds: Array.from(assessmentIds)
+  };
+};
+
+/**
  * Remove all section variant links for a question across all assessments
  * This is used when marking a question as draft to remove it from all assessments
  * @param {number} questionId - The question metadata ID

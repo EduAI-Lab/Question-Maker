@@ -105,6 +105,11 @@ export const assessmentService = {
     await api.delete(`/api/assessments/${assessmentId}/questions/${questionId}`);
   },
 
+  async checkQuestionInAssessments(questionId: number): Promise<{ isInAssessments: boolean; assessmentIds: number[] }> {
+    const response = await api.get(`/api/assessments/questions/${questionId}/check-in-assessments`);
+    return response.data.data;
+  },
+
   async removeQuestionFromAllSections(questionId: number): Promise<{ removedLinks: number; affectedAssessments: number[] }> {
     const response = await api.delete(`/api/assessments/questions/${questionId}/remove-from-all-sections`);
     return response.data.data;

@@ -145,19 +145,15 @@ export const QuestionDetailView = ({
         try {
             setIsTogglingDraft(true);
             
-            // If marking as draft, check if question is in any assessments
+            // If marking as draft, check if question is actually in any assessments
             if (!entry.isDraft) {
-                // Fetch the full question to get questionOrder
-                const fullQuestion = await questionService.getQuestion(entry.questionId);
-                const questionOrder = fullQuestion.questionOrder || {};
-                const assessmentIds = Object.keys(questionOrder)
-                    .map((id) => Number(id))
-                    .filter((id) => Number.isInteger(id) && id > 0);
+                // Check actual section variant links instead of relying on questionOrder
+                const checkResult = await assessmentService.checkQuestionInAssessments(entry.questionId);
                 
-                if (assessmentIds.length > 0) {
+                if (checkResult.isInAssessments && checkResult.assessmentIds.length > 0) {
                     // Fetch assessment names
                     const assessmentNames: string[] = [];
-                    for (const assessmentId of assessmentIds) {
+                    for (const assessmentId of checkResult.assessmentIds) {
                         try {
                             const assessment = await assessmentService.getAssessment(assessmentId);
                             assessmentNames.push(assessment.name);
