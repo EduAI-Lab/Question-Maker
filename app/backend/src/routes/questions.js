@@ -26,6 +26,8 @@ router.post('/', authenticateToken, async (req, res, next) => {
     const rawPrimaryTopicId = req.body.primaryTopicId;
     const type = req.body.type || 'MCQ';
     const questionOrder = req.body.questionOrder;
+    const isAiGenerated = req.body.isAiGenerated;
+    const isDraft = req.body.isDraft;
 
     const allowedTypes = ['MCQ', 'SA'];
     if (type && !allowedTypes.includes(type)) {
@@ -63,7 +65,9 @@ router.post('/', authenticateToken, async (req, res, next) => {
       courseId,
       primaryTopicId,
       type,
-      questionOrder
+      questionOrder,
+      isAiGenerated,
+      isDraft
     });
 
     res.status(201).json({

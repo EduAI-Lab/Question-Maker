@@ -596,13 +596,16 @@ export const AddQuestionDialog = ({
                 }
             }
 
+            // Ensure isAiGenerated is set correctly - if AI generation was used, it should be true
+            const shouldMarkAsAiGenerated = isAiGenerated === true;
+            
             const createdQuestion = await questionService.createQuestion({
                 description,
                 courseId,
                 primaryTopicId,
                 type: form.questionType,
                 questionOrder,
-                isAiGenerated,
+                isAiGenerated: shouldMarkAsAiGenerated,
                 isDraft: !markAsReviewed // Inverted: if marked as reviewed, then NOT a draft
             });
 
