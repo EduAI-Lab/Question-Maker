@@ -55,7 +55,8 @@ export const createQuestion = async (userId, questionData) => {
       primaryTopicId,
       type = 'MCQ',
       questionOrder = {},
-      isAiGenerated = false
+      isAiGenerated = false,
+      isDraft = true // All new questions start as drafts until reviewed
     } = questionData;
 
     if (!description || !description.trim()) {
@@ -90,7 +91,8 @@ export const createQuestion = async (userId, questionData) => {
       type: normalizedType,
       description: description.trim(),
       questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {},
-      isAiGenerated: Boolean(isAiGenerated)
+      isAiGenerated: Boolean(isAiGenerated),
+      isDraft: Boolean(isDraft)
     });
 
     return question;
@@ -241,6 +243,10 @@ export const updateQuestion = async (questionId, userId, updateData) => {
 
     if (updates.isAiGenerated !== undefined) { //mock for AI generated questions
       updates.isAiGenerated = Boolean(updates.isAiGenerated);
+    }
+
+    if (updates.isDraft !== undefined) {
+      updates.isDraft = Boolean(updates.isDraft);
     }
 
     await question.update(updates);

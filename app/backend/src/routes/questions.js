@@ -138,7 +138,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const { description, content, courseId, classId, type, primaryTopicId, questionOrder, isAiGenerated } = req.body; //mock for AI generated questions
+    const { description, content, courseId, classId, type, primaryTopicId, questionOrder, isAiGenerated, isDraft } = req.body; //mock for AI generated questions
 
     const updates = {};
 
@@ -192,6 +192,10 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
 
     if (isAiGenerated !== undefined) {
       updates.isAiGenerated = Boolean(isAiGenerated);
+    }
+
+    if (isDraft !== undefined) {
+      updates.isDraft = Boolean(isDraft);
     }
 
     if (Object.keys(updates).length === 0) {

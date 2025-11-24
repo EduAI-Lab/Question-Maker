@@ -46,6 +46,13 @@ export const Question_Metadata = sequelize.define('Question_Metadata', {
     field: 'is_ai_generated',
     comment: 'Indicates if this question was generated using AI'
   },
+  isDraft: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+    field: 'is_draft',
+    comment: 'Indicates if this question is a draft and needs review before being added to assessments. All new questions start as drafts.'
+  },
   createdAt: {
     type: DataTypes.DATE,
     allowNull: false,
