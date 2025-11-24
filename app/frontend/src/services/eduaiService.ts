@@ -76,6 +76,8 @@ export interface EduAICourseOption {
     code: string;
     name: string;
     description?: string;
+    term?: string;
+    year?: number;
 }
 
 export interface EduAITopicOption {
@@ -155,8 +157,9 @@ const MOCK_COURSE_OPTIONS: EduAICourseOption[] = [
     }
 ];
 
-const MOCK_COURSE_TOPICS: Record<string, EduAITopicOption[]> = {
-    COSC211: [
+// Mock topics mapped by course code (without spaces)
+const MOCK_COURSE_TOPICS_BY_CODE: Record<string, EduAITopicOption[]> = {
+    'COSC211': [
         { id: 'cosc211-1', name: 'Instruction Set Architectures' },
         { id: 'cosc211-2', name: 'Pipeline Design' },
         { id: 'cosc211-3', name: 'Cache Coherence Strategies' },
@@ -164,7 +167,7 @@ const MOCK_COURSE_TOPICS: Record<string, EduAITopicOption[]> = {
         { id: 'cosc211-5', name: 'Parallel Execution Models' },
         { id: 'cosc211-6', name: 'Performance Benchmarking' }
     ],
-    COSC121: [
+    'COSC121': [
         { id: 'cosc121-1', name: 'Object-Oriented Design' },
         { id: 'cosc121-2', name: 'Data Structures Fundamentals' },
         { id: 'cosc121-3', name: 'Algorithm Analysis' },
@@ -215,19 +218,59 @@ class EduAIService {
     }
 
     /**
-     * Mock: Return EduAI course inventory.
-     * Replace with real API call when endpoint is available.
+     * Retrieve all courses from EduAI via backend proxy.
+     * Each unique combination of code, name, term, and year is a separate course.
      */
     async listCourses(): Promise<EduAICourseOption[]> {
-        return MOCK_COURSE_OPTIONS;
+        try {
+            const response = await api.get('/api/eduai/courses');
+            const coursesData = response.data.data;
+
+            // Transform EduAI API response to our format
+            if (coursesData && Array.isArray(coursesData.courses)) {
+                return coursesData.courses.map((course: any) => ({
+                    id: course.id,
+                    code: course.code,
+                    name: course.name,
+                    description: course.description || `${course.term} ${course.year}`,
+                    term: course.term,
+                    year: course.year
+                }));
+            }
+
+            return [];
+        } catch (error) {
+            console.error('Failed to fetch courses from EduAI:', error);
+            throw error;
+        }
     }
 
     /**
      * Mock: Return topic list for a course.
+     * Topics are looked up by course code (e.g., "COSC 211" -> "COSC211")
+     * courseIdOrCode can be either the EduAI course UUID or the course code
      * Replace with live API call when endpoint is available.
      */
-    async listCourseTopics(courseId: string): Promise<EduAITopicOption[]> {
-        return MOCK_COURSE_TOPICS[courseId] ?? [];
+    async listCourseTopics(courseIdOrCode: string, courseCode?: string): Promise<EduAITopicOption[]> {
+        // For now, skip the live endpoint since it doesn't work yet
+        // Use mock topics based on course code
+        const codeToMatch = courseCode || courseIdOrCode;
+        const normalizedCode = codeToMatch.replace(/\s+/g, '').toUpperCase();
+
+        // Try exact match first (e.g., "COSC211")
+        if (MOCK_COURSE_TOPICS_BY_CODE[normalizedCode]) {
+            return MOCK_COURSE_TOPICS_BY_CODE[normalizedCode];
+        }
+
+        // Try with space variations (e.g., "COSC 211" -> "COSC211")
+        for (const [code, topics] of Object.entries(MOCK_COURSE_TOPICS_BY_CODE)) {
+            const normalizedMockCode = code.replace(/\s+/g, '');
+            if (normalizedCode === normalizedMockCode) {
+                return topics;
+            }
+        }
+
+        return [];
     }
 
     /**

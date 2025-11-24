@@ -79,7 +79,8 @@ export const ProfileCoursesDialog = ({
 
                 const entries = await Promise.all(
                     options.map(async (option) => {
-                        const topics = await eduaiService.listCourseTopics(option.id);
+                        // Pass both the course ID and code to help with topic lookup
+                        const topics = await eduaiService.listCourseTopics(option.id, option.code);
                         return [option.id, topics] as const;
                     })
                 );
@@ -244,6 +245,11 @@ export const ProfileCoursesDialog = ({
                                                 <span className="text-sm font-semibold text-foreground">
                                                     {option.code} · {option.name}
                                                 </span>
+                                                {option.term && option.year && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                        {option.term} {option.year}
+                                                    </Badge>
+                                                )}
                                                 {isAdded && <Badge variant="outline">Already added</Badge>}
                                                 {isSelected && !isAdded && !isSaving && (
                                                     <Badge variant="secondary">Selected</Badge>
