@@ -145,41 +145,6 @@ export const QuestionDetailView = ({
         try {
             setIsTogglingDraft(true);
             
-            // If marking as draft, check if question is actually in any assessments
-            if (!entry.isDraft) {
-                // Check actual section variant links instead of relying on questionOrder
-                const checkResult = await assessmentService.checkQuestionInAssessments(entry.questionId);
-                
-                if (checkResult.isInAssessments && checkResult.assessmentIds.length > 0) {
-                    // Fetch assessment names
-                    const assessmentNames: string[] = [];
-                    for (const assessmentId of checkResult.assessmentIds) {
-                        try {
-                            const assessment = await assessmentService.getAssessment(assessmentId);
-                            assessmentNames.push(assessment.name);
-                        } catch (error) {
-                            assessmentNames.push(`Assessment #${assessmentId}`);
-                        }
-                    }
-                    
-                    const assessmentList = assessmentNames.length === 1
-                        ? assessmentNames[0]
-                        : assessmentNames.join(', ');
-                    
-                    const confirmMessage = assessmentNames.length === 1
-                        ? `Question is in assessment ${assessmentList}. Do you wish to continue? This will remove the question from the assessment ${assessmentList}.`
-                        : `Question is in assessments ${assessmentList}. Do you wish to continue? This will remove the question from these assessments.`;
-                    
-                    if (!window.confirm(confirmMessage)) {
-                        setIsTogglingDraft(false);
-                        return;
-                    }
-                    
-                    // Remove question from all sections across all assessments
-                    await assessmentService.removeQuestionFromAllSections(entry.questionId);
-                }
-            }
-            
             const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
                 isDraft: !entry.isDraft
             });

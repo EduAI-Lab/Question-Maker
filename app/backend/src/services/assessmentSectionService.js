@@ -66,7 +66,7 @@ export const getSectionsForAssessment = async (assessmentId, userId) => {
               {
                 model: Question_Metadata,
                 as: 'questionMetadata',
-                attributes: ['id', 'description', 'type', 'questionOrder'],
+                attributes: ['id', 'description', 'type', 'questionOrder', 'isDraft'],
                 include: [
                   {
                     model: Course,

@@ -4,7 +4,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, ChevronUp, ChevronDown, Eye, Upload } from 'lucide-react';
+import { Plus, ChevronUp, ChevronDown, Eye, Upload, AlertTriangle } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
@@ -67,6 +67,17 @@ const buildQuestionEntries = (assessment: Assessment): QuestionEntry[] => {
   });
 
   return Array.from(map.values()).sort((a, b) => a.order - b.order);
+};
+
+const hasDraftQuestions = (assessment: Assessment): boolean => {
+  if (!assessment.sections || assessment.sections.length === 0) {
+    return false;
+  }
+  return assessment.sections.some((section) =>
+    section.sectionVariants?.some(
+      (link) => link.variant?.questionMetadata?.isDraft === true
+    )
+  );
 };
 
 export const AssessmentSection = ({
@@ -149,6 +160,7 @@ export const AssessmentSection = ({
             const difficulty = blueprint?.difficultyDistribution;
             const primaryCount = blueprint?.primaryTopicIds?.length ?? 0;
             const secondaryCount = blueprint?.secondaryTopicIds?.length ?? 0;
+            const hasDrafts = hasDraftQuestions(assessment);
 
             return (
               <Card key={assessment.id} className="hover:shadow-md transition-shadow">
@@ -163,6 +175,12 @@ export const AssessmentSection = ({
                       <Badge variant="outline">
                         {assessmentQuestions.length} questions
                       </Badge>
+                      {hasDrafts && (
+                        <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Contains Draft questions
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2">
                       <Button
@@ -179,7 +197,9 @@ export const AssessmentSection = ({
                           variant="outline"
                           size="sm"
                           onClick={() => onExportToCanvas(assessment.id, assessment.name)}
-                          className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                          disabled={hasDrafts}
+                          title={hasDrafts ? 'Cannot export: Assessment contains draft questions. Please review all draft questions before exporting.' : 'Export assessment to Canvas'}
+                          className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <Upload className="h-4 w-4" />
                           <span>Export to Canvas</span>

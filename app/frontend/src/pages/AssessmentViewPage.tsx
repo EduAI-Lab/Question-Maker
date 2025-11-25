@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload, AlertTriangle } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
@@ -837,13 +837,11 @@ const MatchingQuestionsPanel = ({
             return (
               <div
                 key={question.id}
-                onClick={() => !isDraft && onToggleQuestion(question)}
+                onClick={() => onToggleQuestion(question)}
                 className={`flex items-start gap-3 rounded border px-3 py-3 text-sm ${
-                  isDraft
-                    ? 'border-gray-200 bg-gray-100 opacity-60 cursor-not-allowed'
-                    : isSelected
-                      ? 'border-primary bg-primary/5 cursor-pointer'
-                      : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
+                  isSelected
+                    ? 'border-primary bg-primary/5 cursor-pointer'
+                    : 'border-gray-200 hover:bg-gray-50 cursor-pointer'
                 }`}
               >
                 <input
@@ -851,12 +849,16 @@ const MatchingQuestionsPanel = ({
                   checked={isSelected}
                   onChange={() => onToggleQuestion(question)}
                   onClick={(e) => e.stopPropagation()}
-                  disabled={isDraft}
-                  className={`mt-1 h-4 w-4 rounded border-gray-300 ${isDraft ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 cursor-pointer"
                 />
                 <div className="flex-1 space-y-1">
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{question.type}</Badge>
+                    {isDraft && (
+                      <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300">
+                        Draft
+                      </Badge>
+                    )}
                     <p className="font-medium flex-1">{displayText}</p>
                     {isDraft ? (
                       <Button
@@ -1137,10 +1139,6 @@ export const AssessmentViewPage = () => {
   };
 
   const handleToggleQuestionSelection = (question: Question) => {
-    // Don't allow selecting draft questions
-    if (question.isDraft) {
-      return;
-    }
     const questionId = question.id;
     const isSelected = selectedQuestionIds.has(questionId);
     const defaultVariantId = question.variants?.[0]?.id;
@@ -1592,6 +1590,16 @@ export const AssessmentViewPage = () => {
     [sections]
   );
 
+  // Check if assessment has any draft questions
+  const hasDraftQuestions = useMemo(() => {
+    if (!sections || sections.length === 0) return false;
+    return sections.some((section) =>
+      section.sectionVariants?.some(
+        (link) => link.variant?.questionMetadata?.isDraft === true
+      )
+    );
+  }, [sections]);
+
   if (Number.isNaN(assessmentId)) {
     return (
       <div className="p-6">
@@ -1631,7 +1639,15 @@ export const AssessmentViewPage = () => {
             <Card>
               <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-2">
-                  <CardTitle className="text-2xl">{assessment.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-2xl">{assessment.name}</CardTitle>
+                    {hasDraftQuestions && (
+                      <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Contains Draft questions
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                     <Badge variant="outline">{assessment.type}</Badge>
                     <Badge variant="outline">{assessment.semester}</Badge>
@@ -1644,6 +1660,8 @@ export const AssessmentViewPage = () => {
                     variant="default"
                     size="sm"
                     onClick={() => setIsCanvasExportOpen(true)}
+                    disabled={hasDraftQuestions}
+                    title={hasDraftQuestions ? 'Cannot export: Assessment contains draft questions. Please review all draft questions before exporting.' : 'Export assessment to Canvas'}
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     Export to Canvas
