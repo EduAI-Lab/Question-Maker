@@ -26,6 +26,7 @@ import { Input } from '../components/ui/input';
 import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
+import { QuestionMetadataCard } from '../components/assessments/QuestionMetadataCard';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
 const QUESTION_TYPES: QuestionType[] = ['MCQ', 'SA'];
@@ -894,64 +895,16 @@ const MatchingQuestionsPanel = ({
         <div className="max-h-[480px] space-y-3 overflow-y-auto pr-1">
           {questions.map((question) => {
             const isSelected = selectedQuestionIds.has(question.id);
-            const primaryVariant = question.variants?.[0];
-            const displayText =
-              primaryVariant?.questionText ||
-              question.description ||
-              `Question #${question.id}`;
-            const secondaryTopicNames = Array.from(
-              new Set(
-                (question.variants ?? []).flatMap((variant) => variant.secondaryTopicsId ?? [])
-              )
-            )
-              .map((topicId) => topicsById[topicId]?.name)
-              .filter(Boolean) as string[];
 
             return (
-              <div
+              <QuestionMetadataCard
                 key={question.id}
-                onClick={() => onToggleQuestion(question)}
-                className={`flex items-start gap-3 rounded border px-3 py-3 text-sm cursor-pointer ${
-                  isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => onToggleQuestion(question)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 cursor-pointer"
-                />
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{question.type}</Badge>
-                    <p className="font-medium flex-1">{displayText}</p>
-                    <Button
-                      type="button"
-                      variant="default"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddVariant(question);
-                      }}
-                      className="text-xs bg-black text-white hover:bg-gray-800"
-                    >
-                      Variant
-                    </Button>
-                  </div>
-                  {primaryVariant?.questionText && question.description && (
-                    <p className="text-xs text-muted-foreground">{question.description}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Primary: {getTopicName(topicsById, question.primaryTopicId)}
-                  </p>
-                  {secondaryTopicNames.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Secondary: {secondaryTopicNames.join(', ')}
-                    </p>
-                  )}
-                </div>
-              </div>
+                question={question}
+                isSelected={isSelected}
+                onToggleSelection={() => onToggleQuestion(question)}
+                onAddVariant={() => onAddVariant(question)}
+                topicsById={topicsById}
+              />
             );
           })}
         </div>

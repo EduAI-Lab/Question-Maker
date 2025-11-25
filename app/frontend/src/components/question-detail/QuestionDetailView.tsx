@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { X, Copy, Trash2, ArrowLeft } from 'lucide-react';
@@ -58,6 +59,7 @@ export const QuestionDetailView = ({
     onDeleteVariant,
     onSelectVariant
 }: QuestionDetailViewProps) => {
+    const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
     const { variant } = entry;
     const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
@@ -247,10 +249,21 @@ export const QuestionDetailView = ({
                                 Relationships
                             </h3>
                             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                    label="Assessment linkage"
-                                    value={variant.assessmentId ?? 'Not linked'}
-                                />
+                                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        Assessment linkage
+                                    </p>
+                                    {variant.assessment ? (
+                                        <button
+                                            onClick={() => navigate(`/assessments/${variant.assessment!.id}`)}
+                                            className="mt-2 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+                                        >
+                                            {variant.assessment.name} ({variant.assessment.semester})
+                                        </button>
+                                    ) : (
+                                        <p className="mt-2 text-sm font-medium text-gray-900">Not linked</p>
+                                    )}
+                                </div>
                                 <DetailItem label="Reference variant" value={variant.referenceId ?? 'None'} />
                             </div>
                         </section>

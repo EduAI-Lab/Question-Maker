@@ -122,7 +122,42 @@ export const updateAssessmentSection = async (sectionId, userId, updates) => {
 
 export const deleteAssessmentSection = async (sectionId, userId) => {
   const section = await findSectionForUser(sectionId, userId);
+  const assessmentId = section.assessment.id;
+
+  // Get all variants in this section
+  const sectionVariants = await SectionVariants.findAll({
+    where: { sectionId },
+    attributes: ['variantId']
+  });
+
+  const variantIds = sectionVariants.map(sv => sv.variantId);
+
+  // Delete the section (this will cascade delete SectionVariants)
   await section.destroy();
+
+  // For each variant, check if it's still in any other sections of the same assessment
+  for (const variantId of variantIds) {
+    const otherSectionsCount = await SectionVariants.count({
+      where: { variantId },
+      include: [
+        {
+          model: AssessmentSections,
+          as: 'section',
+          where: { assessmentId },
+          attributes: []
+        }
+      ]
+    });
+
+    // If variant is not in any other sections of this assessment, clear the assessmentId
+    if (otherSectionsCount === 0) {
+      const variant = await Variants.findByPk(variantId);
+      if (variant && variant.assessmentId === assessmentId) {
+        await variant.update({ assessmentId: null });
+      }
+    }
+  }
+
   return true;
 };
 
@@ -153,8 +188,8 @@ const verifyVariantOwnership = async (variantId, userId) => {
 };
 
 export const addVariantToSection = async (sectionId, userId, variantId, options = {}) => {
-  await findSectionForUser(sectionId, userId);
-  await verifyVariantOwnership(variantId, userId);
+  const section = await findSectionForUser(sectionId, userId);
+  const variant = await verifyVariantOwnership(variantId, userId);
 
   const displayOrder = options.displayOrder ?? await SectionVariants.count({ where: { sectionId } });
 
@@ -165,11 +200,17 @@ export const addVariantToSection = async (sectionId, userId, variantId, options 
     metadata: options.metadata || null
   });
 
+  // Update the variant's assessmentId to link it to the assessment
+  const assessmentId = section.assessment.id;
+  if (variant.assessmentId !== assessmentId) {
+    await variant.update({ assessmentId });
+  }
+
   return link;
 };
 
 export const removeVariantFromSection = async (sectionId, userId, variantId) => {
-  await findSectionForUser(sectionId, userId);
+  const section = await findSectionForUser(sectionId, userId);
 
   const deleted = await SectionVariants.destroy({
     where: { sectionId, variantId }
@@ -177,6 +218,28 @@ export const removeVariantFromSection = async (sectionId, userId, variantId) => 
 
   if (!deleted) {
     throw new Error('Variant not found in section');
+  }
+
+  // Check if variant is in any other sections of the same assessment
+  const assessmentId = section.assessment.id;
+  const otherSectionsCount = await SectionVariants.count({
+    where: { variantId },
+    include: [
+      {
+        model: AssessmentSections,
+        as: 'section',
+        where: { assessmentId },
+        attributes: []
+      }
+    ]
+  });
+
+  // If variant is not in any other sections of this assessment, clear the assessmentId
+  if (otherSectionsCount === 0) {
+    const variant = await Variants.findByPk(variantId);
+    if (variant && variant.assessmentId === assessmentId) {
+      await variant.update({ assessmentId: null });
+    }
   }
 
   return true;
