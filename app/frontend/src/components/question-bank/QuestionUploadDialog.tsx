@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ScrollArea } from '../ui/scroll-area';
 import { Progress } from '../ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Tooltip } from '../ui/tooltip';
 import { useToast } from '../ui/use-toast';
 
 import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '../../types/question';
@@ -377,6 +378,25 @@ export const QuestionUploadDialog = ({
         if (!assessmentType || !assessmentName.trim() || !assessmentSemester.trim()) return false;
         return true;
     }, [assessmentName, assessmentSemester, assessmentType, courseId, includedDrafts.length, processingStage]);
+
+    const getDisabledReason = (): string | null => {
+        if (processingStage === 'saving') return null; // Don't show tooltip while saving
+        if (!canSave) {
+            const reasons: string[] = [];
+            if (!courseId) reasons.push('course');
+            if (includedDrafts.length === 0) reasons.push('at least one question selected');
+            if (!assessmentType) reasons.push('assessment type');
+            if (!assessmentName.trim()) reasons.push('assessment name');
+            if (!assessmentSemester.trim()) reasons.push('assessment semester');
+            
+            if (reasons.length > 0) {
+                return `Missing required: ${reasons.join(', ')}`;
+            }
+        }
+        return null;
+    };
+
+    const disabledReason = getDisabledReason();
 
     const handleCopyAll = useCallback(async () => {
         const lines = draftQuestions.map((draft, index) => {
@@ -826,10 +846,21 @@ export const QuestionUploadDialog = ({
                         <Button variant="outline" onClick={onClose}>
                             Cancel
                         </Button>
-                        <Button onClick={() => void handleSave()} disabled={!canSave}>
-                            {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create Questions
-                        </Button>
+                        {disabledReason ? (
+                            <Tooltip content={disabledReason} multiline>
+                                <span className="inline-block">
+                                    <Button onClick={() => void handleSave()} disabled={!canSave}>
+                                        {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Create Questions
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        ) : (
+                            <Button onClick={() => void handleSave()} disabled={!canSave}>
+                                {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Create Questions
+                            </Button>
+                        )}
                     </div>
                 </DialogFooter>
             </DialogContent>

@@ -4,7 +4,8 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, ChevronUp, ChevronDown, Eye, Upload } from 'lucide-react';
+import { Tooltip } from '../ui/tooltip';
+import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2 } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
@@ -15,6 +16,7 @@ interface AssessmentSectionProps {
   isLoading?: boolean;
   loadError?: string | null;
   onExportToCanvas?: (assessmentId: number, assessmentName: string) => void;
+  onDeleteAssessment?: (assessmentId: number, assessmentName: string) => void;
 }
 
 type QuestionEntry = {
@@ -39,31 +41,58 @@ const getAssessmentTypeColor = (type: string) => {
   }
 };
 
+// This method may be depreciated later because ideally sections should all have unique questions
+const countTotalQuestions = (assessment: Assessment): number => {
+  // Count total question instances across all sections (including duplicates)
+  if (!assessment.sections || assessment.sections.length === 0) {
+    return 0;
+  }
+
+  let totalCount = 0;
+  assessment.sections.forEach((section) => {
+    totalCount += (section.sectionVariants ?? []).length;
+  });
+
+  return totalCount;
+};
+
 const buildQuestionEntries = (assessment: Assessment): QuestionEntry[] => {
-  if (!assessment.variants || assessment.variants.length === 0) {
+  // Questions are organized through sections -> sectionVariants -> variant -> questionMetadata
+  if (!assessment.sections || assessment.sections.length === 0) {
     return [];
   }
 
   const map = new Map<number, QuestionEntry>();
 
-  assessment.variants.forEach((variant) => {
-    const metadata = variant.questionMetadata;
-    if (!metadata) {
-      return;
-    }
+  // Iterate through all sections
+  assessment.sections.forEach((section) => {
+    // Iterate through sectionVariants in each section
+    (section.sectionVariants ?? []).forEach((sectionVariant) => {
+      const variant = sectionVariant.variant;
+      if (!variant) {
+        return;
+      }
 
-    const orderValue = metadata.questionOrder?.[assessment.id];
-    const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
+      const metadata = variant.questionMetadata;
+      if (!metadata) {
+        return;
+      }
 
-    const existing = map.get(metadata.id);
-    if (!existing || order < existing.order) {
-      map.set(metadata.id, {
-        id: metadata.id,
-        description: metadata.description ?? null,
-        difficulty: variant.difficulty ?? 'medium',
-        order
-      });
-    }
+      // Use displayOrder from sectionVariant, or fallback to questionOrder
+      const orderValue = sectionVariant.displayOrder ?? metadata.questionOrder?.[assessment.id];
+      const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
+
+      const existing = map.get(metadata.id);
+      // Keep the entry with the lowest order (earliest position)
+      if (!existing || order < existing.order) {
+        map.set(metadata.id, {
+          id: metadata.id,
+          description: metadata.description ?? null,
+          difficulty: variant.difficulty ?? 'medium',
+          order
+        });
+      }
+    });
   });
 
   return Array.from(map.values()).sort((a, b) => a.order - b.order);
@@ -75,7 +104,8 @@ export const AssessmentSection = ({
   selectedCourseId,
   isLoading = false,
   loadError,
-  onExportToCanvas
+  onExportToCanvas,
+  onDeleteAssessment
 }: AssessmentSectionProps) => {
   const navigate = useNavigate();
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
@@ -145,6 +175,7 @@ export const AssessmentSection = ({
         <div className="space-y-4">
           {assessments.map((assessment) => {
             const assessmentQuestions = buildQuestionEntries(assessment);
+            const totalQuestionCount = countTotalQuestions(assessment);
             const blueprint = assessment.blueprintConfig;
             const difficulty = blueprint?.difficultyDistribution;
             const primaryCount = blueprint?.primaryTopicIds?.length ?? 0;
@@ -161,7 +192,7 @@ export const AssessmentSection = ({
                       </Badge>
                       <Badge variant="outline">{assessment.semester}</Badge>
                       <Badge variant="outline">
-                        {assessmentQuestions.length} questions
+                        {totalQuestionCount} questions
                       </Badge>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -175,14 +206,40 @@ export const AssessmentSection = ({
                         <span>View</span>
                       </Button>
                       {onExportToCanvas && (
+                        totalQuestionCount === 0 ? (
+                          <Tooltip content="No questions in assessment">
+                            <span className="inline-block">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled
+                                className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                              >
+                                <Upload className="h-4 w-4" />
+                                <span>Export to Canvas</span>
+                              </Button>
+                            </span>
+                          </Tooltip>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onExportToCanvas(assessment.id, assessment.name)}
+                            className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                          >
+                            <Upload className="h-4 w-4" />
+                            <span>Export to Canvas</span>
+                          </Button>
+                        )
+                      )}
+                      {onDeleteAssessment && (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => onExportToCanvas(assessment.id, assessment.name)}
-                          className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                          onClick={() => onDeleteAssessment(assessment.id, assessment.name)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
-                          <Upload className="h-4 w-4" />
-                          <span>Export to Canvas</span>
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       )}
                       <Button
