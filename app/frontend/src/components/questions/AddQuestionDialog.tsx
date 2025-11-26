@@ -95,6 +95,8 @@ export const AddQuestionDialog = ({
     const [courseDetails, setCourseDetails] = useState<Course | null>(null);
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [availableEduCourses, setAvailableEduCourses] = useState<EduAICourseOption[]>([]);
+    const [isAiGenerated, setIsAiGenerated] = useState(false);
+    const [markAsReviewed, setMarkAsReviewed] = useState(false); // false = draft (default), true = reviewed
     const { toast } = useToast();
 
     useEffect(() => {
@@ -105,6 +107,8 @@ export const AddQuestionDialog = ({
             setAssessments([]);
             setCourseDetails(null);
             setIsGenerating(false);
+            setIsAiGenerated(false);
+            setMarkAsReviewed(false);
             return;
         }
 
@@ -510,6 +514,7 @@ export const AddQuestionDialog = ({
                 };
             });
 
+            setIsAiGenerated(true);
             toast({
                 title: 'Question generated',
                 description: 'Review the generated text and adjust any details before saving.'
@@ -591,12 +596,17 @@ export const AddQuestionDialog = ({
                 }
             }
 
+            // Ensure isAiGenerated is set correctly - if AI generation was used, it should be true
+            const shouldMarkAsAiGenerated = isAiGenerated === true;
+            
             const createdQuestion = await questionService.createQuestion({
                 description,
                 courseId,
                 primaryTopicId,
                 type: form.questionType,
-                questionOrder
+                questionOrder,
+                isAiGenerated: shouldMarkAsAiGenerated,
+                isDraft: !markAsReviewed // Inverted: if marked as reviewed, then NOT a draft
             });
 
             await questionService.createVariant(createdQuestion.id, {
@@ -1084,21 +1094,47 @@ export const AddQuestionDialog = ({
                     </div>
                 </ScrollArea>
 
-                <DialogFooter className="pt-4">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                        Cancel
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={
-                            isSubmitting ||
-                            (form.mode === 'variant' && baseVariantOptions.length === 0) ||
-                            (form.mode === 'variant' && !form.baseSelection)
-                        }
-                    >
-                        {isSubmitting ? 'Saving...' : form.mode === 'new' ? 'Create Question' : 'Add Variant'}
-                    </Button>
+                <DialogFooter className="pt-4 flex-col sm:flex-row gap-3">
+                    <div className="flex items-center space-x-2">
+                        <input
+                            type="checkbox"
+                            id="mark-as-reviewed"
+                            checked={markAsReviewed}
+                            onChange={(e) => setMarkAsReviewed(e.target.checked)}
+                            disabled={isSubmitting || form.mode === 'variant'}
+                            className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <label
+                            htmlFor="mark-as-reviewed"
+                            className={`text-sm ${form.mode === 'variant' ? 'text-muted-foreground' : 'text-foreground'} cursor-pointer`}
+                        >
+                            Mark as reviewed
+                        </label>
+                    </div>
+                    <div className="flex gap-2 ml-auto">
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={
+                                isSubmitting ||
+                                (form.mode === 'variant' && baseVariantOptions.length === 0) ||
+                                (form.mode === 'variant' && !form.baseSelection)
+                            }
+                        >
+                            {isSubmitting
+                                ? 'Saving...'
+                                : form.mode === 'new'
+                                    ? markAsReviewed
+                                        ? 'Add reviewed question'
+                                        : 'Save as draft'
+                                    : markAsReviewed
+                                        ? 'Save reviewed variant'
+                                        : 'Save variant draft'}
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

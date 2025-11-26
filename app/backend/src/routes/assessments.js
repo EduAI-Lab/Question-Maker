@@ -16,7 +16,9 @@ import {
   deleteAssessmentSection,
   addVariantToSection,
   removeVariantFromSection,
-  updateVariantOrderInSection
+  updateVariantOrderInSection,
+  removeQuestionFromAllSections,
+  checkQuestionInAssessments
 } from '../services/assessmentSectionService.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -318,6 +320,41 @@ router.delete('/:assessmentId/sections/:sectionId/variants/:variantId', authenti
     res.json({
       success: true,
       message: 'Variant removed from section successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Check if question is in any assessment sections
+router.get('/questions/:questionId/check-in-assessments', authenticateToken, async (req, res, next) => {
+  try {
+    const result = await checkQuestionInAssessments(
+      Number(req.params.questionId),
+      req.user.id
+    );
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Remove question from all sections across all assessments
+router.delete('/questions/:questionId/remove-from-all-sections', authenticateToken, async (req, res, next) => {
+  try {
+    const result = await removeQuestionFromAllSections(
+      Number(req.params.questionId),
+      req.user.id
+    );
+
+    res.json({
+      success: true,
+      message: 'Question removed from all sections successfully',
+      data: result
     });
   } catch (error) {
     next(error);

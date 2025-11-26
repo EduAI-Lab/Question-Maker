@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload } from 'lucide-react';
+import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload, AlertTriangle } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
@@ -26,6 +26,7 @@ import { Input } from '../components/ui/input';
 import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
+import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
 import { QuestionMetadataCard } from '../components/assessments/QuestionMetadataCard';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
@@ -348,12 +349,25 @@ const SectionCard = ({
   onDeleteVariant: (sectionId: number, variantId: number) => void;
 }) => {
   const questionCount = section.sectionVariants?.length ?? 0;
+  
+  // Check if this section has any draft questions
+  const hasDraftQuestions = section.sectionVariants?.some(
+    (link) => link.variant?.questionMetadata?.isDraft === true
+  ) ?? false;
 
   return (
     <Card className="border border-gray-200">
       <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col">
-          <CardTitle className="text-lg">{section.name}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg">{section.name}</CardTitle>
+            {hasDraftQuestions && (
+              <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Contains Draft questions
+              </Badge>
+            )}
+          </div>
           {section.sectionType && (
             <p className="text-sm text-muted-foreground capitalize">{section.sectionType}</p>
           )}
@@ -810,6 +824,8 @@ interface MatchingQuestionsPanelProps {
   onAddSelected: () => void;
   onCreateNewQuestion: () => void;
   onAddVariant: (question: Question) => void;
+  onViewQuestion?: (question: Question) => void;
+  onToggleReview: (questionId: number, nextDraft: boolean) => void;
   isSearching: boolean;
   isCreatingSection: boolean;
   searchError: string | null;
@@ -832,6 +848,8 @@ const MatchingQuestionsPanel = ({
   onAddSelected,
   onCreateNewQuestion,
   onAddVariant,
+  onViewQuestion,
+  onToggleReview,
   isSearching,
   isCreatingSection,
   searchError,
@@ -904,6 +922,7 @@ const MatchingQuestionsPanel = ({
                 onToggleSelection={() => onToggleQuestion(question)}
                 onAddVariant={() => onAddVariant(question)}
                 topicsById={topicsById}
+                onToggleReview={onToggleReview}
               />
             );
           })}
@@ -1000,6 +1019,7 @@ export const AssessmentViewPage = () => {
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
   const [lastFilters, setLastFilters] = useState<QuestionSearchFilters | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
   
   // Delete confirmation modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -1094,6 +1114,8 @@ export const AssessmentViewPage = () => {
           courseCode: question.course?.code,
           secondaryTopicNames:
             secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+          isAiGenerated: question.isAiGenerated,
+          isDraft: question.isDraft,
           variant
         };
       })
@@ -1184,6 +1206,98 @@ export const AssessmentViewPage = () => {
     });
   };
 
+  const handleViewQuestion = (question: Question) => {
+    // Convert Question to QuestionVariantEntry
+    const primaryVariant = question.variants?.[0];
+    if (!primaryVariant) {
+      toast({
+        variant: 'destructive',
+        title: 'No variant found',
+        description: 'This question has no variants to display.'
+      });
+      return;
+    }
+
+    const resolveTopicName = (topicId: number) => topicsById[topicId]?.name ?? `Topic ${topicId}`;
+    const secondaryTopicNames = Array.isArray(primaryVariant.secondaryTopicsId)
+      ? (primaryVariant.secondaryTopicsId
+          .map((topicId) => resolveTopicName(topicId))
+          .filter(Boolean) as string[])
+      : undefined;
+
+    const entry: QuestionVariantEntry = {
+      questionId: question.id,
+      questionDescription: question.description,
+      questionType: question.type,
+      primaryTopicId: question.primaryTopicId,
+      primaryTopicName: resolveTopicName(question.primaryTopicId),
+      courseId: question.courseId,
+      courseName: question.course?.name,
+      courseCode: question.course?.code,
+      secondaryTopicNames:
+        secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+      isAiGenerated: question.isAiGenerated,
+      isDraft: question.isDraft,
+      variant: primaryVariant
+    };
+
+    setSelectedVariant(entry);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedVariant(null);
+  };
+
+  const handleViewVariant = async (entry: QuestionVariantEntry) => {
+    setSelectedVariant(entry);
+    // Refresh the question in the matching questions list if it was updated
+    const question = matchingQuestions.find((q) => q.id === entry.questionId);
+    if (question) {
+      try {
+        const updatedQuestion = await questionService.getQuestion(entry.questionId);
+        setMatchingQuestions((prev) =>
+          prev.map((q) => (q.id === entry.questionId ? updatedQuestion : q))
+        );
+      } catch (error) {
+        console.error('Failed to refresh question', error);
+      }
+    }
+  };
+
+  const handleCreateVariant = (entry: QuestionVariantEntry) => {
+    setPresetVariant(entry);
+    setIsAddQuestionOpen(true);
+    setSelectedVariant(null);
+  };
+
+  const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
+    try {
+      const question = matchingQuestions.find((item) => item.id === entry.questionId);
+      if (!question) {
+        return;
+      }
+
+      const isLastVariant = (question.variants?.length ?? 0) <= 1;
+      if (isLastVariant) {
+        await questionService.deleteQuestion(question.id);
+        setMatchingQuestions((prev) => prev.filter((item) => item.id !== question.id));
+      } else {
+        await questionService.deleteVariant(entry.variant.id);
+        setMatchingQuestions((prev) =>
+          prev.map((item) =>
+            item.id === question.id
+              ? { ...item, variants: item.variants?.filter((variant) => variant.id !== entry.variant.id) ?? [] }
+              : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Failed to delete variant', error);
+    } finally {
+      setSelectedVariant(null);
+    }
+  };
+
   const clearQuestionSelection = () => {
     setSelectedQuestionIds(new Set());
     setSelectedVariantByQuestion({});
@@ -1237,6 +1351,8 @@ export const AssessmentViewPage = () => {
       secondaryTopicNames: primaryVariant.secondaryTopicsId
         ?.map((id) => availableTopics.find((t) => t.id === id)?.name)
         .filter(Boolean) as string[] | undefined,
+      isAiGenerated: question.isAiGenerated,
+      isDraft: question.isDraft,
       variant: variantWithAssessment
     };
     setPresetVariant(variantEntry);
@@ -1253,6 +1369,30 @@ export const AssessmentViewPage = () => {
       const filtered = prev.filter((question) => question.id !== newQuestion.id);
       return [newQuestion, ...filtered];
     });
+  };
+
+  const handleToggleQuestionReview = async (questionId: number, nextDraft: boolean) => {
+    try {
+      const updated = await questionService.updateQuestion(questionId, { isDraft: nextDraft });
+      setMatchingQuestions((prev) =>
+        prev.map((question) =>
+          question.id === questionId ? { ...question, isDraft: updated.isDraft } : question
+        )
+      );
+      if (selectedVariant?.questionId === questionId) {
+        setSelectedVariant({ ...selectedVariant, isDraft: updated.isDraft });
+      }
+      toast({
+        title: 'Review status updated',
+        description: `Question is now ${updated.isDraft ? 'marked as draft' : 'marked as reviewed'}.`
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to update review status',
+        description: error?.response?.data?.error || 'Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleDeleteAssessment = () => {
@@ -1279,6 +1419,8 @@ export const AssessmentViewPage = () => {
       });
     } finally {
       setIsDeletingAssessment(false);
+      setDeleteModalOpen(false);
+      setDeleteAction(null);
     }
   };
 
@@ -1526,6 +1668,16 @@ export const AssessmentViewPage = () => {
     [sections]
   );
 
+  // Check if assessment has any draft questions
+  const hasDraftQuestions = useMemo(() => {
+    if (!sections || sections.length === 0) return false;
+    return sections.some((section) =>
+      section.sectionVariants?.some(
+        (link) => link.variant?.questionMetadata?.isDraft === true
+      )
+    );
+  }, [sections]);
+
   const hasQuestions = useMemo(() => {
     // Count unique questions (questionMetadata IDs) across all sections
     const uniqueQuestionIds = new Set<number>();
@@ -1579,7 +1731,15 @@ export const AssessmentViewPage = () => {
             <Card>
               <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-2">
-                  <CardTitle className="text-2xl">{assessment.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-2xl">{assessment.name}</CardTitle>
+                    {hasDraftQuestions && (
+                      <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Contains Draft questions
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                     <Badge variant="outline">{assessment.type}</Badge>
                     <Badge variant="outline">{assessment.semester}</Badge>
@@ -1588,7 +1748,7 @@ export const AssessmentViewPage = () => {
                   {assessment.description && <p className="text-sm text-muted-foreground">{assessment.description}</p>}
                 </div>
                 <div className="flex gap-2">
-                  {hasQuestions ? (
+                  {hasQuestions && !hasDraftQuestions ? (
                     <Button
                       variant="default"
                       size="sm"
@@ -1598,7 +1758,16 @@ export const AssessmentViewPage = () => {
                       Export to Canvas
                     </Button>
                   ) : (
-                    <Tooltip content="No questions in assessment">
+                    <Tooltip 
+                      content={
+                        !hasQuestions 
+                          ? "No questions in assessment" 
+                          : hasDraftQuestions 
+                          ? "Cannot export: Assessment contains draft questions. Please review all draft questions before exporting."
+                          : "Export assessment to Canvas"
+                      }
+                      multiline
+                    >
                       <span className="inline-block">
                         <Button
                           variant="default"
@@ -1681,6 +1850,8 @@ export const AssessmentViewPage = () => {
                     onAddSelected={handleFinalizeSection}
                     onCreateNewQuestion={handleCreateNewQuestion}
                     onAddVariant={handleAddVariant}
+                    onViewQuestion={handleViewQuestion}
+                    onToggleReview={handleToggleQuestionReview}
                     isSearching={isSearchingQuestions}
                     isCreatingSection={isCreatingSection}
                     searchError={questionSearchError}
@@ -1718,37 +1889,49 @@ export const AssessmentViewPage = () => {
             });
           }}
         />
-      )}
-      <DeleteConfirmationModal
-        open={deleteModalOpen}
-        onOpenChange={setDeleteModalOpen}
-        onConfirm={async () => {
-          if (!deleteAction) return;
-          if (deleteAction.type === 'assessment') {
-            await confirmDeleteAssessment();
-          } else if (deleteAction.type === 'section') {
-            await confirmDeleteSection();
-          } else if (deleteAction.type === 'variant') {
-            await confirmDeleteVariant();
-          }
-        }}
-        title={
-          deleteAction?.type === 'assessment'
-            ? `Delete assessment "${assessment?.name}"?`
-            : deleteAction?.type === 'section'
-            ? `Delete section "${(deleteAction.item as AssessmentSection)?.name}"?`
-            : 'Remove question from section?'
-        }
-        message={
-          deleteAction?.type === 'assessment'
-            ? 'This action cannot be undone. All sections and questions in this assessment will be removed.'
-            : deleteAction?.type === 'section'
-            ? 'This cannot be undone. All questions in this section will be removed from the assessment.'
-            : 'This question will be removed from the section. This action cannot be undone.'
-        }
-        confirmLabel="Delete"
-        isLoading={isDeletingAssessment}
-      />
+       )}
+       {selectedVariant && (
+         <QuestionDetailView
+           entry={selectedVariant}
+           relatedVariants={questionVariantEntries.filter(
+             (entry) => entry.questionId === selectedVariant.questionId
+           )}
+           onClose={handleCloseDetail}
+           onCreateVariant={handleCreateVariant}
+           onDeleteVariant={handleDeleteVariant}
+           onSelectVariant={handleViewVariant}
+         />
+       )}
+       <DeleteConfirmationModal
+         open={deleteModalOpen}
+         onOpenChange={setDeleteModalOpen}
+         onConfirm={async () => {
+           if (!deleteAction) return;
+           if (deleteAction.type === 'assessment') {
+             await confirmDeleteAssessment();
+           } else if (deleteAction.type === 'section') {
+             await confirmDeleteSection();
+           } else if (deleteAction.type === 'variant') {
+             await confirmDeleteVariant();
+           }
+         }}
+         title={
+           deleteAction?.type === 'assessment'
+             ? `Delete assessment "${assessment?.name}"?`
+             : deleteAction?.type === 'section'
+             ? `Delete section "${(deleteAction.item as AssessmentSection)?.name}"?`
+             : 'Remove question from section?'
+         }
+         message={
+           deleteAction?.type === 'assessment'
+             ? 'This action cannot be undone. All sections and questions in this assessment will be removed.'
+             : deleteAction?.type === 'section'
+             ? 'This cannot be undone. All questions in this section will be removed from the assessment.'
+             : 'This question will be removed from the section. This action cannot be undone.'
+         }
+         confirmLabel="Delete"
+         isLoading={isDeletingAssessment}
+       />
     </div>
   );
 };

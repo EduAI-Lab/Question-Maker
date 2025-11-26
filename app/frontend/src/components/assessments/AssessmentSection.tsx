@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Tooltip } from '../ui/tooltip';
-import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2 } from 'lucide-react';
+import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2, AlertTriangle } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
@@ -98,6 +98,17 @@ const buildQuestionEntries = (assessment: Assessment): QuestionEntry[] => {
   return Array.from(map.values()).sort((a, b) => a.order - b.order);
 };
 
+const hasDraftQuestions = (assessment: Assessment): boolean => {
+  if (!assessment.sections || assessment.sections.length === 0) {
+    return false;
+  }
+  return assessment.sections.some((section) =>
+    section.sectionVariants?.some(
+      (link) => link.variant?.questionMetadata?.isDraft === true
+    )
+  );
+};
+
 export const AssessmentSection = ({
   assessments,
   onAddAssessment,
@@ -180,6 +191,7 @@ export const AssessmentSection = ({
             const difficulty = blueprint?.difficultyDistribution;
             const primaryCount = blueprint?.primaryTopicIds?.length ?? 0;
             const secondaryCount = blueprint?.secondaryTopicIds?.length ?? 0;
+            const hasDrafts = hasDraftQuestions(assessment);
 
             return (
               <Card key={assessment.id} className="hover:shadow-md transition-shadow">
@@ -194,6 +206,12 @@ export const AssessmentSection = ({
                       <Badge variant="outline">
                         {totalQuestionCount} questions
                       </Badge>
+                      {hasDrafts && (
+                        <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Contains Draft questions
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2">
                       <Button
@@ -205,43 +223,52 @@ export const AssessmentSection = ({
                         <Eye className="h-4 w-4" />
                         <span>View</span>
                       </Button>
-                      {onExportToCanvas && (
-                        totalQuestionCount === 0 ? (
-                          <Tooltip content="No questions in assessment">
-                            <span className="inline-block">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled
-                                className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
-                              >
-                                <Upload className="h-4 w-4" />
-                                <span>Export to Canvas</span>
-                              </Button>
-                            </span>
-                          </Tooltip>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onExportToCanvas(assessment.id, assessment.name)}
-                            className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
-                          >
-                            <Upload className="h-4 w-4" />
-                            <span>Export to Canvas</span>
-                          </Button>
-                        )
-                      )}
-                      {onDeleteAssessment && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onDeleteAssessment(assessment.id, assessment.name)}
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                       {onExportToCanvas && (
+                         totalQuestionCount === 0 || hasDrafts ? (
+                           <Tooltip 
+                             content={
+                               totalQuestionCount === 0
+                                 ? "No questions in assessment"
+                                 : hasDrafts
+                                 ? "Cannot export: Assessment contains draft questions. Please review all draft questions before exporting."
+                                 : "Export assessment to Canvas"
+                             }
+                             multiline
+                           >
+                             <span className="inline-block">
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 disabled
+                                 className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                               >
+                                 <Upload className="h-4 w-4" />
+                                 <span>Export to Canvas</span>
+                               </Button>
+                             </span>
+                           </Tooltip>
+                         ) : (
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => onExportToCanvas(assessment.id, assessment.name)}
+                             className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                           >
+                             <Upload className="h-4 w-4" />
+                             <span>Export to Canvas</span>
+                           </Button>
+                         )
+                       )}
+                       {onDeleteAssessment && (
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => onDeleteAssessment(assessment.id, assessment.name)}
+                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                         >
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                       )}
                       <Button
                         variant="ghost"
                         size="sm"

@@ -126,6 +126,8 @@ export const LandingPage = () => {
           courseName: question.course?.name,
           courseCode: question.course?.code,
           secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+          isAiGenerated: question.isAiGenerated,
+          isDraft: question.isDraft,
           variant
         };
       });
@@ -145,6 +147,19 @@ export const LandingPage = () => {
 
   const handleViewVariant = (entry: QuestionVariantEntry) => {
     setSelectedVariant(entry);
+  };
+
+  const handleUpdateQuestionFlags = (
+    questionId: number,
+    updates: Partial<Pick<Question, 'isAiGenerated' | 'isDraft'>>
+  ) => {
+    setQuestions((prev) =>
+      prev.map((question) =>
+        question.id === questionId
+          ? { ...question, ...updates }
+          : question
+      )
+    );
   };
 
   const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
@@ -422,6 +437,23 @@ export const LandingPage = () => {
           loadError={assessmentsError}
           selectedCourseId={selectedCourse?.id ?? null}
           onExportToCanvas={(assessmentId, assessmentName) => {
+            // Safety check: prevent export if assessment has draft questions
+            const assessment = filteredAssessments.find(a => a.id === assessmentId);
+            if (assessment) {
+              const hasDrafts = assessment.sections?.some((section) =>
+                section.sectionVariants?.some(
+                  (link) => link.variant?.questionMetadata?.isDraft === true
+                )
+              );
+              if (hasDrafts) {
+                toast({
+                  title: 'Cannot export',
+                  description: 'Assessment contains draft questions. Please review all draft questions before exporting.',
+                  variant: 'destructive'
+                });
+                return;
+              }
+            }
             setSelectedAssessmentForExport({ id: assessmentId, name: assessmentName });
             setIsCanvasExportOpen(true);
           }}
@@ -438,6 +470,7 @@ export const LandingPage = () => {
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
+          onUpdateQuestionFlags={handleUpdateQuestionFlags}
         />
       )}
 

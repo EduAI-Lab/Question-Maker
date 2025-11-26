@@ -26,6 +26,8 @@ router.post('/', authenticateToken, async (req, res, next) => {
     const rawPrimaryTopicId = req.body.primaryTopicId;
     const type = req.body.type || 'MCQ';
     const questionOrder = req.body.questionOrder;
+    const isAiGenerated = req.body.isAiGenerated;
+    const isDraft = req.body.isDraft;
 
     const allowedTypes = ['MCQ', 'SA'];
     if (type && !allowedTypes.includes(type)) {
@@ -63,7 +65,9 @@ router.post('/', authenticateToken, async (req, res, next) => {
       courseId,
       primaryTopicId,
       type,
-      questionOrder
+      questionOrder,
+      isAiGenerated,
+      isDraft
     });
 
     res.status(201).json({
@@ -138,7 +142,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const { description, content, courseId, classId, type, primaryTopicId, questionOrder } = req.body;
+    const { description, content, courseId, classId, type, primaryTopicId, questionOrder, isAiGenerated, isDraft } = req.body; //mock for AI generated questions
 
     const updates = {};
 
@@ -188,6 +192,14 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
 
     if (questionOrder !== undefined) {
       updates.questionOrder = questionOrder;
+    }
+
+    if (isAiGenerated !== undefined) {
+      updates.isAiGenerated = Boolean(isAiGenerated);
+    }
+
+    if (isDraft !== undefined) {
+      updates.isDraft = Boolean(isDraft);
     }
 
     if (Object.keys(updates).length === 0) {

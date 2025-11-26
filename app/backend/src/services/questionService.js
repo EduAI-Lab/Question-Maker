@@ -54,7 +54,9 @@ export const createQuestion = async (userId, questionData) => {
       courseId,
       primaryTopicId,
       type = 'MCQ',
-      questionOrder = {}
+      questionOrder = {},
+      isAiGenerated = false,
+      isDraft = true // All new questions start as drafts until reviewed
     } = questionData;
 
     if (!description || !description.trim()) {
@@ -88,7 +90,9 @@ export const createQuestion = async (userId, questionData) => {
       primaryTopicId: parsedPrimaryTopicId,
       type: normalizedType,
       description: description.trim(),
-      questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {}
+      questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {},
+      isAiGenerated: Boolean(isAiGenerated),
+      isDraft: Boolean(isDraft)
     });
 
     return question;
@@ -251,6 +255,14 @@ export const updateQuestion = async (questionId, userId, updateData) => {
       throw new Error('questionOrder must be an object');
     }
 
+    if (updates.isAiGenerated !== undefined) { //mock for AI generated questions
+      updates.isAiGenerated = Boolean(updates.isAiGenerated);
+    }
+
+    if (updates.isDraft !== undefined) {
+      updates.isDraft = Boolean(updates.isDraft);
+    }
+
     await question.update(updates);
     return question;
   } catch (error) {
@@ -311,7 +323,7 @@ export const createMultipleQuestions = async (userId, questionsData) => {
 };
 
 export const saveExtractedQuestions = async (userId, payload) => {
-  const { courseId, primaryTopicId, topicName, questions, assessment } = payload;
+  const { courseId, primaryTopicId, topicName, questions, assessment, isAiGenerated = false } = payload;
 
   if (!courseId) {
     throw new Error('courseId is required');
@@ -468,7 +480,8 @@ export const saveExtractedQuestions = async (userId, payload) => {
         courseId,
         primaryTopicId: primaryTopicForQuestion,
         type: questionType,
-        questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {}
+        questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {},
+        isAiGenerated: Boolean(isAiGenerated)
       }, { transaction });
 
       const variant = await Variants.create({

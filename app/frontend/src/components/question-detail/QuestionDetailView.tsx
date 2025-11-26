@@ -2,8 +2,11 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { X, Copy, Trash2, ArrowLeft } from 'lucide-react';
+import { X, Copy, Trash2, ArrowLeft, Sparkles, FileEdit } from 'lucide-react';
 import { QuestionVariantEntry } from '../../types/question';
+import { questionService } from '../../services/questionService';
+import { assessmentService } from '../../services/assessmentService';
+import { useToast } from '../ui/use-toast';
 
 const DetailItem = ({
     label,
@@ -49,6 +52,10 @@ interface QuestionDetailViewProps {
     onCreateVariant: (entry: QuestionVariantEntry) => void;
     onDeleteVariant: (entry: QuestionVariantEntry) => void;
     onSelectVariant: (entry: QuestionVariantEntry) => void;
+    onUpdateQuestionFlags: (
+        questionId: number,
+        updates: Partial<Pick<QuestionVariantEntry, 'isAiGenerated' | 'isDraft'>>
+    ) => void;
 }
 
 export const QuestionDetailView = ({
@@ -57,10 +64,14 @@ export const QuestionDetailView = ({
     onClose,
     onCreateVariant,
     onDeleteVariant,
-    onSelectVariant
+    onSelectVariant,
+    onUpdateQuestionFlags
 }: QuestionDetailViewProps) => {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
+    const [isToggling, setIsToggling] = useState(false);
+    const [isTogglingDraft, setIsTogglingDraft] = useState(false);
+    const { toast } = useToast();
     const { variant } = entry;
     const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
     const secondaryTopicsDisplay =
@@ -105,6 +116,69 @@ export const QuestionDetailView = ({
     const handleSelectVariant = (target: QuestionVariantEntry) => {
         onSelectVariant(target);
         setViewMode('detail');
+    };
+    //mock for AI generated questions
+    const handleToggleAiTag = async () => {
+        try {
+            setIsToggling(true);
+            const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
+                isAiGenerated: !entry.isAiGenerated
+            });
+            
+            // Update the entry with the new value
+            const updatedEntry: QuestionVariantEntry = {
+                ...entry,
+                isAiGenerated: updatedQuestion.isAiGenerated
+            };
+            
+            onSelectVariant(updatedEntry);
+            onUpdateQuestionFlags(entry.questionId, { isAiGenerated: updatedQuestion.isAiGenerated });
+            
+            toast({
+                title: 'AI tag toggled',
+                description: `Question is now ${updatedQuestion.isAiGenerated ? 'marked as' : 'unmarked from'} AI-generated.`
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Failed to toggle AI tag',
+                description: error?.message || 'An error occurred'
+            });
+        } finally {
+            setIsToggling(false);
+        }
+    };
+
+    const handleToggleDraft = async () => {
+        try {
+            setIsTogglingDraft(true);
+            
+            const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
+                isDraft: !entry.isDraft
+            });
+            
+            // Update the entry with the new value
+            const updatedEntry: QuestionVariantEntry = {
+                ...entry,
+                isDraft: updatedQuestion.isDraft
+            };
+            
+            onSelectVariant(updatedEntry);
+            onUpdateQuestionFlags(entry.questionId, { isDraft: updatedQuestion.isDraft });
+            
+            toast({
+                title: 'Review status updated',
+                description: `Question is now ${updatedQuestion.isDraft ? 'marked as draft' : 'marked as reviewed'}.`
+            });
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: 'Failed to toggle draft status',
+                description: error?.message || 'An error occurred'
+            });
+        } finally {
+            setIsTogglingDraft(false);
+        }
     };
 
     useEffect(() => {
@@ -163,6 +237,20 @@ export const QuestionDetailView = ({
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
                                     <Badge variant="outline">{entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`}</Badge>
                                     <Badge variant="secondary" className="uppercase">{entry.questionType}</Badge>
+                                    {entry.isAiGenerated && (
+                                        <Badge variant="default" className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-300">
+                                            AI Generated
+                                        </Badge>
+                                    )}
+                                    {entry.isDraft ? (
+                                        <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300">
+                                            Draft
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-200 border-green-300">
+                                            Reviewed
+                                        </Badge>
+                                    )}
                                 </div>
                             </div>
 
@@ -241,6 +329,27 @@ export const QuestionDetailView = ({
                                 <DetailItem label="Question type" value={entry.questionType} />
                                 <DetailItem label="Difficulty" value={variant.difficulty ?? '—'} />
                                 <DetailItem label="Created" value={createdAtDisplay} />
+                                {entry.isAiGenerated && (
+                                    <DetailItem label="AI Generated" value={
+                                        <Badge variant="default" className="bg-purple-100 text-purple-800 hover:bg-purple-200 border-purple-300">
+                                            Yes
+                                        </Badge>
+                                    } />
+                                )}
+                                <DetailItem 
+                                    label="Review Status" 
+                                    value={
+                                        entry.isDraft ? (
+                                            <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300">
+                                                Draft
+                                            </Badge>
+                                        ) : (
+                                            <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-200 border-green-300">
+                                                Reviewed
+                                            </Badge>
+                                        )
+                                    } 
+                                />
                             </div>
                         </section>
 
@@ -284,7 +393,31 @@ export const QuestionDetailView = ({
                     )}
                 </div>
 
-                <div className="flex items-center justify-end gap-3 border-t bg-gray-50 px-6 py-4">
+                <div className="flex items-center justify-between border-t bg-gray-50 px-6 py-4">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleToggleAiTag}
+                            disabled={isToggling}
+                            className="flex items-center gap-2 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                            title="Test: Toggle AI Generated tag"
+                        >
+                            <Sparkles className="h-3 w-3" />
+                            <span>{entry.isAiGenerated ? 'Remove AI Tag' : 'Add AI Tag'}</span>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleToggleDraft}
+                            disabled={isTogglingDraft}
+                            className="flex items-center gap-2 text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+                            title="Toggle review status"
+                        >
+                            <FileEdit className="h-3 w-3" />
+                            <span>{entry.isDraft ? 'Mark as Reviewed' : 'Mark as Draft'}</span>
+                        </Button>
+                    </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={() => onCreateVariant(entry)} className="flex items-center gap-2">
                             <Copy className="h-4 w-4" />
