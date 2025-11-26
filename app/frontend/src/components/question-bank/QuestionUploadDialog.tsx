@@ -108,6 +108,14 @@ export const QuestionUploadDialog = ({
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
     const [providerApiKey, setProviderApiKey] = useState('');
+    const selectedModel = useMemo(
+        () => availableModels.find((model) => model.id === aiModel),
+        [aiModel, availableModels]
+    );
+    const isExternalModel = useMemo(
+        () => (selectedModel ? selectedModel.provider !== 'ollama' : !aiModel.startsWith('ollama')),
+        [aiModel, selectedModel]
+    );
 
     useEffect(() => {
         if (!open) {
@@ -683,6 +691,11 @@ export const QuestionUploadDialog = ({
                                         )}
                                     </SelectContent>
                                 </Select>
+                                {isExternalModel && (
+                                    <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
+                                    </div>
+                                )}
                             </div>
 
                             {apiKeyStorage.requiresApiKey(aiModel) && (

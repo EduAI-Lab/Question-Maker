@@ -105,6 +105,14 @@ export const AddQuestionDialog = ({
     const [isAiGenerated, setIsAiGenerated] = useState(false);
     const [markAsReviewed, setMarkAsReviewed] = useState(false); // false = draft (default), true = reviewed
     const { toast } = useToast();
+    const selectedGenerationModel = useMemo(
+        () => availableModels.find((model) => model.id === form.generationModel),
+        [availableModels, form.generationModel]
+    );
+    const isExternalGenerationModel = useMemo(
+        () => (selectedGenerationModel ? selectedGenerationModel.provider !== 'ollama' : !form.generationModel.startsWith('ollama')),
+        [form.generationModel, selectedGenerationModel]
+    );
 
     useEffect(() => {
         if (!open) {
@@ -821,6 +829,11 @@ export const AddQuestionDialog = ({
                                                     )}
                                                 </SelectContent>
                                             </Select>
+                                            {isExternalGenerationModel && (
+                                                <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                    External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Desired Difficulty</Label>
@@ -1036,6 +1049,11 @@ export const AddQuestionDialog = ({
                                                     )}
                                                 </SelectContent>
                                             </Select>
+                                            {isExternalGenerationModel && (
+                                                <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                    External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Desired Difficulty</Label>
