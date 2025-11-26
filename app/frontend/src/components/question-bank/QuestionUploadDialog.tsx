@@ -27,6 +27,7 @@ import { useToast } from '../ui/use-toast';
 import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '../../types/question';
 import { Topic } from '../../types/topic';
 import { questionService } from '../../services/questionService';
+import { eduaiService, EduAIModelOption } from '../../services/eduaiService';
 
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
@@ -51,12 +52,6 @@ const questionTypeLabels: Record<QuestionType, string> = {
     LA: 'Long Answer'
 };
 const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
-const aiModelOptions = [
-    { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
-    { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
-    { id: 'gemini-1-5-pro', label: 'Gemini 1.5 Pro' },
-    { id: 'llama-3-1-70b', label: 'Llama 3.1 70B' }
-] as const;
 
 interface QuestionUploadDialogProps {
     open: boolean;
@@ -109,7 +104,8 @@ export const QuestionUploadDialog = ({
         const year = now.getFullYear();
         return `Fall ${year}`;
     });
-    const [aiModel, setAiModel] = useState('gpt-4o');
+    const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
+    const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
 
     useEffect(() => {
         if (!open) {
@@ -174,6 +170,22 @@ export const QuestionUploadDialog = ({
             setNewTopicName('Uploaded Questions');
         }
     }, [open, topics]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const fetchModels = async () => {
+            try {
+                const models = await eduaiService.listModels();
+                setAvailableModels(models);
+            } catch (error) {
+                console.error('Failed to fetch AI models:', error);
+                setAvailableModels([]);
+            }
+        };
+
+        void fetchModels();
+    }, [open]);
 
     const performPdfOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {
         const arrayBuffer = await file.arrayBuffer();
@@ -618,11 +630,30 @@ export const QuestionUploadDialog = ({
                                         <SelectValue placeholder="Select a model" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {aiModelOptions.map((option) => (
-                                            <SelectItem key={option.id} value={option.id}>
-                                                {option.label}
+                                        {availableModels.length === 0 ? (
+                                            <SelectItem value="__no_models" disabled>
+                                                No models available yet
                                             </SelectItem>
-                                        ))}
+                                        ) : (
+                                            <>
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">UBC Hosted</div>
+                                                {availableModels
+                                                    .filter((option) => option.provider === 'ollama')
+                                                    .map((option) => (
+                                                        <SelectItem key={option.id} value={option.id}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">External</div>
+                                                {availableModels
+                                                    .filter((option) => option.provider !== 'ollama')
+                                                    .map((option) => (
+                                                        <SelectItem key={option.id} value={option.id}>
+                                                            {option.label} ({option.provider})
+                                                        </SelectItem>
+                                                    ))}
+                                            </>
+                                        )}
                                     </SelectContent>
                                 </Select>
                             </div>

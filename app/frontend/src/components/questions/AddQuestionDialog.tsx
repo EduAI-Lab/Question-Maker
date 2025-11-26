@@ -782,12 +782,24 @@ export const AddQuestionDialog = ({
                                                             No models available yet
                                                         </SelectItem>
                                                     ) : (
-                                                        availableModels.map((model) => (
-                                                            <SelectItem key={model.id} value={model.id}>
-                                                                {model.label}
-                                                                {model.provider ? ` (${model.provider})` : ''}
-                                                            </SelectItem>
-                                                        ))
+                                                        <>
+                                                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">UBC Hosted</div>
+                                                            {availableModels
+                                                                .filter((model) => model.provider === 'ollama')
+                                                                .map((model) => (
+                                                                    <SelectItem key={model.id} value={model.id}>
+                                                                        {model.label}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">External</div>
+                                                            {availableModels
+                                                                .filter((model) => model.provider !== 'ollama')
+                                                                .map((model) => (
+                                                                    <SelectItem key={model.id} value={model.id}>
+                                                                        {model.label} ({model.provider})
+                                                                    </SelectItem>
+                                                                ))}
+                                                        </>
                                                     )}
                                                 </SelectContent>
                                             </Select>
