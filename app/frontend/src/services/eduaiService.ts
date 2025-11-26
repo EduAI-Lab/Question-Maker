@@ -66,7 +66,7 @@ export interface EduAIQuestionGenerationResponse {
 export interface EduAIModelOption {
     id: string;
     label: string;
-    provider: 'ollama' | 'google' | 'openai' | 'other';
+    provider: string;
     description?: string;
     isDefault?: boolean;
 }
@@ -210,11 +210,28 @@ class EduAIService {
     }
 
     /**
-     * Mock: Return available EduAI model options.
-     * Replace with real API call when endpoint is available.
+     * Fetch available AI models from EduAI
      */
     async listModels(): Promise<EduAIModelOption[]> {
-        return MOCK_MODEL_OPTIONS;
+        try {
+            const response = await api.get('/api/eduai/ai-models');
+            const models = response.data;
+
+            // Transform API response to our format
+            return models
+                .filter((model: any) => model.isActive)
+                .map((model: any) => ({
+                    id: `${model.provider.name}:${model.modelId}`,
+                    label: model.name,
+                    provider: model.provider.name,
+                    description: model.description,
+                    isDefault: model.modelId === 'gpt-oss:120b' // Default to ollama model
+                }));
+        } catch (error) {
+            console.error('Failed to fetch AI models from EduAI:', error);
+            // Fallback to mock data on error
+            return MOCK_MODEL_OPTIONS;
+        }
     }
 
     /**
