@@ -11,6 +11,7 @@ interface QuestionMetadataCardProps {
   onToggleSelection: () => void;
   onAddVariant: () => void;
   topicsById: Record<number, Topic>;
+  onToggleReview?: (questionId: number, nextDraft: boolean) => void;
 }
 
 const getTopicName = (topicsById: Record<number, Topic>, topicId?: number | null) => {
@@ -50,7 +51,8 @@ export const QuestionMetadataCard = ({
   isSelected,
   onToggleSelection,
   onAddVariant,
-  topicsById
+  topicsById,
+  onToggleReview
 }: QuestionMetadataCardProps) => {
   const variants = question.variants || [];
   const [activeVariantId, setActiveVariantId] = useState<number>(
@@ -101,6 +103,23 @@ export const QuestionMetadataCard = ({
                     {variants.length} variants
                   </Badge>
                 )}
+                {question.isDraft !== undefined && (
+                  <Badge
+                    variant="default"
+                    className={
+                      question.isDraft
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : 'bg-green-100 text-green-800 border-green-200'
+                    }
+                  >
+                    {question.isDraft ? 'Draft' : 'Reviewed'}
+                  </Badge>
+                )}
+                {question.isAiGenerated && (
+                  <Badge variant="outline" className="text-xs border-purple-200 text-purple-800">
+                    AI
+                  </Badge>
+                )}
               </div>
               {question.description && (
                 <p className="text-sm font-medium text-gray-900 mb-1">
@@ -116,18 +135,34 @@ export const QuestionMetadataCard = ({
                 </p>
               )}
             </div>
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddVariant();
-              }}
-              className="text-xs bg-black text-white hover:bg-gray-800"
-            >
-              + Variant
-            </Button>
+            <div className="flex items-center gap-2">
+              {onToggleReview && question.isDraft !== undefined && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleReview(question.id, !question.isDraft);
+                  }}
+                  className="text-xs"
+                >
+                  {question.isDraft ? 'Mark Reviewed' : 'Mark Draft'}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddVariant();
+                }}
+                className="text-xs bg-black text-white hover:bg-gray-800"
+              >
+                + Variant
+              </Button>
+            </div>
           </div>
         </div>
       </div>

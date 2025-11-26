@@ -825,6 +825,7 @@ interface MatchingQuestionsPanelProps {
   onCreateNewQuestion: () => void;
   onAddVariant: (question: Question) => void;
   onViewQuestion?: (question: Question) => void;
+  onToggleReview: (questionId: number, nextDraft: boolean) => void;
   isSearching: boolean;
   isCreatingSection: boolean;
   searchError: string | null;
@@ -848,6 +849,7 @@ const MatchingQuestionsPanel = ({
   onCreateNewQuestion,
   onAddVariant,
   onViewQuestion,
+  onToggleReview,
   isSearching,
   isCreatingSection,
   searchError,
@@ -920,6 +922,7 @@ const MatchingQuestionsPanel = ({
                 onToggleSelection={() => onToggleQuestion(question)}
                 onAddVariant={() => onAddVariant(question)}
                 topicsById={topicsById}
+                onToggleReview={onToggleReview}
               />
             );
           })}
@@ -1366,6 +1369,30 @@ export const AssessmentViewPage = () => {
       const filtered = prev.filter((question) => question.id !== newQuestion.id);
       return [newQuestion, ...filtered];
     });
+  };
+
+  const handleToggleQuestionReview = async (questionId: number, nextDraft: boolean) => {
+    try {
+      const updated = await questionService.updateQuestion(questionId, { isDraft: nextDraft });
+      setMatchingQuestions((prev) =>
+        prev.map((question) =>
+          question.id === questionId ? { ...question, isDraft: updated.isDraft } : question
+        )
+      );
+      if (selectedVariant?.questionId === questionId) {
+        setSelectedVariant({ ...selectedVariant, isDraft: updated.isDraft });
+      }
+      toast({
+        title: 'Review status updated',
+        description: `Question is now ${updated.isDraft ? 'marked as draft' : 'marked as reviewed'}.`
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to update review status',
+        description: error?.response?.data?.error || 'Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleDeleteAssessment = () => {
@@ -1824,6 +1851,7 @@ export const AssessmentViewPage = () => {
                     onCreateNewQuestion={handleCreateNewQuestion}
                     onAddVariant={handleAddVariant}
                     onViewQuestion={handleViewQuestion}
+                    onToggleReview={handleToggleQuestionReview}
                     isSearching={isSearchingQuestions}
                     isCreatingSection={isCreatingSection}
                     searchError={questionSearchError}
