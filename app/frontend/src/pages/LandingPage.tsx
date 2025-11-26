@@ -17,8 +17,11 @@ import { useToast } from '../components/ui/use-toast';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
 export const LandingPage = () => {
+  const LAST_SELECTED_COURSE_KEY = 'landing:last-selected-course';
+
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [preferredCourseId, setPreferredCourseId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
@@ -64,6 +67,25 @@ export const LandingPage = () => {
     }
   }, [topicsByCourse]);
 
+  // Load last selected course preference once
+  useEffect(() => {
+    const stored = localStorage.getItem(LAST_SELECTED_COURSE_KEY);
+    if (stored) {
+      const parsed = Number(stored);
+      if (Number.isInteger(parsed)) {
+        setPreferredCourseId(parsed);
+      }
+    }
+  }, []);
+
+  // Persist selection
+  useEffect(() => {
+    if (selectedCourse?.id) {
+      localStorage.setItem(LAST_SELECTED_COURSE_KEY, String(selectedCourse.id));
+    }
+  }, [selectedCourse]);
+
+  // Choose course based on preference when courses list updates
   useEffect(() => {
     if (courses.length === 0) {
       setSelectedCourse(null);
@@ -71,10 +93,23 @@ export const LandingPage = () => {
       return;
     }
 
-    if (!selectedCourse || !courses.some(course => course.id === selectedCourse.id)) {
-      setSelectedCourse(courses[0]);
+    // If current selection is valid, keep it
+    if (selectedCourse && courses.some((course) => course.id === selectedCourse.id)) {
+      return;
     }
-  }, [courses, selectedCourse]);
+
+    // Try preferred id from storage
+    if (preferredCourseId) {
+      const match = courses.find((course) => course.id === preferredCourseId);
+      if (match) {
+        setSelectedCourse(match);
+        return;
+      }
+    }
+
+    // Fallback to first course
+    setSelectedCourse(courses[0]);
+  }, [courses, preferredCourseId, selectedCourse]);
 
   useEffect(() => {
     if (selectedCourse) {
