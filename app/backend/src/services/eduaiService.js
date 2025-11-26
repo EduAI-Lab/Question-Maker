@@ -153,7 +153,7 @@ Requirements:
     "difficulty": "easy/medium/hard",
     "reasoning_level": "factual/analytical/application",
     "bloom_level": "remember/understand/apply/analyze/evaluate/create",
-    "type": "MCQ/SA",
+    "type": "MCQ/SA/LA",
     "primary_topic_id": number | null,
     "secondary_topic_ids": number[]
   }
@@ -265,7 +265,10 @@ Please ensure the questions are appropriate for the course level and cover the k
             typeof question.type === "string" &&
             question.type.toUpperCase().trim() === "SA"
               ? "SA"
-              : "MCQ",
+              : typeof question.type === "string" &&
+                question.type.toUpperCase().trim() === "LA"
+                ? "LA"
+                : "MCQ",
           primary_topic_id: primaryTopicId,
           secondary_topic_ids: secondaryTopicIds,
         };
@@ -274,6 +277,53 @@ Please ensure the questions are appropriate for the course level and cover the k
       return normalizedQuestions;
     } catch (error) {
       throw new Error(`EduAI question generation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Retrieve all courses from EduAI
+   * @returns {Promise<Array>} List of courses with their metadata
+   */
+  async listCourses() {
+    if (!this.isConfigured()) {
+      throw new Error(
+        "EduAI service is not configured. Please set EDUAI_API_KEY environment variable."
+      );
+    }
+
+    const url = `${this.baseURL}/api/courses`;
+
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+        },
+        timeout: 30000,
+      });
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        const errorMessage =
+          error.response.data?.error ||
+          error.response.data?.message ||
+          error.response.statusText;
+        const statusCode = error.response.status;
+        console.error("EduAI courses API error:", {
+          status: statusCode,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url,
+        });
+        throw new Error(`EduAI API error (${statusCode}): ${errorMessage}`);
+      } else if (error.request) {
+        console.error("EduAI courses request error:", error.request);
+        throw new Error("EduAI API request failed: No response received");
+      } else {
+        console.error("EduAI courses error:", error.message);
+        throw new Error(`EduAI API error: ${error.message}`);
+      }
     }
   }
 

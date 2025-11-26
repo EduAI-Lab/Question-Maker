@@ -6,9 +6,10 @@ interface TooltipProps {
   content: string;
   side?: 'top' | 'bottom' | 'left' | 'right';
   className?: string;
+  multiline?: boolean;
 }
 
-export const Tooltip = ({ children, content, side = 'top', className }: TooltipProps) => {
+export const Tooltip = ({ children, content, side = 'top', className, multiline = false }: TooltipProps) => {
   const [isVisible, setIsVisible] = React.useState(false);
 
   const sideClasses = {
@@ -35,7 +36,10 @@ export const Tooltip = ({ children, content, side = 'top', className }: TooltipP
       {isVisible && (
         <div
           className={cn(
-            'absolute z-50 px-3 py-1.5 text-sm text-white bg-gray-900 rounded-md shadow-lg whitespace-nowrap pointer-events-none',
+            'absolute z-50 px-3 py-1.5 text-sm text-white bg-gray-900 rounded-md shadow-lg pointer-events-none',
+            multiline 
+              ? 'max-w-xs break-words' 
+              : 'whitespace-nowrap',
             sideClasses[side],
             className
           )}

@@ -1,4 +1,4 @@
-import { Question_Metadata, Variants, Topics, Assessments } from '../schema/index.js';
+import { Question_Metadata, Variants, Topics, Assessments, AssessmentSections, SectionVariants } from '../schema/index.js';
 import { Course } from '../schema/Course.js';
 
 const normalizeSecondaryTopics = (value) => {
@@ -54,7 +54,9 @@ export const createQuestion = async (userId, questionData) => {
       courseId,
       primaryTopicId,
       type = 'MCQ',
-      questionOrder = {}
+      questionOrder = {},
+      isAiGenerated = false,
+      isDraft = true // All new questions start as drafts until reviewed
     } = questionData;
 
     if (!description || !description.trim()) {
@@ -80,7 +82,7 @@ export const createQuestion = async (userId, questionData) => {
       throw new Error('Course not found');
     }
 
-    const allowedTypes = ['MCQ', 'SA'];
+    const allowedTypes = ['MCQ', 'SA', 'LA'];
     const normalizedType = allowedTypes.includes(type) ? type : 'MCQ';
 
     const question = await Question_Metadata.create({
@@ -88,7 +90,9 @@ export const createQuestion = async (userId, questionData) => {
       primaryTopicId: parsedPrimaryTopicId,
       type: normalizedType,
       description: description.trim(),
-      questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {}
+      questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {},
+      isAiGenerated: Boolean(isAiGenerated),
+      isDraft: Boolean(isDraft)
     });
 
     return question;
@@ -123,7 +127,14 @@ export const getQuestionsByUser = async (userId, options = {}) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'answer', 'assessmentId', 'secondaryTopicsId']
+          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'createdAt', 'updatedAt'],
+          include: [
+            {
+              model: Assessments,
+              as: 'assessment',
+              attributes: ['id', 'name', 'type', 'semester']
+            }
+          ]
         }
       ],
       order: [['createdAt', 'DESC']],
@@ -159,7 +170,14 @@ export const getQuestionById = async (questionId, userId) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'answer', 'assessmentId', 'secondaryTopicsId']
+          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'createdAt', 'updatedAt'],
+          include: [
+            {
+              model: Assessments,
+              as: 'assessment',
+              attributes: ['id', 'name', 'type', 'semester']
+            }
+          ]
         }
       ]
     });
@@ -227,7 +245,7 @@ export const updateQuestion = async (questionId, userId, updateData) => {
     }
 
     if (updates.type !== undefined) {
-      const allowedTypes = ['MCQ', 'SA'];
+      const allowedTypes = ['MCQ', 'SA', 'LA'];
       if (!allowedTypes.includes(updates.type)) {
         throw new Error(`Invalid question type. Allowed values: ${allowedTypes.join(', ')}`);
       }
@@ -235,6 +253,14 @@ export const updateQuestion = async (questionId, userId, updateData) => {
 
     if (updates.questionOrder !== undefined && typeof updates.questionOrder !== 'object') {
       throw new Error('questionOrder must be an object');
+    }
+
+    if (updates.isAiGenerated !== undefined) { //mock for AI generated questions
+      updates.isAiGenerated = Boolean(updates.isAiGenerated);
+    }
+
+    if (updates.isDraft !== undefined) {
+      updates.isDraft = Boolean(updates.isDraft);
     }
 
     await question.update(updates);
@@ -276,7 +302,7 @@ export const createMultipleQuestions = async (userId, questionsData) => {
       const description = q.description ?? q.content;
       const courseId = Number(q.courseId ?? q.classId);
       const primaryTopicId = Number(q.primaryTopicId ?? 1);
-      const type = ['MCQ', 'SA'].includes(q.type) ? q.type : 'MCQ';
+      const type = ['MCQ', 'SA', 'LA'].includes(q.type) ? q.type : 'MCQ';
       const questionOrder = q.questionOrder || {};
 
       const question = await createQuestion(userId, {
@@ -297,7 +323,7 @@ export const createMultipleQuestions = async (userId, questionsData) => {
 };
 
 export const saveExtractedQuestions = async (userId, payload) => {
-  const { courseId, primaryTopicId, topicName, questions, assessment } = payload;
+  const { courseId, primaryTopicId, topicName, questions, assessment, isAiGenerated = false } = payload;
 
   if (!courseId) {
     throw new Error('courseId is required');
@@ -380,6 +406,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
     };
 
     let createdAssessment = null;
+    let createdSection = null;
     if (assessment) {
       const { type, name, semester } = assessment;
       if (!type || !name || !semester) {
@@ -388,7 +415,16 @@ export const saveExtractedQuestions = async (userId, payload) => {
       createdAssessment = await Assessments.create({
         type,
         name,
-        semester
+        semester,
+        courseId
+      }, { transaction });
+
+      // Create a default section for the uploaded questions
+      createdSection = await AssessmentSections.create({
+        assessmentId: createdAssessment.id,
+        name: 'Uploaded Questions',
+        description: 'Questions extracted from uploaded document',
+        position: 0
       }, { transaction });
     }
 
@@ -405,7 +441,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
         ? item.difficulty.toLowerCase().trim()
         : '';
 
-      const questionType = typeof item.type === 'string' && ['MCQ', 'SA'].includes(item.type)
+      const questionType = typeof item.type === 'string' && ['MCQ', 'SA', 'LA'].includes(item.type)
         ? item.type
         : 'SA';
 
@@ -444,10 +480,11 @@ export const saveExtractedQuestions = async (userId, payload) => {
         courseId,
         primaryTopicId: primaryTopicForQuestion,
         type: questionType,
-        questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {}
+        questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {},
+        isAiGenerated: Boolean(isAiGenerated)
       }, { transaction });
 
-      await Variants.create({
+      const variant = await Variants.create({
         questionMetadataId: metadata.id,
         questionText,
         difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
@@ -456,6 +493,15 @@ export const saveExtractedQuestions = async (userId, payload) => {
         secondaryTopicsId: secondaryTopics,
         referenceId: null
       }, { transaction });
+
+      // Link variant to section if assessment and section were created
+      if (createdSection) {
+        await SectionVariants.create({
+          sectionId: createdSection.id,
+          variantId: variant.id,
+          displayOrder: orderCounter - 1
+        }, { transaction });
+      }
 
       createdIds.push(metadata.id);
       if (createdAssessment) {
@@ -487,7 +533,10 @@ export const saveExtractedQuestions = async (userId, payload) => {
       order: [['createdAt', 'DESC']]
     });
 
-    return savedQuestions.map((question) => question.toJSON());
+    return {
+      questions: savedQuestions.map((question) => question.toJSON()),
+      assessmentId: createdAssessment ? createdAssessment.id : null
+    };
   } catch (error) {
     await transaction.rollback();
     throw error;

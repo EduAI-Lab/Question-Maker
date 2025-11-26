@@ -66,7 +66,7 @@ export const getSectionsForAssessment = async (assessmentId, userId) => {
               {
                 model: Question_Metadata,
                 as: 'questionMetadata',
-                attributes: ['id', 'description', 'type', 'questionOrder'],
+                attributes: ['id', 'description', 'type', 'questionOrder', 'isDraft'],
                 include: [
                   {
                     model: Course,
@@ -122,7 +122,42 @@ export const updateAssessmentSection = async (sectionId, userId, updates) => {
 
 export const deleteAssessmentSection = async (sectionId, userId) => {
   const section = await findSectionForUser(sectionId, userId);
+  const assessmentId = section.assessment.id;
+
+  // Get all variants in this section
+  const sectionVariants = await SectionVariants.findAll({
+    where: { sectionId },
+    attributes: ['variantId']
+  });
+
+  const variantIds = sectionVariants.map(sv => sv.variantId);
+
+  // Delete the section (this will cascade delete SectionVariants)
   await section.destroy();
+
+  // For each variant, check if it's still in any other sections of the same assessment
+  for (const variantId of variantIds) {
+    const otherSectionsCount = await SectionVariants.count({
+      where: { variantId },
+      include: [
+        {
+          model: AssessmentSections,
+          as: 'section',
+          where: { assessmentId },
+          attributes: []
+        }
+      ]
+    });
+
+    // If variant is not in any other sections of this assessment, clear the assessmentId
+    if (otherSectionsCount === 0) {
+      const variant = await Variants.findByPk(variantId);
+      if (variant && variant.assessmentId === assessmentId) {
+        await variant.update({ assessmentId: null });
+      }
+    }
+  }
+
   return true;
 };
 
@@ -153,8 +188,8 @@ const verifyVariantOwnership = async (variantId, userId) => {
 };
 
 export const addVariantToSection = async (sectionId, userId, variantId, options = {}) => {
-  await findSectionForUser(sectionId, userId);
-  await verifyVariantOwnership(variantId, userId);
+  const section = await findSectionForUser(sectionId, userId);
+  const variant = await verifyVariantOwnership(variantId, userId);
 
   const displayOrder = options.displayOrder ?? await SectionVariants.count({ where: { sectionId } });
 
@@ -165,11 +200,17 @@ export const addVariantToSection = async (sectionId, userId, variantId, options 
     metadata: options.metadata || null
   });
 
+  // Update the variant's assessmentId to link it to the assessment
+  const assessmentId = section.assessment.id;
+  if (variant.assessmentId !== assessmentId) {
+    await variant.update({ assessmentId });
+  }
+
   return link;
 };
 
 export const removeVariantFromSection = async (sectionId, userId, variantId) => {
-  await findSectionForUser(sectionId, userId);
+  const section = await findSectionForUser(sectionId, userId);
 
   const deleted = await SectionVariants.destroy({
     where: { sectionId, variantId }
@@ -177,6 +218,28 @@ export const removeVariantFromSection = async (sectionId, userId, variantId) => 
 
   if (!deleted) {
     throw new Error('Variant not found in section');
+  }
+
+  // Check if variant is in any other sections of the same assessment
+  const assessmentId = section.assessment.id;
+  const otherSectionsCount = await SectionVariants.count({
+    where: { variantId },
+    include: [
+      {
+        model: AssessmentSections,
+        as: 'section',
+        where: { assessmentId },
+        attributes: []
+      }
+    ]
+  });
+
+  // If variant is not in any other sections of this assessment, clear the assessmentId
+  if (otherSectionsCount === 0) {
+    const variant = await Variants.findByPk(variantId);
+    if (variant && variant.assessmentId === assessmentId) {
+      await variant.update({ assessmentId: null });
+    }
   }
 
   return true;
@@ -197,4 +260,161 @@ export const updateVariantOrderInSection = async (sectionId, userId, variantId, 
   await link.save();
 
   return link;
+};
+
+/**
+ * Check if a question is linked to any assessment sections
+ * @param {number} questionId - The question metadata ID
+ * @param {number} userId - The user ID for authorization
+ * @returns {Promise<{isInAssessments: boolean, assessmentIds: number[]}>} - Whether question is in assessments and which assessment IDs
+ */
+export const checkQuestionInAssessments = async (questionId, userId) => {
+  // Verify user owns the question
+  const question = await Question_Metadata.findOne({
+    where: { id: questionId },
+    include: [
+      {
+        model: Course,
+        as: 'course',
+        where: { userId },
+        attributes: ['id']
+      }
+    ]
+  });
+
+  if (!question) {
+    throw new Error('Question not found');
+  }
+
+  // Find all variants of this question
+  const variants = await Variants.findAll({
+    where: { questionMetadataId: questionId }
+  });
+
+  if (variants.length === 0) {
+    return { isInAssessments: false, assessmentIds: [] };
+  }
+
+  const variantIds = variants.map((v) => v.id);
+
+  // Find all section variant links for these variants
+  const sectionVariantLinks = await SectionVariants.findAll({
+    where: { variantId: variantIds },
+    include: [
+      {
+        model: AssessmentSections,
+        as: 'section',
+        attributes: ['id', 'assessmentId'],
+        include: [
+          {
+            model: Assessments,
+            as: 'assessment',
+            attributes: ['id']
+          }
+        ]
+      }
+    ]
+  });
+
+  if (sectionVariantLinks.length === 0) {
+    return { isInAssessments: false, assessmentIds: [] };
+  }
+
+  // Get unique assessment IDs
+  const assessmentIds = new Set();
+  sectionVariantLinks.forEach((link) => {
+    if (link.section?.assessment?.id) {
+      assessmentIds.add(link.section.assessment.id);
+    }
+  });
+
+  return {
+    isInAssessments: assessmentIds.size > 0,
+    assessmentIds: Array.from(assessmentIds)
+  };
+};
+
+/**
+ * Remove all section variant links for a question across all assessments
+ * This is used when marking a question as draft to remove it from all assessments
+ * @param {number} questionId - The question metadata ID
+ * @param {number} userId - The user ID for authorization
+ * @returns {Promise<{removedLinks: number, affectedAssessments: number[]}>} - Number of links removed and affected assessment IDs
+ */
+export const removeQuestionFromAllSections = async (questionId, userId) => {
+  // Verify user owns the question
+  const question = await Question_Metadata.findOne({
+    where: { id: questionId },
+    include: [
+      {
+        model: Course,
+        as: 'course',
+        where: { userId },
+        attributes: ['id']
+      }
+    ]
+  });
+
+  if (!question) {
+    throw new Error('Question not found');
+  }
+
+  // Find all variants of this question
+  const variants = await Variants.findAll({
+    where: { questionMetadataId: questionId }
+  });
+
+  if (variants.length === 0) {
+    return { removedLinks: 0, affectedAssessments: [] };
+  }
+
+  const variantIds = variants.map((v) => v.id);
+
+  // Find all section variant links for these variants
+  const sectionVariantLinks = await SectionVariants.findAll({
+    where: { variantId: variantIds },
+    include: [
+      {
+        model: AssessmentSections,
+        as: 'section',
+        attributes: ['id', 'assessmentId'],
+        include: [
+          {
+            model: Assessments,
+            as: 'assessment',
+            attributes: ['id']
+          }
+        ]
+      }
+    ]
+  });
+
+  if (sectionVariantLinks.length === 0) {
+    return { removedLinks: 0, affectedAssessments: [] };
+  }
+
+  // Get unique assessment IDs
+  const affectedAssessmentIds = new Set();
+  sectionVariantLinks.forEach((link) => {
+    if (link.section?.assessment?.id) {
+      affectedAssessmentIds.add(link.section.assessment.id);
+    }
+  });
+
+  // Delete all section variant links
+  const deletedCount = await SectionVariants.destroy({
+    where: { variantId: variantIds }
+  });
+
+  // Update questionOrder for each affected assessment
+  const currentOrder = question.questionOrder || {};
+  affectedAssessmentIds.forEach((assessmentId) => {
+    delete currentOrder[assessmentId];
+  });
+  await question.update({ questionOrder: currentOrder });
+
+  return {
+    removedLinks: deletedCount,
+    affectedAssessments: Array.from(affectedAssessmentIds)
+  };
 };

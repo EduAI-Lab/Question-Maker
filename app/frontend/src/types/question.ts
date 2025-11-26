@@ -1,5 +1,5 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
-export type QuestionType = 'MCQ' | 'SA';
+export type QuestionType = 'MCQ' | 'SA' | 'LA';
 export type ReasoningLevel = 'factual' | 'analytical' | 'application';
 export type AssessmentType = 'Assignment' | 'Lab' | 'Quiz' | 'Mid' | 'Final';
 
@@ -11,6 +11,8 @@ export interface QuestionMetadata {
     courseId: number;
     primaryTopicId: number;
     questionOrder: Record<number, number> | null; // Maps assessment IDs to order numbers
+    isAiGenerated?: boolean; // Indicates if this question was generated using AI
+    isDraft?: boolean; // Indicates if this question is a draft and needs review
     createdAt: string;
     updatedAt: string;
     // Relations
@@ -106,6 +108,8 @@ export interface QuestionCreate {
     primaryTopicId: number;
     type: QuestionType;
     questionOrder?: Record<number, number> | null;
+    isAiGenerated?: boolean;
+    isDraft?: boolean;
 }
 
 export interface QuestionGenerationParams {
@@ -157,6 +161,8 @@ export interface QuestionVariantEntry {
     courseName?: string;
     courseCode?: string | null;
     secondaryTopicNames?: string[];
+    isAiGenerated?: boolean;
+    isDraft?: boolean;
     variant: QuestionVariant;
 }
 

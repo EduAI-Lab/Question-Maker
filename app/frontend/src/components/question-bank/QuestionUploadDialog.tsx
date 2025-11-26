@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Tesseract from 'tesseract.js';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker?url';
@@ -20,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ScrollArea } from '../ui/scroll-area';
 import { Progress } from '../ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Tooltip } from '../ui/tooltip';
 import { useToast } from '../ui/use-toast';
 
 import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '../../types/question';
@@ -42,7 +44,12 @@ type DraftQuestion = Required<Pick<ExtractedQuestion, 'question'>> &
     };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
-const questionTypes: QuestionType[] = ['SA', 'MCQ'];
+const questionTypes: QuestionType[] = ['SA', 'MCQ', 'LA'];
+const questionTypeLabels: Record<QuestionType, string> = {
+    MCQ: 'Multiple Choice',
+    SA: 'Short Answer',
+    LA: 'Long Answer'
+};
 const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
 const aiModelOptions = [
     { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
@@ -85,6 +92,7 @@ export const QuestionUploadDialog = ({
     onQuestionsSaved
 }: QuestionUploadDialogProps) => {
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     const [topics, setTopics] = useState<Topic[]>(providedTopics);
     const [primaryTopicId, setPrimaryTopicId] = useState<string>('');
@@ -257,7 +265,7 @@ export const QuestionUploadDialog = ({
                         ? (item.difficulty as QuestionDifficulty)
                         : 'medium',
                     answer: item.answer ?? '',
-                    type: item.type && ['MCQ', 'SA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
+                    type: item.type && ['MCQ', 'SA', 'LA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
                     summary: item.summary.trim(),
                     primaryTopicId,
                     secondaryTopicIds,
@@ -376,6 +384,25 @@ export const QuestionUploadDialog = ({
         return true;
     }, [assessmentName, assessmentSemester, assessmentType, courseId, includedDrafts.length, processingStage]);
 
+    const getDisabledReason = (): string | null => {
+        if (processingStage === 'saving') return null; // Don't show tooltip while saving
+        if (!canSave) {
+            const reasons: string[] = [];
+            if (!courseId) reasons.push('course');
+            if (includedDrafts.length === 0) reasons.push('at least one question selected');
+            if (!assessmentType) reasons.push('assessment type');
+            if (!assessmentName.trim()) reasons.push('assessment name');
+            if (!assessmentSemester.trim()) reasons.push('assessment semester');
+            
+            if (reasons.length > 0) {
+                return `Missing required: ${reasons.join(', ')}`;
+            }
+        }
+        return null;
+    };
+
+    const disabledReason = getDisabledReason();
+
     const handleCopyAll = useCallback(async () => {
         const lines = draftQuestions.map((draft, index) => {
             const base = [`${index + 1}. ${draft.question.trim()}`];
@@ -445,7 +472,7 @@ export const QuestionUploadDialog = ({
             const fallbackTopicName =
                 topics.length === 0 ? (newTopicName.trim() || 'Uploaded Questions') : undefined;
 
-            const saved = await questionService.saveExtractedQuestions({
+            const result = await questionService.saveExtractedQuestions({
                 courseId,
                 primaryTopicId: fallbackPrimaryTopicId,
                 topicName: fallbackTopicName,
@@ -457,12 +484,17 @@ export const QuestionUploadDialog = ({
                 }
             });
 
-            onQuestionsSaved(saved);
+            onQuestionsSaved(result.questions);
             toast({
                 title: 'Questions added',
-                description: `${saved.length} question${saved.length === 1 ? '' : 's'} saved successfully.`
+                description: `${result.questions.length} question${result.questions.length === 1 ? '' : 's'} saved successfully.`
             });
             onClose();
+
+            // Navigate to the newly created assessment
+            if (result.assessmentId) {
+                navigate(`/assessments/${result.assessmentId}`);
+            }
         } catch (err: any) {
             console.error('Failed to save extracted questions', err);
             const message = err?.response?.data?.error || err?.message || 'Failed to save questions.';
@@ -784,7 +816,7 @@ export const QuestionUploadDialog = ({
                                                             <SelectContent>
                                                                 {questionTypes.map((type) => (
                                                                     <SelectItem key={type} value={type}>
-                                                                        {type === 'MCQ' ? 'Multiple Choice' : 'Short Answer'}
+                                                                        {questionTypeLabels[type]}
                                                                     </SelectItem>
                                                                 ))}
                                                             </SelectContent>
@@ -819,10 +851,21 @@ export const QuestionUploadDialog = ({
                         <Button variant="outline" onClick={onClose}>
                             Cancel
                         </Button>
-                        <Button onClick={() => void handleSave()} disabled={!canSave}>
-                            {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create Questions
-                        </Button>
+                        {disabledReason ? (
+                            <Tooltip content={disabledReason} multiline>
+                                <span className="inline-block">
+                                    <Button onClick={() => void handleSave()} disabled={!canSave}>
+                                        {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Create Questions
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        ) : (
+                            <Button onClick={() => void handleSave()} disabled={!canSave}>
+                                {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Create Questions
+                            </Button>
+                        )}
                     </div>
                 </DialogFooter>
             </DialogContent>

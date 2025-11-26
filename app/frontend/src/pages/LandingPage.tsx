@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
@@ -14,11 +15,21 @@ import { QuestionUploadDialog } from '../components/question-bank/QuestionUpload
 import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
 import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
 import { useToast } from '../components/ui/use-toast';
+import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
 export const LandingPage = () => {
+  const LAST_SELECTED_COURSE_KEY = 'landing:last-selected-course';
+
+  const location = useLocation();
+  const navigate = useNavigate();
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
+  const [preferredCourseId, setPreferredCourseId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    return tab === 'assessments' ? 'assessments' : 'questions';
+  });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
   const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
@@ -33,6 +44,12 @@ export const LandingPage = () => {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
   const [selectedAssessmentForExport, setSelectedAssessmentForExport] = useState<{ id: number; name: string } | null>(null);
+  const [deleteAssessmentModalOpen, setDeleteAssessmentModalOpen] = useState(false);
+  const [assessmentToDelete, setAssessmentToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [isDeletingAssessment, setIsDeletingAssessment] = useState(false);
+  const [deleteVariantModalOpen, setDeleteVariantModalOpen] = useState(false);
+  const [variantToDelete, setVariantToDelete] = useState<QuestionVariantEntry | null>(null);
+  const [isDeletingVariant, setIsDeletingVariant] = useState(false);
   const { toast } = useToast();
 
   const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
@@ -57,6 +74,44 @@ export const LandingPage = () => {
     }
   }, [topicsByCourse]);
 
+  // Load last selected course preference once
+  useEffect(() => {
+    const stored = localStorage.getItem(LAST_SELECTED_COURSE_KEY);
+    if (stored) {
+      const parsed = Number(stored);
+      if (Number.isInteger(parsed)) {
+        setPreferredCourseId(parsed);
+      }
+    }
+  }, []);
+
+  // Persist selection
+  useEffect(() => {
+    if (selectedCourse?.id) {
+      localStorage.setItem(LAST_SELECTED_COURSE_KEY, String(selectedCourse.id));
+    }
+  }, [selectedCourse]);
+
+  // Update tab based on URL query (e.g., /landing?tab=assessments)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'assessments' || tab === 'questions') {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
+  // Keep URL query in sync with selected tab to make refreshes stable
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const currentTab = params.get('tab');
+    if (currentTab === activeTab) return;
+
+    params.set('tab', activeTab);
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  }, [activeTab, location.pathname, location.search, navigate]);
+
+  // Choose course based on preference when courses list updates
   useEffect(() => {
     if (courses.length === 0) {
       setSelectedCourse(null);
@@ -64,10 +119,23 @@ export const LandingPage = () => {
       return;
     }
 
-    if (!selectedCourse || !courses.some(course => course.id === selectedCourse.id)) {
-      setSelectedCourse(courses[0]);
+    // If current selection is valid, keep it
+    if (selectedCourse && courses.some((course) => course.id === selectedCourse.id)) {
+      return;
     }
-  }, [courses, selectedCourse]);
+
+    // Try preferred id from storage
+    if (preferredCourseId) {
+      const match = courses.find((course) => course.id === preferredCourseId);
+      if (match) {
+        setSelectedCourse(match);
+        return;
+      }
+    }
+
+    // Fallback to first course
+    setSelectedCourse(courses[0]);
+  }, [courses, preferredCourseId, selectedCourse]);
 
   useEffect(() => {
     if (selectedCourse) {
@@ -119,6 +187,8 @@ export const LandingPage = () => {
           courseName: question.course?.name,
           courseCode: question.course?.code,
           secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+          isAiGenerated: question.isAiGenerated,
+          isDraft: question.isDraft,
           variant
         };
       });
@@ -138,6 +208,19 @@ export const LandingPage = () => {
 
   const handleViewVariant = (entry: QuestionVariantEntry) => {
     setSelectedVariant(entry);
+  };
+
+  const handleUpdateQuestionFlags = (
+    questionId: number,
+    updates: Partial<Pick<Question, 'isAiGenerated' | 'isDraft'>>
+  ) => {
+    setQuestions((prev) =>
+      prev.map((question) =>
+        question.id === questionId
+          ? { ...question, ...updates }
+          : question
+      )
+    );
   };
 
   const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
@@ -186,8 +269,16 @@ export const LandingPage = () => {
     setSelectedVariant(null);
   };
 
-  const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
+  const handleDeleteVariant = (entry: QuestionVariantEntry) => {
+    setVariantToDelete(entry);
+    setDeleteVariantModalOpen(true);
+  };
+
+  const confirmDeleteVariant = async () => {
+    if (!variantToDelete) return;
+    const entry = variantToDelete;
     try {
+      setIsDeletingVariant(true);
       const question = questions.find((item) => item.id === entry.questionId);
       if (!question) {
         return;
@@ -208,10 +299,17 @@ export const LandingPage = () => {
           )
         );
       }
+      setSelectedVariant(null);
     } catch (error) {
       console.error('Failed to delete variant', error);
+      toast({
+        title: 'Failed to delete question',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
     } finally {
-      setSelectedVariant(null);
+      setIsDeletingVariant(false);
+      setVariantToDelete(null);
     }
   };
 
@@ -244,6 +342,33 @@ export const LandingPage = () => {
       void loadTopicsForCourse(selectedCourse.id);
     }
     setIsUploadOpen(true);
+  };
+
+  const handleDeleteAssessment = (assessmentId: number, assessmentName: string) => {
+    setAssessmentToDelete({ id: assessmentId, name: assessmentName });
+    setDeleteAssessmentModalOpen(true);
+  };
+
+  const confirmDeleteAssessment = async () => {
+    if (!assessmentToDelete) return;
+    try {
+      setIsDeletingAssessment(true);
+      await assessmentService.deleteAssessment(assessmentToDelete.id);
+      setAssessments((prev) => prev.filter((item) => item.id !== assessmentToDelete.id));
+      toast({
+        title: 'Assessment deleted',
+        description: `"${assessmentToDelete.name}" has been removed.`
+      });
+      setAssessmentToDelete(null);
+    } catch (_error) {
+      toast({
+        title: 'Failed to delete assessment',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeletingAssessment(false);
+    }
   };
 
   const handleCreateAssessment = async (params: AssessmentGenerationParams) => {
@@ -373,9 +498,27 @@ export const LandingPage = () => {
           loadError={assessmentsError}
           selectedCourseId={selectedCourse?.id ?? null}
           onExportToCanvas={(assessmentId, assessmentName) => {
+            // Safety check: prevent export if assessment has draft questions
+            const assessment = filteredAssessments.find(a => a.id === assessmentId);
+            if (assessment) {
+              const hasDrafts = assessment.sections?.some((section) =>
+                section.sectionVariants?.some(
+                  (link) => link.variant?.questionMetadata?.isDraft === true
+                )
+              );
+              if (hasDrafts) {
+                toast({
+                  title: 'Cannot export',
+                  description: 'Assessment contains draft questions. Please review all draft questions before exporting.',
+                  variant: 'destructive'
+                });
+                return;
+              }
+            }
             setSelectedAssessmentForExport({ id: assessmentId, name: assessmentName });
             setIsCanvasExportOpen(true);
           }}
+          onDeleteAssessment={handleDeleteAssessment}
         />
         )}
       </div>
@@ -388,6 +531,7 @@ export const LandingPage = () => {
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
+          onUpdateQuestionFlags={handleUpdateQuestionFlags}
         />
       )}
 
@@ -437,6 +581,44 @@ export const LandingPage = () => {
           }}
         />
       )}
+      <DeleteConfirmationModal
+        open={deleteVariantModalOpen}
+        onOpenChange={setDeleteVariantModalOpen}
+        onConfirm={confirmDeleteVariant}
+        title={
+          variantToDelete
+            ? (() => {
+                const question = questions.find((item) => item.id === variantToDelete.questionId);
+                const isLastVariant = question && (question.variants?.length ?? 0) <= 1;
+                return isLastVariant
+                  ? 'Delete question?'
+                  : 'Delete question variant?';
+              })()
+            : 'Delete question?'
+        }
+        message={
+          variantToDelete
+            ? (() => {
+                const question = questions.find((item) => item.id === variantToDelete.questionId);
+                const isLastVariant = question && (question.variants?.length ?? 0) <= 1;
+                return isLastVariant
+                  ? 'This will permanently delete the entire question and all its variants. This action cannot be undone.'
+                  : 'This will permanently delete this question variant. This action cannot be undone.';
+              })()
+            : 'This action cannot be undone.'
+        }
+        confirmLabel="Delete"
+        isLoading={isDeletingVariant}
+      />
+      <DeleteConfirmationModal
+        open={deleteAssessmentModalOpen}
+        onOpenChange={setDeleteAssessmentModalOpen}
+        onConfirm={confirmDeleteAssessment}
+        title={assessmentToDelete ? `Delete assessment "${assessmentToDelete.name}"?` : 'Delete assessment?'}
+        message="This action cannot be undone. All sections and questions in this assessment will be removed."
+        confirmLabel="Delete"
+        isLoading={isDeletingAssessment}
+      />
     </div>
   );
 };

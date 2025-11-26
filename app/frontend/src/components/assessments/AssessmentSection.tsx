@@ -4,7 +4,8 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
-import { Plus, ChevronUp, ChevronDown, Eye, Upload } from 'lucide-react';
+import { Tooltip } from '../ui/tooltip';
+import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2, AlertTriangle } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
@@ -15,6 +16,7 @@ interface AssessmentSectionProps {
   isLoading?: boolean;
   loadError?: string | null;
   onExportToCanvas?: (assessmentId: number, assessmentName: string) => void;
+  onDeleteAssessment?: (assessmentId: number, assessmentName: string) => void;
 }
 
 type QuestionEntry = {
@@ -39,34 +41,72 @@ const getAssessmentTypeColor = (type: string) => {
   }
 };
 
+// This method may be depreciated later because ideally sections should all have unique questions
+const countTotalQuestions = (assessment: Assessment): number => {
+  // Count total question instances across all sections (including duplicates)
+  if (!assessment.sections || assessment.sections.length === 0) {
+    return 0;
+  }
+
+  let totalCount = 0;
+  assessment.sections.forEach((section) => {
+    totalCount += (section.sectionVariants ?? []).length;
+  });
+
+  return totalCount;
+};
+
 const buildQuestionEntries = (assessment: Assessment): QuestionEntry[] => {
-  if (!assessment.variants || assessment.variants.length === 0) {
+  // Questions are organized through sections -> sectionVariants -> variant -> questionMetadata
+  if (!assessment.sections || assessment.sections.length === 0) {
     return [];
   }
 
   const map = new Map<number, QuestionEntry>();
 
-  assessment.variants.forEach((variant) => {
-    const metadata = variant.questionMetadata;
-    if (!metadata) {
-      return;
-    }
+  // Iterate through all sections
+  assessment.sections.forEach((section) => {
+    // Iterate through sectionVariants in each section
+    (section.sectionVariants ?? []).forEach((sectionVariant) => {
+      const variant = sectionVariant.variant;
+      if (!variant) {
+        return;
+      }
 
-    const orderValue = metadata.questionOrder?.[assessment.id];
-    const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
+      const metadata = variant.questionMetadata;
+      if (!metadata) {
+        return;
+      }
 
-    const existing = map.get(metadata.id);
-    if (!existing || order < existing.order) {
-      map.set(metadata.id, {
-        id: metadata.id,
-        description: metadata.description ?? null,
-        difficulty: variant.difficulty ?? 'medium',
-        order
-      });
-    }
+      // Use displayOrder from sectionVariant, or fallback to questionOrder
+      const orderValue = sectionVariant.displayOrder ?? metadata.questionOrder?.[assessment.id];
+      const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
+
+      const existing = map.get(metadata.id);
+      // Keep the entry with the lowest order (earliest position)
+      if (!existing || order < existing.order) {
+        map.set(metadata.id, {
+          id: metadata.id,
+          description: metadata.description ?? null,
+          difficulty: variant.difficulty ?? 'medium',
+          order
+        });
+      }
+    });
   });
 
   return Array.from(map.values()).sort((a, b) => a.order - b.order);
+};
+
+const hasDraftQuestions = (assessment: Assessment): boolean => {
+  if (!assessment.sections || assessment.sections.length === 0) {
+    return false;
+  }
+  return assessment.sections.some((section) =>
+    section.sectionVariants?.some(
+      (link) => link.variant?.questionMetadata?.isDraft === true
+    )
+  );
 };
 
 export const AssessmentSection = ({
@@ -75,7 +115,8 @@ export const AssessmentSection = ({
   selectedCourseId,
   isLoading = false,
   loadError,
-  onExportToCanvas
+  onExportToCanvas,
+  onDeleteAssessment
 }: AssessmentSectionProps) => {
   const navigate = useNavigate();
   const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
@@ -145,10 +186,12 @@ export const AssessmentSection = ({
         <div className="space-y-4">
           {assessments.map((assessment) => {
             const assessmentQuestions = buildQuestionEntries(assessment);
+            const totalQuestionCount = countTotalQuestions(assessment);
             const blueprint = assessment.blueprintConfig;
             const difficulty = blueprint?.difficultyDistribution;
             const primaryCount = blueprint?.primaryTopicIds?.length ?? 0;
             const secondaryCount = blueprint?.secondaryTopicIds?.length ?? 0;
+            const hasDrafts = hasDraftQuestions(assessment);
 
             return (
               <Card key={assessment.id} className="hover:shadow-md transition-shadow">
@@ -161,30 +204,75 @@ export const AssessmentSection = ({
                       </Badge>
                       <Badge variant="outline">{assessment.semester}</Badge>
                       <Badge variant="outline">
-                        {assessmentQuestions.length} questions
+                        {totalQuestionCount} questions
                       </Badge>
+                      {hasDrafts && (
+                        <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          Contains Draft questions
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/assessments/${assessment.id}`)}
+                        onClick={() =>
+                          navigate(`/assessments/${assessment.id}`, {
+                            state: { fromTab: 'assessments' }
+                          })
+                        }
                         className="flex items-center space-x-1"
                       >
                         <Eye className="h-4 w-4" />
                         <span>View</span>
                       </Button>
-                      {onExportToCanvas && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => onExportToCanvas(assessment.id, assessment.name)}
-                          className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
-                        >
-                          <Upload className="h-4 w-4" />
-                          <span>Export to Canvas</span>
-                        </Button>
-                      )}
+                       {onExportToCanvas && (
+                         totalQuestionCount === 0 || hasDrafts ? (
+                           <Tooltip 
+                             content={
+                               totalQuestionCount === 0
+                                 ? "No questions in assessment"
+                                 : hasDrafts
+                                 ? "Cannot export: Assessment contains draft questions. Please review all draft questions before exporting."
+                                 : "Export assessment to Canvas"
+                             }
+                             multiline
+                           >
+                             <span className="inline-block">
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 disabled
+                                 className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                               >
+                                 <Upload className="h-4 w-4" />
+                                 <span>Export to Canvas</span>
+                               </Button>
+                             </span>
+                           </Tooltip>
+                         ) : (
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => onExportToCanvas(assessment.id, assessment.name)}
+                             className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                           >
+                             <Upload className="h-4 w-4" />
+                             <span>Export to Canvas</span>
+                           </Button>
+                         )
+                       )}
+                       {onDeleteAssessment && (
+                         <Button
+                           variant="ghost"
+                           size="sm"
+                           onClick={() => onDeleteAssessment(assessment.id, assessment.name)}
+                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                         >
+                           <Trash2 className="h-4 w-4" />
+                         </Button>
+                       )}
                       <Button
                         variant="ghost"
                         size="sm"

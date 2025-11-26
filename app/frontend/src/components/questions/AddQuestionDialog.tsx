@@ -36,10 +36,7 @@ interface AddQuestionDialogProps {
     presetVariant?: QuestionVariantEntry | null;
 }
 
-type Mode = 'new' | 'variant';
-
 type FormState = {
-    mode: Mode;
     baseSelection: string; // encoded as `${questionId}:${variantId}`
     variantText: string;
     variantDifficulty: QuestionDifficulty;
@@ -57,7 +54,6 @@ type FormState = {
 };
 
 const defaultForm: FormState = {
-    mode: 'new',
     baseSelection: '',
     variantText: '',
     variantDifficulty: 'medium',
@@ -75,7 +71,12 @@ const defaultForm: FormState = {
 };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
-const questionTypes: QuestionType[] = ['MCQ', 'SA'];
+const questionTypes: QuestionType[] = ['MCQ', 'SA', 'LA'];
+const questionTypeLabels: Record<QuestionType, string> = {
+    MCQ: 'Multiple Choice',
+    SA: 'Short Answer',
+    LA: 'Long Answer'
+};
 
 export const AddQuestionDialog = ({
     open,
@@ -95,7 +96,12 @@ export const AddQuestionDialog = ({
     const [courseDetails, setCourseDetails] = useState<Course | null>(null);
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [availableEduCourses, setAvailableEduCourses] = useState<EduAICourseOption[]>([]);
+    const [isAiGenerated, setIsAiGenerated] = useState(false);
+    const [markAsReviewed, setMarkAsReviewed] = useState(false); // false = draft (default), true = reviewed
     const { toast } = useToast();
+
+    // Derive mode from presetVariant prop
+    const mode: 'new' | 'variant' = presetVariant ? 'variant' : 'new';
 
     useEffect(() => {
         if (!open) {
@@ -105,6 +111,8 @@ export const AddQuestionDialog = ({
             setAssessments([]);
             setCourseDetails(null);
             setIsGenerating(false);
+            setIsAiGenerated(false);
+            setMarkAsReviewed(false);
             return;
         }
 
@@ -112,7 +120,6 @@ export const AddQuestionDialog = ({
             const referenceId = presetVariant.variant.referenceId ?? presetVariant.variant.id;
             setForm({
                 ...defaultForm,
-                mode: 'variant',
                 baseSelection: `${presetVariant.questionId}:${presetVariant.variant.id}`,
                 variantReferenceId: referenceId ? referenceId.toString() : '',
                 variantDifficulty: presetVariant.variant.difficulty ?? 'medium',
@@ -363,6 +370,24 @@ export const AddQuestionDialog = ({
             ? `EduAI does not recognize course code "${resolvedCourseCodeForDisplay}". Question generation will still run, but results may be less accurate.`
             : null;
 
+    const handleCopyFromVariant = (variantEntry: QuestionVariantEntry) => {
+        const referenceId = variantEntry.variant.referenceId ?? variantEntry.variant.id;
+        setForm((prev) => ({
+            ...prev,
+            baseSelection: `${variantEntry.questionId}:${variantEntry.variant.id}`,
+            variantText: variantEntry.variant.questionText,
+            variantDifficulty: variantEntry.variant.difficulty ?? 'medium',
+            variantAnswer: variantEntry.variant.answer || '',
+            variantSecondaryTopics: variantEntry.variant.secondaryTopicsId || [],
+            variantAssessmentId: variantEntry.variant.assessmentId ? variantEntry.variant.assessmentId.toString() : 'none',
+            variantReferenceId: referenceId ? referenceId.toString() : ''
+        }));
+        toast({
+            title: 'Fields copied',
+            description: 'Variant fields have been copied. You can now edit them before saving.'
+        });
+    };
+
     const handleGenerateWithAI = async () => {
         if (!courseId) {
             setError('Select a course before generating a question.');
@@ -402,7 +427,7 @@ export const AddQuestionDialog = ({
                 const trimmedPrompt = form.generationPrompt.trim();
                 const sections: string[] = [trimmedPrompt];
 
-                if (form.mode === 'variant') {
+                if (mode === 'variant') {
                     const contextLines: string[] = [];
                     const baseSource = selectedBase ?? presetVariant ?? null;
 
@@ -447,7 +472,9 @@ export const AddQuestionDialog = ({
             }
 
             const inferredType: QuestionType =
-                generated.type === 'SA' || generated.type === 'MCQ' ? generated.type : 'MCQ';
+                generated.type === 'SA' || generated.type === 'MCQ' || generated.type === 'LA'
+                    ? generated.type
+                    : 'MCQ';
             const inferredDifficulty: QuestionDifficulty =
                 generated.difficulty === 'easy' || generated.difficulty === 'hard'
                     ? generated.difficulty
@@ -476,7 +503,7 @@ export const AddQuestionDialog = ({
                       )
                     : [];
 
-                if (prev.mode === 'variant') {
+                if (mode === 'variant') {
                     return {
                         ...prev,
                         variantText: generated.content ?? prev.variantText,
@@ -510,6 +537,7 @@ export const AddQuestionDialog = ({
                 };
             });
 
+            setIsAiGenerated(true);
             toast({
                 title: 'Question generated',
                 description: 'Review the generated text and adjust any details before saving.'
@@ -544,7 +572,7 @@ export const AddQuestionDialog = ({
                 throw new Error('Variant question text is required.');
             }
 
-            if (form.mode === 'variant') {
+            if (mode === 'variant') {
                 if (!form.baseSelection) {
                     throw new Error('Please select an existing variant to base this on.');
                 }
@@ -591,12 +619,17 @@ export const AddQuestionDialog = ({
                 }
             }
 
+            // Ensure isAiGenerated is set correctly - if AI generation was used, it should be true
+            const shouldMarkAsAiGenerated = isAiGenerated === true;
+            
             const createdQuestion = await questionService.createQuestion({
                 description,
                 courseId,
                 primaryTopicId,
                 type: form.questionType,
-                questionOrder
+                questionOrder,
+                isAiGenerated: shouldMarkAsAiGenerated,
+                isDraft: !markAsReviewed // Inverted: if marked as reviewed, then NOT a draft
             });
 
             await questionService.createVariant(createdQuestion.id, {
@@ -624,313 +657,336 @@ export const AddQuestionDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-            <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-3xl">
+            <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-6xl">
                 <DialogHeader>
-                    <DialogTitle>{form.mode === 'new' ? 'Create Question' : 'Add Variant'}</DialogTitle>
+                    <DialogTitle>
+                        {mode === 'new'
+                            ? 'Create New Question'
+                            : `Add Variant: ${presetVariant?.questionDescription || 'Question'}`}
+                    </DialogTitle>
                 </DialogHeader>
 
-                <ScrollArea className="h-[60vh] pr-4">
-                    <div className="space-y-6">
-                        <div>
-                            <Label className="text-sm font-semibold">What would you like to do?</Label>
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                <Button
-                                    type="button"
-                                    variant={form.mode === 'new' ? 'default' : 'outline'}
-                                    onClick={() => setForm((prev) => ({ ...prev, mode: 'new', baseSelection: '' }))}
-                                >
-                                    Create new question
-                                </Button>
-                                <Button
-                                    type="button"
-                                    variant={form.mode === 'variant' ? 'default' : 'outline'}
-                                    onClick={() => setForm((prev) => ({ ...prev, mode: 'variant' }))}
-                                    disabled={baseVariantOptions.length === 0}
-                                >
-                                    Add variant to existing question
-                                </Button>
-                            </div>
-                            {form.mode === 'variant' && baseVariantOptions.length === 0 && (
-                                <p className="mt-2 text-xs text-muted-foreground">
-                                    No existing variants available. Create a new question first.
-                                </p>
-                            )}
-                        </div>
-
-                        {form.mode === 'variant' && (
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="base-question">Base Variant</Label>
-                                    <Select
-                                        value={form.baseSelection}
-                                        onValueChange={(value) => {
-                                            const entry = baseVariantOptions.find((option) => option.value === value)?.entry;
-                                            if (entry) {
-                                                const referenceId = entry.variant.referenceId ?? entry.variant.id;
-                                                setForm((prev) => ({
-                                                    ...prev,
-                                                    baseSelection: value,
-                                                    variantReferenceId: referenceId ? referenceId.toString() : '',
-                                                    variantDifficulty: entry.variant.difficulty ?? 'medium',
-                                                    variantSecondaryTopics: entry.variant.secondaryTopicsId || [],
-                                                    variantAssessmentId: entry.variant.assessmentId ? entry.variant.assessmentId.toString() : 'none'
-                                                }));
-                                            } else {
-                                                setForm((prev) => ({
-                                                    ...prev,
-                                                    baseSelection: value,
-                                                    variantReferenceId: '',
-                                                    variantSecondaryTopics: [],
-                                                    variantAssessmentId: 'none'
-                                                }));
-                                            }
-                                        }}
-                                    >
-                                        <SelectTrigger id="base-question">
-                                            <SelectValue placeholder="Select an existing variant" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {baseVariantOptions.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                {selectedBase && (
-                                    <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground space-y-2">
-                                        <p>
-                                            <span className="font-medium text-foreground">Parent question:</span>{' '}
-                                            {selectedBase.questionDescription}
+                <div className="flex gap-6 h-[65vh]">
+                    {/* LEFT PANEL: Question Details Form (75% width) */}
+                    <div className="flex-[3] overflow-hidden">
+                        <ScrollArea className="h-full pr-4">
+                            <div className="space-y-6">
+                                {mode === 'variant' && presetVariant && (
+                                    <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                                        <h4 className="text-sm font-semibold text-foreground">Base Question Info</h4>
+                                        <p className="text-sm">
+                                            <span className="font-medium">Description:</span>{' '}
+                                            <span className="text-muted-foreground">{presetVariant.questionDescription}</span>
                                         </p>
-                                        <p>
-                                            <span className="font-medium text-foreground">Primary topic:</span>{' '}
-                                            {topics.find((topic) => topic.id === selectedBase.primaryTopicId)?.name || `#${selectedBase.primaryTopicId}`}
+                                        <p className="text-sm">
+                                            <span className="font-medium">Primary Topic:</span>{' '}
+                                            <span className="text-muted-foreground">
+                                                {topics.find((topic) => topic.id === presetVariant.primaryTopicId)?.name || `#${presetVariant.primaryTopicId}`}
+                                            </span>
                                         </p>
-                                        <p className="text-xs italic text-foreground/60">Reference variant ID is auto-populated (dev only).</p>
+                                        <p className="text-sm">
+                                            <span className="font-medium">Type:</span>{' '}
+                                            <span className="text-muted-foreground">{questionTypeLabels[presetVariant.questionType]}</span>
+                                        </p>
                                     </div>
                                 )}
-                            </div>
-                        )}
 
-                        {form.mode === 'new' && (
-                            <div className="space-y-4">
-                                <div className="space-y-2 rounded-md border bg-muted/30 p-4">
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                        <div>
-                                            <Label className="text-sm font-semibold">Generate with EduAI</Label>
-                                            <p className="text-xs text-muted-foreground">
-                                                Provide a topic or concept and let EduAI draft the question. You can edit the
-                                                result before saving.
-                                            </p>
-                                        </div>
-                                        <Button
-                                            type="button"
-                                            onClick={handleGenerateWithAI}
-                                            disabled={isGenerating}
-                                        >
-                                            {isGenerating ? 'Generating…' : 'Generate Question'}
-                                        </Button>
-                                    </div>
-                                    <div className="space-y-2 pt-2">
-                                        {courseWarningMessage && (
-                                            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
-                                                {courseWarningMessage}
-                                            </div>
-                                        )}
-                                        <Label htmlFor="generation-prompt">Topic / Prompt</Label>
-                                        <Textarea
-                                            id="generation-prompt"
-                                            value={form.generationPrompt}
-                                            onChange={(event) => handleFieldChange('generationPrompt', event.target.value)}
-                                            placeholder="e.g. Analyze the time complexity of quicksort."
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {/* New Question Mode: Show question metadata fields */}
+                                {mode === 'new' && (
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-semibold">Question Metadata</h4>
+
                                         <div className="space-y-2">
-                                            <Label>Model</Label>
+                                            <Label htmlFor="primary-topic">Primary Topic</Label>
                                             <Select
-                                                value={form.generationModel}
-                                                onValueChange={(value) => handleFieldChange('generationModel', value)}
-                                                disabled={availableModels.length === 0}
+                                                value={form.primaryTopicId}
+                                                onValueChange={(value) => handleFieldChange('primaryTopicId', value)}
+                                                disabled={topics.length === 0}
                                             >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select a model" />
+                                                <SelectTrigger id="primary-topic">
+                                                    <SelectValue placeholder={topics.length === 0 ? 'No topics available' : 'Select a topic'} />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    {availableModels.length === 0 ? (
-                                                        <SelectItem value="__no_models" disabled>
-                                                            No models available yet
+                                                    {topics.length === 0 ? (
+                                                        <SelectItem value="__no_topics" disabled>
+                                                            {isAuxLoading ? 'Loading topics...' : 'No topics available'}
                                                         </SelectItem>
                                                     ) : (
-                                                        availableModels.map((model) => (
-                                                            <SelectItem key={model.id} value={model.id}>
-                                                                {model.label}
-                                                                {model.provider ? ` (${model.provider})` : ''}
+                                                        topics.map((topic) => (
+                                                            <SelectItem key={topic.id} value={topic.id.toString()}>
+                                                                {topic.name} (#{topic.id})
                                                             </SelectItem>
                                                         ))
                                                     )}
                                                 </SelectContent>
                                             </Select>
                                         </div>
+
                                         <div className="space-y-2">
-                                            <Label>Desired Difficulty</Label>
+                                            <Label htmlFor="question-description">Question Description</Label>
+                                            <Textarea
+                                                id="question-description"
+                                                value={form.questionDescription}
+                                                onChange={(event) => handleFieldChange('questionDescription', event.target.value)}
+                                                placeholder="Enter a short description"
+                                                rows={2}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Variant Details (shown for both modes) */}
+                                <div className="space-y-4">
+                                    <h4 className="text-sm font-semibold">Variant Details</h4>
+
+                                    {/* Question Type - only for new mode */}
+                                    {mode === 'new' && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="question-type">Question Type</Label>
                                             <Select
-                                                value={form.generationDifficulty}
-                                                onValueChange={(value) =>
-                                                    handleFieldChange(
-                                                        'generationDifficulty',
-                                                        (value as QuestionDifficulty | 'balanced')
-                                                    )
-                                                }
+                                                value={form.questionType}
+                                                onValueChange={(value) => handleFieldChange('questionType', value as QuestionType)}
                                             >
-                                                <SelectTrigger>
-                                                    <SelectValue />
+                                                <SelectTrigger id="question-type">
+                                                    <SelectValue placeholder="Select type" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="balanced">Let EduAI decide</SelectItem>
-                                                    <SelectItem value="easy">Easy</SelectItem>
-                                                    <SelectItem value="medium">Medium</SelectItem>
-                                                    <SelectItem value="hard">Hard</SelectItem>
+                                                    {questionTypes.map((type) => (
+                                                        <SelectItem key={type} value={type} className="uppercase">
+                                                            {questionTypeLabels[type]}
+                                                        </SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="question-type">Question Type</Label>
-                                    <Select
-                                        value={form.questionType}
-                                        onValueChange={(value) => handleFieldChange('questionType', value as QuestionType)}
-                                    >
-                                        <SelectTrigger id="question-type">
-                                            <SelectValue placeholder="Select type" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {questionTypes.map((type) => (
-                                                <SelectItem key={type} value={type} className="uppercase">
-                                                    {type}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="primary-topic">Primary Topic</Label>
-                                    <Select
-                                        value={form.primaryTopicId}
-                                        onValueChange={(value) => handleFieldChange('primaryTopicId', value)}
-                                        disabled={topics.length === 0}
-                                    >
-                                        <SelectTrigger id="primary-topic">
-                                            <SelectValue placeholder={topics.length === 0 ? 'No topics available' : 'Select a topic'} />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {topics.length === 0 ? (
-                                                <SelectItem value="__no_topics" disabled>
-                                                    {isAuxLoading ? 'Loading topics...' : 'No topics available'}
-                                                </SelectItem>
-                                            ) : (
-                                                topics.map((topic) => (
-                                                    <SelectItem key={topic.id} value={topic.id.toString()}>
-                                                        {topic.name} (#{topic.id})
-                                                    </SelectItem>
-                                                ))
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="question-description">Question Description</Label>
-                                    <Textarea
-                                        id="question-description"
-                                        value={form.questionDescription}
-                                        onChange={(event) => handleFieldChange('questionDescription', event.target.value)}
-                                        placeholder="Enter the question prompt"
-                                    />
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="question-order">Question Order (JSON)</Label>
-                                    <Input
-                                        id="question-order"
-                                        value={form.questionOrder}
-                                        onChange={(event) => handleFieldChange('questionOrder', event.target.value)}
-                                        placeholder='Optional e.g. {"assessmentId": order}'
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="space-y-4">
-                            <h4 className="text-sm font-semibold">Variant Details</h4>
-
-                            {form.mode === 'variant' && (
-                                <div className="space-y-3 rounded-md border bg-muted/30 p-4">
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                        <div className="space-y-1">
-                                            <Label className="text-sm font-semibold">Generate Variant with EduAI</Label>
-                                            <p className="text-xs text-muted-foreground">
-                                                Describe how you want to tweak this question and let EduAI draft a new variant.
-                                                {selectedBase && (
-                                                    <>
-                                                        {' '}
-                                                        The base question is &ldquo;{selectedBase.questionDescription}&rdquo;.
-                                                    </>
-                                                )}
-                                            </p>
-                                        </div>
-                                        <Button
-                                            type="button"
-                                            onClick={handleGenerateWithAI}
-                                            disabled={isGenerating}
-                                        >
-                                            {isGenerating ? 'Generating…' : 'Generate Variant'}
-                                        </Button>
-                                    </div>
-
-                                    {courseWarningMessage && (
-                                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
-                                            {courseWarningMessage}
                                         </div>
                                     )}
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="variant-generation-prompt">Variant Prompt</Label>
+                                        <Label htmlFor="variant-text">Question Text</Label>
                                         <Textarea
-                                            id="variant-generation-prompt"
-                                            value={form.generationPrompt}
-                                            onChange={(event) =>
-                                                handleFieldChange('generationPrompt', event.target.value)
-                                            }
-                                            placeholder="e.g. Create a harder twist that focuses on application rather than recall."
+                                            id="variant-text"
+                                            value={form.variantText}
+                                            onChange={(event) => handleFieldChange('variantText', event.target.value)}
+                                            placeholder="Enter the full question text"
+                                            rows={6}
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <Label>Model</Label>
+                                            <Label htmlFor="variant-difficulty">Difficulty</Label>
+                                            <Select
+                                                value={form.variantDifficulty}
+                                                onValueChange={(value) => handleFieldChange('variantDifficulty', value as QuestionDifficulty)}
+                                            >
+                                                <SelectTrigger id="variant-difficulty">
+                                                    <SelectValue placeholder="Select difficulty" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {difficultyOptions.map((option) => (
+                                                        <SelectItem key={option} value={option} className="capitalize">
+                                                            {option}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="variant-reference">Reference Variant ID <span className="text-xs text-muted-foreground">(dev only)</span></Label>
+                                            <Input
+                                                id="variant-reference"
+                                                value={form.variantReferenceId}
+                                                placeholder="Auto-assigned"
+                                                readOnly
+                                                className="bg-muted/50"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="variant-answer">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                                        <Textarea
+                                            id="variant-answer"
+                                            value={form.variantAnswer}
+                                            onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
+                                            placeholder="Provide an answer or leave blank"
+                                            rows={3}
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="variant-assessment">Assessment <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                                            <Select
+                                                value={form.variantAssessmentId}
+                                                onValueChange={(value) => handleFieldChange('variantAssessmentId', value)}
+                                            >
+                                                <SelectTrigger id="variant-assessment">
+                                                    <SelectValue placeholder="Select assessment" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">No assessment</SelectItem>
+                                                    {assessmentOptions.length === 0 ? (
+                                                        <SelectItem value="__no_assessments" disabled>
+                                                            {isAuxLoading ? 'Loading...' : 'No assessments available'}
+                                                        </SelectItem>
+                                                    ) : (
+                                                        assessmentOptions.map((assessment) => (
+                                                            <SelectItem key={assessment.id} value={assessment.id.toString()}>
+                                                                {assessment.name} ({assessment.type})
+                                                            </SelectItem>
+                                                        ))
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Secondary Topics <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                                            <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-auto">
+                                                {topics.length === 0 ? (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {isAuxLoading ? 'Loading topics...' : 'No topics available'}
+                                                    </p>
+                                                ) : (
+                                                    topics.map((topic) => {
+                                                        const checked = form.variantSecondaryTopics.includes(topic.id);
+                                                        const isPrimary = form.primaryTopicId === topic.id.toString();
+                                                        return (
+                                                            <label
+                                                                key={topic.id}
+                                                                className={`flex items-center space-x-2 text-sm ${
+                                                                    isPrimary ? 'text-muted-foreground/70' : 'text-foreground'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="h-4 w-4"
+                                                                    checked={checked}
+                                                                    disabled={isPrimary}
+                                                                    onChange={(event) => toggleSecondaryTopic(topic.id, event.target.checked)}
+                                                                />
+                                                                <span>{topic.name}</span>
+                                                            </label>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {error && <p className="text-sm text-destructive">{error}</p>}
+                            </div>
+                        </ScrollArea>
+                    </div>
+
+                    {/* RIGHT PANEL: Helper Tools (25% width) */}
+                    <div className="flex-[1] overflow-hidden border-l pl-6">
+                        <ScrollArea className="h-full pr-2">
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-semibold text-muted-foreground">How to Fill This Form</h4>
+
+                                {/* Option 1: Copy from Base Variant */}
+                                {mode === 'variant' && presetVariant && (
+                                    <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3">
+                                        <div className="flex items-start gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 text-blue-500">
+                                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                                            </svg>
+                                            <div className="flex-1">
+                                                <h5 className="text-sm font-semibold">Copy from Base Variant</h5>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    Auto-fill fields from the base variant
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded border">
+                                                {presetVariant.variant.questionText.slice(0, 100)}
+                                                {presetVariant.variant.questionText.length > 100 ? '...' : ''}
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                onClick={() => handleCopyFromVariant(presetVariant)}
+                                                className="w-full"
+                                                size="sm"
+                                                variant="outline"
+                                            >
+                                                Copy Fields
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Option 2: Generate with EduAI */}
+                                <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3">
+                                    <div className="flex items-start gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 text-primary">
+                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                        </svg>
+                                        <div className="flex-1">
+                                            <h5 className="text-sm font-semibold">Generate with EduAI</h5>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                                {mode === 'variant'
+                                                    ? 'Let EduAI create a variant based on a prompt'
+                                                    : 'Let EduAI generate a question from a prompt'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {courseWarningMessage && (
+                                        <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+                                            {courseWarningMessage}
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-3">
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="ai-prompt" className="text-xs font-medium">Prompt</Label>
+                                            <Textarea
+                                                id="ai-prompt"
+                                                value={form.generationPrompt}
+                                                onChange={(event) => handleFieldChange('generationPrompt', event.target.value)}
+                                                placeholder={mode === 'variant'
+                                                    ? 'e.g., Make it harder and focus on edge cases'
+                                                    : 'e.g., Time complexity of quicksort'}
+                                                className="text-xs resize-none"
+                                                rows={form.generationPrompt.length > 50 ? 4 : 2}
+                                                onFocus={(e) => {
+                                                    if (e.target.rows === 2) {
+                                                        e.target.rows = 4;
+                                                    }
+                                                }}
+                                                onBlur={(e) => {
+                                                    if (form.generationPrompt.length <= 50) {
+                                                        e.target.rows = 2;
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="ai-model" className="text-xs font-medium">Model</Label>
                                             <Select
                                                 value={form.generationModel}
                                                 onValueChange={(value) => handleFieldChange('generationModel', value)}
                                                 disabled={availableModels.length === 0}
                                             >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select a model" />
+                                                <SelectTrigger id="ai-model" className="h-9 text-xs">
+                                                    <SelectValue placeholder="Select model" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {availableModels.length === 0 ? (
-                                                        <SelectItem value="__no_models" disabled>
-                                                            No models available yet
+                                                        <SelectItem value="__no_models" disabled className="text-xs">
+                                                            No models available
                                                         </SelectItem>
                                                     ) : (
                                                         availableModels.map((model) => (
-                                                            <SelectItem key={model.id} value={model.id}>
+                                                            <SelectItem key={model.id} value={model.id} className="text-xs">
                                                                 {model.label}
                                                                 {model.provider ? ` (${model.provider})` : ''}
                                                             </SelectItem>
@@ -939,166 +995,81 @@ export const AddQuestionDialog = ({
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label>Desired Difficulty</Label>
+
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="ai-difficulty" className="text-xs font-medium">Difficulty</Label>
                                             <Select
                                                 value={form.generationDifficulty}
                                                 onValueChange={(value) =>
-                                                    handleFieldChange(
-                                                        'generationDifficulty',
-                                                        value as QuestionDifficulty | 'balanced'
-                                                    )
+                                                    handleFieldChange('generationDifficulty', value as QuestionDifficulty | 'balanced')
                                                 }
                                             >
-                                                <SelectTrigger>
+                                                <SelectTrigger id="ai-difficulty" className="h-9 text-xs">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="balanced">Let EduAI decide</SelectItem>
-                                                    <SelectItem value="easy">Easy</SelectItem>
-                                                    <SelectItem value="medium">Medium</SelectItem>
-                                                    <SelectItem value="hard">Hard</SelectItem>
+                                                    <SelectItem value="balanced" className="text-xs">Let EduAI decide</SelectItem>
+                                                    <SelectItem value="easy" className="text-xs">Easy</SelectItem>
+                                                    <SelectItem value="medium" className="text-xs">Medium</SelectItem>
+                                                    <SelectItem value="hard" className="text-xs">Hard</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                    </div>
-                                </div>
-                            )}
 
-                            <div className="space-y-2">
-                                <Label htmlFor="variant-text">Variant Question Text</Label>
-                                <Textarea
-                                    id="variant-text"
-                                    value={form.variantText}
-                                    onChange={(event) => handleFieldChange('variantText', event.target.value)}
-                                    placeholder="Enter the question wording"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="variant-difficulty">Difficulty</Label>
-                                    <Select
-                                        value={form.variantDifficulty}
-                                        onValueChange={(value) => handleFieldChange('variantDifficulty', value as QuestionDifficulty)}
-                                    >
-                                        <SelectTrigger id="variant-difficulty">
-                                            <SelectValue placeholder="Select difficulty" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {difficultyOptions.map((option) => (
-                                                <SelectItem key={option} value={option} className="capitalize">
-                                                    {option}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label htmlFor="variant-reference">Reference Variant ID <span className="text-xs text-muted-foreground">(dev only)</span></Label>
-                                    <Input
-                                        id="variant-reference"
-                                        value={form.variantReferenceId}
-                                        placeholder="Auto-assigned"
-                                        readOnly
-                                        className="bg-muted/50"
-                                    />
-                                    <p className="text-xs text-muted-foreground">Automatically populated when you select a base variant. Not editable.</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="variant-answer">Answer (optional)</Label>
-                                <Textarea
-                                    id="variant-answer"
-                                    value={form.variantAnswer}
-                                    onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
-                                    placeholder="Provide an answer or leave blank"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="variant-assessment">Assessment (optional)</Label>
-                                    <Select
-                                        value={form.variantAssessmentId}
-                                        onValueChange={(value) => handleFieldChange('variantAssessmentId', value)}
-                                    >
-                                        <SelectTrigger id="variant-assessment">
-                                            <SelectValue placeholder="Select assessment" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="none">No assessment</SelectItem>
-                                            {assessmentOptions.length === 0 ? (
-                                                <SelectItem value="__no_assessments" disabled>
-                                                    {isAuxLoading ? 'Loading...' : 'No assessments available'}
-                                                </SelectItem>
-                                            ) : (
-                                                assessmentOptions.map((assessment) => (
-                                                    <SelectItem key={assessment.id} value={assessment.id.toString()}>
-                                                        {assessment.name} ({assessment.type})
-                                                    </SelectItem>
-                                                ))
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label>Secondary Topics (optional)</Label>
-                                    <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-auto">
-                                        {topics.length === 0 ? (
-                                            <p className="text-xs text-muted-foreground">
-                                                {isAuxLoading ? 'Loading topics...' : 'No topics available for this course.'}
-                                            </p>
-                                        ) : (
-                                            topics.map((topic) => {
-                                                const checked = form.variantSecondaryTopics.includes(topic.id);
-                                                const isPrimary = form.primaryTopicId === topic.id.toString();
-                                                return (
-                                                    <label
-                                                        key={topic.id}
-                                                        className={`flex items-center space-x-2 text-sm ${
-                                                            isPrimary ? 'text-muted-foreground/70' : 'text-foreground'
-                                                        }`}
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            className="h-4 w-4"
-                                                            checked={checked}
-                                                            disabled={isPrimary}
-                                                            onChange={(event) => toggleSecondaryTopic(topic.id, event.target.checked)}
-                                                        />
-                                                        <span>{topic.name} (#{topic.id})</span>
-                                                    </label>
-                                                );
-                                            })
-                                        )}
+                                        <Button
+                                            type="button"
+                                            onClick={handleGenerateWithAI}
+                                            disabled={isGenerating}
+                                            className="w-full"
+                                            size="sm"
+                                        >
+                                            {isGenerating ? 'Generating...' : 'Generate'}
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
-                        {error && <p className="text-sm text-destructive">{error}</p>}
+                        </ScrollArea>
                     </div>
-                </ScrollArea>
+                </div>
 
-                <DialogFooter className="pt-4">
-                    <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-                        Cancel
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={
-                            isSubmitting ||
-                            (form.mode === 'variant' && baseVariantOptions.length === 0) ||
-                            (form.mode === 'variant' && !form.baseSelection)
-                        }
-                    >
-                        {isSubmitting ? 'Saving...' : form.mode === 'new' ? 'Create Question' : 'Add Variant'}
-                    </Button>
+                <DialogFooter className="pt-4 flex-col sm:flex-row gap-3">
+                    <div className="flex items-center space-x-2">
+                        <input
+                            type="checkbox"
+                            id="mark-as-reviewed"
+                            checked={markAsReviewed}
+                            onChange={(e) => setMarkAsReviewed(e.target.checked)}
+                            disabled={isSubmitting || mode === 'variant'}
+                            className="h-4 w-4 rounded border-gray-300"
+                        />
+                        <label
+                            htmlFor="mark-as-reviewed"
+                            className={`text-sm ${mode === 'variant' ? 'text-muted-foreground' : 'text-foreground'} cursor-pointer`}
+                        >
+                            Mark as reviewed
+                        </label>
+                    </div>
+                    <div className="flex gap-2 ml-auto">
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={
+                                isSubmitting ||
+                                (mode === 'variant' && !form.baseSelection)
+                            }
+                        >
+                            {isSubmitting
+                                ? 'Saving...'
+                                : mode === 'new'
+                                    ? markAsReviewed
+                                        ? 'Create Question'
+                                        : 'Create Question (Draft)'
+                                    : 'Add Variant'}
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

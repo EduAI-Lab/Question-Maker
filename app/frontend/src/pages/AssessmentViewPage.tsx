@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload } from 'lucide-react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload, AlertTriangle } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
@@ -23,10 +23,19 @@ import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
 import { Label } from '../components/ui/label';
 import { Input } from '../components/ui/input';
+import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
+import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
+import { QuestionMetadataCard } from '../components/assessments/QuestionMetadataCard';
+import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
-const QUESTION_TYPES: QuestionType[] = ['MCQ', 'SA'];
+const QUESTION_TYPES: QuestionType[] = ['MCQ', 'SA', 'LA'];
+const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  MCQ: 'Multiple Choice',
+  SA: 'Short Answer',
+  LA: 'Long Answer'
+};
 
 const defaultReasoningData = (): ReasoningDataState => ({
   factual: { total: 40, easyBoundary: 60, hardBoundary: 90 },
@@ -63,7 +72,7 @@ type QuestionSearchFilters = {
   primaryTopicIds: number[];
   secondaryTopicIds: number[];
   excludedTopicIds: number[];
-  difficulty?: 'easy' | 'medium' | 'hard' | null;
+  difficulty?: Array<'easy' | 'medium' | 'hard'> | null;
 };
 
 const toNumberArray = (value: unknown): number[] => {
@@ -135,20 +144,25 @@ const buildDraftFromSection = (
   section: AssessmentSection
 ): { filters: QuestionSearchFilters; payload: AssessmentSectionCreateInput } => {
   const topicFilters = extractTopicFiltersFromSection(section);
-  const questionTypes =
-    deriveQuestionTypesFromSection(section).length > 0
-      ? deriveQuestionTypesFromSection(section)
-      : ['MCQ'];
+  const questionTypes: QuestionType[] = deriveQuestionTypesFromSection(section);
   const metadata = (section.metadata as Record<string, unknown>) || {};
-  const selectedReasoning =
-    (metadata.selectedReasoning as keyof ReasoningDataState) ?? 'factual';
+  const selectedReasoningRaw = metadata.selectedReasoning;
+  const selectedReasoning: Array<keyof ReasoningDataState> = Array.isArray(selectedReasoningRaw)
+    ? selectedReasoningRaw.filter((r): r is keyof ReasoningDataState => 
+        ['factual', 'analytical', 'application'].includes(r as string)
+      )
+    : selectedReasoningRaw && ['factual', 'analytical', 'application'].includes(selectedReasoningRaw as string)
+    ? [selectedReasoningRaw as keyof ReasoningDataState]
+    : [];
+  
   const questionTarget =
     typeof metadata.questionTarget === 'number' ? metadata.questionTarget : 10;
-  const reasoningData = section.reasoningData ?? defaultReasoningData();
+  const reasoningData = (section as any).reasoningData ?? defaultReasoningData();
+  const primaryReasoning = selectedReasoning.length > 0 ? selectedReasoning[0] : 'factual';
   const difficultySettings =
     section.difficultySettings ?? {
-      easyBoundary: reasoningData[selectedReasoning].easyBoundary,
-      hardBoundary: reasoningData[selectedReasoning].hardBoundary
+      easyBoundary: reasoningData[primaryReasoning].easyBoundary,
+      hardBoundary: reasoningData[primaryReasoning].hardBoundary
     };
 
   const payload: AssessmentSectionCreateInput = {
@@ -166,8 +180,13 @@ const buildDraftFromSection = (
     difficultySettings
   };
 
-  const difficulty = metadata.difficulty && ['easy', 'medium', 'hard'].includes(metadata.difficulty as string)
-    ? (metadata.difficulty as 'easy' | 'medium' | 'hard')
+  const difficultyRaw = metadata.difficulty;
+  const difficulty: Array<'easy' | 'medium' | 'hard'> | null = Array.isArray(difficultyRaw)
+    ? difficultyRaw.filter((d): d is 'easy' | 'medium' | 'hard' =>
+        ['easy', 'medium', 'hard'].includes(d as string)
+      )
+    : difficultyRaw && ['easy', 'medium', 'hard'].includes(difficultyRaw as string)
+    ? [difficultyRaw as 'easy' | 'medium' | 'hard']
     : null;
 
   const filters: QuestionSearchFilters = {
@@ -213,9 +232,12 @@ const questionMatchesFilters = (question: Question, filters: QuestionSearchFilte
     secondaryIds.some((topicId) => filters.excludedTopicIds.includes(topicId));
 
   // Filter by difficulty if specified
+  // Filter by difficulty if specified
   const matchesDifficulty =
-    !filters.difficulty ||
-    (question.variants ?? []).some((variant) => variant.difficulty === filters.difficulty);
+    !filters.difficulty || filters.difficulty.length === 0 ||
+    (question.variants ?? []).some((variant) => 
+      filters.difficulty!.includes(variant.difficulty)
+    );
 
   return matchesType && matchesTopic && !isExcluded && matchesDifficulty;
 };
@@ -332,12 +354,25 @@ const SectionCard = ({
   onDeleteVariant: (sectionId: number, variantId: number) => void;
 }) => {
   const questionCount = section.sectionVariants?.length ?? 0;
+  
+  // Check if this section has any draft questions
+  const hasDraftQuestions = section.sectionVariants?.some(
+    (link) => link.variant?.questionMetadata?.isDraft === true
+  ) ?? false;
 
   return (
     <Card className="border border-gray-200">
       <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col">
-          <CardTitle className="text-lg">{section.name}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg">{section.name}</CardTitle>
+            {hasDraftQuestions && (
+              <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Contains Draft questions
+              </Badge>
+            )}
+          </div>
           {section.sectionType && (
             <p className="text-sm text-muted-foreground capitalize">{section.sectionType}</p>
           )}
@@ -444,14 +479,14 @@ const CreateSectionPanel = ({
   } = sanitizedDefaults;
   const [sectionName, setSectionName] = useState('');
   const [sectionTypeOptions] = useState<QuestionType[]>(QUESTION_TYPES);
-  const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>(['MCQ']);
+  const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>([]);
   const [primaryTopicIds, setPrimaryTopicIds] = useState<number[]>(primaryDefaults);
   const [secondaryTopicIds, setSecondaryTopicIds] = useState<number[]>(secondaryDefaults);
   const [excludedTopicIds, setExcludedTopicIds] = useState<number[]>(excludedDefaults);
   const [reasoningData, setReasoningData] = useState<ReasoningDataState>(defaultReasoningData());
-  const [selectedReasoning, setSelectedReasoning] = useState<keyof ReasoningDataState>('factual');
+  const [selectedReasoning, setSelectedReasoning] = useState<Array<keyof ReasoningDataState>>([]);
   const [questionTarget, setQuestionTarget] = useState(10);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | null>(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<Array<'easy' | 'medium' | 'hard'>>([]);
 
   const primaryDisabledIds = useMemo(
     () => new Set([...secondaryTopicIds, ...excludedTopicIds]),
@@ -491,10 +526,10 @@ const CreateSectionPanel = ({
           (totals[key] ?? 0) > (totals[best] ?? 0) ? key : best,
         'factual' as keyof ReasoningDataState
       );
-      setSelectedReasoning(favored || 'factual');
+      setSelectedReasoning(favored ? [favored] : []);
     } else {
       setReasoningData(defaultReasoningData());
-      setSelectedReasoning('factual');
+      setSelectedReasoning([]);
     }
   }, [blueprint, isEditing]);
 
@@ -510,7 +545,7 @@ const CreateSectionPanel = ({
     const topicFilters = extractTopicFiltersFromSection(editingSection);
     setSectionName(editingSection.name ?? '');
     const typesFromSection = deriveQuestionTypesFromSection(editingSection);
-    setSelectedTypes(typesFromSection.length > 0 ? typesFromSection : ['MCQ']);
+    setSelectedTypes(typesFromSection);
     setPrimaryTopicIds(topicFilters.primaryTopicIds);
     setSecondaryTopicIds(topicFilters.secondaryTopicIds);
     setExcludedTopicIds(topicFilters.excludedTopicIds);
@@ -518,15 +553,29 @@ const CreateSectionPanel = ({
     const target =
       typeof metadata.questionTarget === 'number' ? metadata.questionTarget : 10;
     setQuestionTarget(target);
-    const selected =
-      (metadata.selectedReasoning as keyof ReasoningDataState) ?? 'factual';
-    setSelectedReasoning(selected);
-    const difficulty = metadata.difficulty && ['easy', 'medium', 'hard'].includes(metadata.difficulty as string)
-      ? (metadata.difficulty as 'easy' | 'medium' | 'hard')
-      : null;
-    setSelectedDifficulty(difficulty);
-    if (editingSection.reasoningData) {
-      setReasoningData(editingSection.reasoningData);
+    const selected = metadata.selectedReasoning;
+    if (Array.isArray(selected)) {
+      setSelectedReasoning(selected.filter((r): r is keyof ReasoningDataState => 
+        ['factual', 'analytical', 'application'].includes(r as string)
+      ));
+    } else if (selected && ['factual', 'analytical', 'application'].includes(selected as string)) {
+      setSelectedReasoning([selected as keyof ReasoningDataState]);
+    } else {
+      setSelectedReasoning([]);
+    }
+    
+    const difficulty = metadata.difficulty;
+    if (Array.isArray(difficulty)) {
+      setSelectedDifficulty(difficulty.filter((d): d is 'easy' | 'medium' | 'hard' =>
+        ['easy', 'medium', 'hard'].includes(d as string)
+      ));
+    } else if (difficulty && ['easy', 'medium', 'hard'].includes(difficulty as string)) {
+      setSelectedDifficulty([difficulty as 'easy' | 'medium' | 'hard']);
+    } else {
+      setSelectedDifficulty([]);
+    }
+    if ((editingSection as any).reasoningData) {
+      setReasoningData((editingSection as any).reasoningData);
     } else {
       setReasoningData(defaultReasoningData());
     }
@@ -535,16 +584,28 @@ const CreateSectionPanel = ({
   useEffect(() => {
     if (isEditing) return;
     setSectionName('');
-    setSelectedTypes(['MCQ']);
+    setSelectedTypes([]);
     setQuestionTarget(10);
-    setSelectedReasoning('factual');
-    setSelectedDifficulty(null);
+    setSelectedReasoning([]);
+    setSelectedDifficulty([]);
     setReasoningData(defaultReasoningData());
   }, [isEditing]);
 
   const toggleType = (type: QuestionType) => {
     setSelectedTypes((prev) =>
       prev.includes(type) ? prev.filter((item) => item !== type) : [...prev, type]
+    );
+  };
+
+  const toggleReasoning = (reasoning: keyof ReasoningDataState) => {
+    setSelectedReasoning((prev) =>
+      prev.includes(reasoning) ? prev.filter((item) => item !== reasoning) : [...prev, reasoning]
+    );
+  };
+
+  const toggleDifficulty = (difficulty: 'easy' | 'medium' | 'hard') => {
+    setSelectedDifficulty((prev) =>
+      prev.includes(difficulty) ? prev.filter((item) => item !== difficulty) : [...prev, difficulty]
     );
   };
 
@@ -577,20 +638,25 @@ const CreateSectionPanel = ({
   const handleSubmit = async () => {
     if (!sectionName.trim()) return;
 
+    // Normalize reasoning data - distribute evenly if multiple selected, or use first one
+    const reasoningCount = selectedReasoning.length;
     const normalizedReasoningData: ReasoningDataState = {
       factual: {
         ...reasoningData.factual,
-        total: selectedReasoning === 'factual' ? 100 : 0
+        total: selectedReasoning.includes('factual') ? (reasoningCount > 0 ? 100 / reasoningCount : 0) : 0
       },
       analytical: {
         ...reasoningData.analytical,
-        total: selectedReasoning === 'analytical' ? 100 : 0
+        total: selectedReasoning.includes('analytical') ? (reasoningCount > 0 ? 100 / reasoningCount : 0) : 0
       },
       application: {
         ...reasoningData.application,
-        total: selectedReasoning === 'application' ? 100 : 0
+        total: selectedReasoning.includes('application') ? (reasoningCount > 0 ? 100 / reasoningCount : 0) : 0
       }
     };
+
+    // Use first selected reasoning for difficulty settings boundaries, or default to factual
+    const primaryReasoning = selectedReasoning.length > 0 ? selectedReasoning[0] : 'factual';
 
     const payload: AssessmentSectionCreateInput = {
       name: sectionName.trim(),
@@ -609,8 +675,8 @@ const CreateSectionPanel = ({
       },
       reasoningData: normalizedReasoningData,
       difficultySettings: {
-        easyBoundary: normalizedReasoningData[selectedReasoning].easyBoundary,
-        hardBoundary: normalizedReasoningData[selectedReasoning].hardBoundary
+        easyBoundary: normalizedReasoningData[primaryReasoning].easyBoundary,
+        hardBoundary: normalizedReasoningData[primaryReasoning].hardBoundary
       }
     };
 
@@ -620,17 +686,13 @@ const CreateSectionPanel = ({
         primaryTopicIds,
         secondaryTopicIds,
         excludedTopicIds,
-        difficulty: selectedDifficulty
+        difficulty: selectedDifficulty.length > 0 ? selectedDifficulty : null
       },
       payload,
       editingSection?.id
     );
   };
 
-  const handleDifficultyChange = (difficulty: 'easy' | 'medium' | 'hard') => {
-    // Toggle: if clicking the same difficulty, deselect it
-    setSelectedDifficulty(selectedDifficulty === difficulty ? null : difficulty);
-  };
 
   return (
     <Card className="border border-gray-200">
@@ -643,7 +705,9 @@ const CreateSectionPanel = ({
       <CardContent className="space-y-5">
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="section-name">Section Name</Label>
+            <Label htmlFor="section-name">
+              Section Name <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="section-name"
               placeholder="e.g., Multiple Choice Questions"
@@ -663,7 +727,7 @@ const CreateSectionPanel = ({
                 size="sm"
                 onClick={() => toggleType(type)}
               >
-                {type}
+                {QUESTION_TYPE_LABELS[type]}
               </Button>
             ))}
           </div>
@@ -702,9 +766,9 @@ const CreateSectionPanel = ({
                 <Button
                   key={type}
                   type="button"
-                  variant={selectedReasoning === type ? 'default' : 'outline'}
+                  variant={selectedReasoning.includes(type) ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedReasoning(type)}
+                  onClick={() => toggleReasoning(type)}
                 >
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </Button>
@@ -718,9 +782,9 @@ const CreateSectionPanel = ({
                 <Button
                   key={level}
                   type="button"
-                  variant={selectedDifficulty === level ? 'default' : 'outline'}
+                  variant={selectedDifficulty.includes(level) ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => handleDifficultyChange(level)}
+                  onClick={() => toggleDifficulty(level)}
                 >
                   {level.charAt(0).toUpperCase() + level.slice(1)}
                 </Button>
@@ -728,13 +792,30 @@ const CreateSectionPanel = ({
             </div>
           </div>
         </div>
-        <Button
-          className="w-full"
-          disabled={isSearching || !sectionName.trim()}
-          onClick={handleSubmit}
-        >
-          {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
-        </Button>
+        {isSearching || !sectionName.trim() ? (
+          <Tooltip 
+            content={isSearching ? 'Searching for questions...' : 'Section name is required'} 
+            multiline
+          >
+            <span className="inline-block w-full">
+              <Button
+                className="w-full"
+                disabled={isSearching || !sectionName.trim()}
+                onClick={handleSubmit}
+              >
+                {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
+              </Button>
+            </span>
+          </Tooltip>
+        ) : (
+          <Button
+            className="w-full"
+            disabled={isSearching || !sectionName.trim()}
+            onClick={handleSubmit}
+          >
+            {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
@@ -748,6 +829,8 @@ interface MatchingQuestionsPanelProps {
   onAddSelected: () => void;
   onCreateNewQuestion: () => void;
   onAddVariant: (question: Question) => void;
+  onViewQuestion?: (question: Question) => void;
+  onToggleReview: (questionId: number, nextDraft: boolean) => void;
   isSearching: boolean;
   isCreatingSection: boolean;
   searchError: string | null;
@@ -770,6 +853,8 @@ const MatchingQuestionsPanel = ({
   onAddSelected,
   onCreateNewQuestion,
   onAddVariant,
+  onViewQuestion,
+  onToggleReview,
   isSearching,
   isCreatingSection,
   searchError,
@@ -778,6 +863,22 @@ const MatchingQuestionsPanel = ({
   canFinalizeSection
 }: MatchingQuestionsPanelProps) => {
   const selectedCount = selectedQuestionIds.size;
+
+  const getDisabledReason = (): string | null => {
+    if (isCreatingSection) return null; // Don't show tooltip while creating
+    if (selectedCount === 0 && !canFinalizeSection) {
+      return 'Select at least one question and configure section';
+    }
+    if (selectedCount === 0) {
+      return 'Select at least one question';
+    }
+    if (!canFinalizeSection) {
+      return 'Configure section details first (run "Search Questions")';
+    }
+    return null;
+  };
+
+  const disabledReason = getDisabledReason();
 
   const renderContent = () => {
     if (isSearching) {
@@ -817,64 +918,17 @@ const MatchingQuestionsPanel = ({
         <div className="max-h-[480px] space-y-3 overflow-y-auto pr-1">
           {questions.map((question) => {
             const isSelected = selectedQuestionIds.has(question.id);
-            const primaryVariant = question.variants?.[0];
-            const displayText =
-              primaryVariant?.questionText ||
-              question.description ||
-              `Question #${question.id}`;
-            const secondaryTopicNames = Array.from(
-              new Set(
-                (question.variants ?? []).flatMap((variant) => variant.secondaryTopicsId ?? [])
-              )
-            )
-              .map((topicId) => topicsById[topicId]?.name)
-              .filter(Boolean) as string[];
 
             return (
-              <div
+              <QuestionMetadataCard
                 key={question.id}
-                onClick={() => onToggleQuestion(question)}
-                className={`flex items-start gap-3 rounded border px-3 py-3 text-sm cursor-pointer ${
-                  isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => onToggleQuestion(question)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 cursor-pointer"
-                />
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{question.type}</Badge>
-                    <p className="font-medium flex-1">{displayText}</p>
-                    <Button
-                      type="button"
-                      variant="default"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddVariant(question);
-                      }}
-                      className="text-xs bg-black text-white hover:bg-gray-800"
-                    >
-                      Variant
-                    </Button>
-                  </div>
-                  {primaryVariant?.questionText && question.description && (
-                    <p className="text-xs text-muted-foreground">{question.description}</p>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    Primary: {getTopicName(topicsById, question.primaryTopicId)}
-                  </p>
-                  {secondaryTopicNames.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Secondary: {secondaryTopicNames.join(', ')}
-                    </p>
-                  )}
-                </div>
-              </div>
+                question={question}
+                isSelected={isSelected}
+                onToggleSelection={() => onToggleQuestion(question)}
+                onAddVariant={() => onAddVariant(question)}
+                topicsById={topicsById}
+                onToggleReview={onToggleReview}
+              />
             );
           })}
         </div>
@@ -912,13 +966,27 @@ const MatchingQuestionsPanel = ({
             <Button type="button" variant="outline" onClick={onCreateNewQuestion}>
               Create New Question
             </Button>
-            <Button
-              type="button"
-              disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
-              onClick={onAddSelected}
-            >
-              {isCreatingSection ? 'Adding...' : 'Save to Section'}
-            </Button>
+            {disabledReason ? (
+              <Tooltip content={disabledReason} multiline>
+                <span className="inline-block">
+                  <Button
+                    type="button"
+                    disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
+                    onClick={onAddSelected}
+                  >
+                    {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                  </Button>
+                </span>
+              </Tooltip>
+            ) : (
+              <Button
+                type="button"
+                disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
+                onClick={onAddSelected}
+              >
+                {isCreatingSection ? 'Adding...' : 'Save to Section'}
+              </Button>
+            )}
           </div>
         </div>
       </CardContent>
@@ -929,6 +997,7 @@ const MatchingQuestionsPanel = ({
 export const AssessmentViewPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const assessmentId = Number(id);
   const { toast } = useToast();
 
@@ -956,6 +1025,14 @@ export const AssessmentViewPage = () => {
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
   const [lastFilters, setLastFilters] = useState<QuestionSearchFilters | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
+  
+  // Delete confirmation modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteAction, setDeleteAction] = useState<{
+    type: 'assessment' | 'section' | 'variant';
+    item?: AssessmentSection | { sectionId: number; variantId: number };
+  } | null>(null);
 
   const resetBuilderContext = () => {
     setMatchingQuestions([]);
@@ -1043,6 +1120,8 @@ export const AssessmentViewPage = () => {
           courseCode: question.course?.code,
           secondaryTopicNames:
             secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+          isAiGenerated: question.isAiGenerated,
+          isDraft: question.isDraft,
           variant
         };
       })
@@ -1133,6 +1212,98 @@ export const AssessmentViewPage = () => {
     });
   };
 
+  const handleViewQuestion = (question: Question) => {
+    // Convert Question to QuestionVariantEntry
+    const primaryVariant = question.variants?.[0];
+    if (!primaryVariant) {
+      toast({
+        variant: 'destructive',
+        title: 'No variant found',
+        description: 'This question has no variants to display.'
+      });
+      return;
+    }
+
+    const resolveTopicName = (topicId: number) => topicsById[topicId]?.name ?? `Topic ${topicId}`;
+    const secondaryTopicNames = Array.isArray(primaryVariant.secondaryTopicsId)
+      ? (primaryVariant.secondaryTopicsId
+          .map((topicId) => resolveTopicName(topicId))
+          .filter(Boolean) as string[])
+      : undefined;
+
+    const entry: QuestionVariantEntry = {
+      questionId: question.id,
+      questionDescription: question.description,
+      questionType: question.type,
+      primaryTopicId: question.primaryTopicId,
+      primaryTopicName: resolveTopicName(question.primaryTopicId),
+      courseId: question.courseId,
+      courseName: question.course?.name,
+      courseCode: question.course?.code,
+      secondaryTopicNames:
+        secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+      isAiGenerated: question.isAiGenerated,
+      isDraft: question.isDraft,
+      variant: primaryVariant
+    };
+
+    setSelectedVariant(entry);
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedVariant(null);
+  };
+
+  const handleViewVariant = async (entry: QuestionVariantEntry) => {
+    setSelectedVariant(entry);
+    // Refresh the question in the matching questions list if it was updated
+    const question = matchingQuestions.find((q) => q.id === entry.questionId);
+    if (question) {
+      try {
+        const updatedQuestion = await questionService.getQuestion(entry.questionId);
+        setMatchingQuestions((prev) =>
+          prev.map((q) => (q.id === entry.questionId ? updatedQuestion : q))
+        );
+      } catch (error) {
+        console.error('Failed to refresh question', error);
+      }
+    }
+  };
+
+  const handleCreateVariant = (entry: QuestionVariantEntry) => {
+    setPresetVariant(entry);
+    setIsAddQuestionOpen(true);
+    setSelectedVariant(null);
+  };
+
+  const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
+    try {
+      const question = matchingQuestions.find((item) => item.id === entry.questionId);
+      if (!question) {
+        return;
+      }
+
+      const isLastVariant = (question.variants?.length ?? 0) <= 1;
+      if (isLastVariant) {
+        await questionService.deleteQuestion(question.id);
+        setMatchingQuestions((prev) => prev.filter((item) => item.id !== question.id));
+      } else {
+        await questionService.deleteVariant(entry.variant.id);
+        setMatchingQuestions((prev) =>
+          prev.map((item) =>
+            item.id === question.id
+              ? { ...item, variants: item.variants?.filter((variant) => variant.id !== entry.variant.id) ?? [] }
+              : item
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Failed to delete variant', error);
+    } finally {
+      setSelectedVariant(null);
+    }
+  };
+
   const clearQuestionSelection = () => {
     setSelectedQuestionIds(new Set());
     setSelectedVariantByQuestion({});
@@ -1186,6 +1357,8 @@ export const AssessmentViewPage = () => {
       secondaryTopicNames: primaryVariant.secondaryTopicsId
         ?.map((id) => availableTopics.find((t) => t.id === id)?.name)
         .filter(Boolean) as string[] | undefined,
+      isAiGenerated: question.isAiGenerated,
+      isDraft: question.isDraft,
       variant: variantWithAssessment
     };
     setPresetVariant(variantEntry);
@@ -1204,12 +1377,38 @@ export const AssessmentViewPage = () => {
     });
   };
 
-  const handleDeleteAssessment = async () => {
+  const handleToggleQuestionReview = async (questionId: number, nextDraft: boolean) => {
+    try {
+      const updated = await questionService.updateQuestion(questionId, { isDraft: nextDraft });
+      setMatchingQuestions((prev) =>
+        prev.map((question) =>
+          question.id === questionId ? { ...question, isDraft: updated.isDraft } : question
+        )
+      );
+      if (selectedVariant?.questionId === questionId) {
+        setSelectedVariant({ ...selectedVariant, isDraft: updated.isDraft });
+      }
+      toast({
+        title: 'Review status updated',
+        description: `Question is now ${updated.isDraft ? 'marked as draft' : 'marked as reviewed'}.`
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Failed to update review status',
+        description: error?.response?.data?.error || 'Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDeleteAssessment = () => {
     if (!assessment) return;
-    const confirmed = window.confirm(
-      `Delete assessment "${assessment.name}"? This action cannot be undone.`
-    );
-    if (!confirmed) return;
+    setDeleteAction({ type: 'assessment' });
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteAssessment = async () => {
+    if (!assessment) return;
     try {
       setIsDeletingAssessment(true);
       await assessmentService.deleteAssessment(assessment.id);
@@ -1226,6 +1425,8 @@ export const AssessmentViewPage = () => {
       });
     } finally {
       setIsDeletingAssessment(false);
+      setDeleteModalOpen(false);
+      setDeleteAction(null);
     }
   };
 
@@ -1279,12 +1480,15 @@ export const AssessmentViewPage = () => {
     }
   };
 
-  const handleDeleteSection = async (section: AssessmentSection) => {
+  const handleDeleteSection = (section: AssessmentSection) => {
     if (!assessment) return;
-    const confirmed = window.confirm(
-      `Delete section "${section.name}"? This cannot be undone.`
-    );
-    if (!confirmed) return;
+    setDeleteAction({ type: 'section', item: section });
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteSection = async () => {
+    if (!assessment || !deleteAction || deleteAction.type !== 'section' || !deleteAction.item) return;
+    const section = deleteAction.item as AssessmentSection;
     try {
       await assessmentService.deleteSection(assessment.id, section.id);
       if (editingSection?.id === section.id) {
@@ -1304,12 +1508,15 @@ export const AssessmentViewPage = () => {
     }
   };
 
-  const handleDeleteVariantFromSection = async (sectionId: number, variantId: number) => {
+  const handleDeleteVariantFromSection = (sectionId: number, variantId: number) => {
     if (!assessment) return;
-    const confirmed = window.confirm(
-      'Remove this question from the section?'
-    );
-    if (!confirmed) return;
+    setDeleteAction({ type: 'variant', item: { sectionId, variantId } });
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteVariant = async () => {
+    if (!assessment || !deleteAction || deleteAction.type !== 'variant' || !deleteAction.item) return;
+    const { sectionId, variantId } = deleteAction.item as { sectionId: number; variantId: number };
     try {
       await assessmentService.removeVariantFromSection(assessment.id, sectionId, variantId);
       await refreshSections();
@@ -1467,10 +1674,43 @@ export const AssessmentViewPage = () => {
     [sections]
   );
 
+  // Check if assessment has any draft questions
+  const hasDraftQuestions = useMemo(() => {
+    if (!sections || sections.length === 0) return false;
+    return sections.some((section) =>
+      section.sectionVariants?.some(
+        (link) => link.variant?.questionMetadata?.isDraft === true
+      )
+    );
+  }, [sections]);
+
+  const hasQuestions = useMemo(() => {
+    // Count unique questions (questionMetadata IDs) across all sections
+    const uniqueQuestionIds = new Set<number>();
+    sections.forEach((section) => {
+      (section.sectionVariants ?? []).forEach((sectionVariant) => {
+        const questionMetadataId = sectionVariant.variant?.questionMetadata?.id;
+        if (questionMetadataId) {
+          uniqueQuestionIds.add(questionMetadataId);
+        }
+      });
+    });
+    return uniqueQuestionIds.size > 0;
+  }, [sections]);
+
+  const handleBack = () => {
+    const fromTab = (location.state as any)?.fromTab;
+    if (fromTab === 'assessments') {
+      navigate('/landing?tab=assessments', { replace: true });
+    } else {
+      navigate('/landing', { replace: true });
+    }
+  };
+
   if (Number.isNaN(assessmentId)) {
     return (
       <div className="p-6">
-        <Button variant="ghost" onClick={() => navigate(-1)}>
+        <Button variant="ghost" onClick={handleBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -1483,7 +1723,7 @@ export const AssessmentViewPage = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
+          <Button variant="ghost" onClick={handleBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -1506,7 +1746,15 @@ export const AssessmentViewPage = () => {
             <Card>
               <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="space-y-2">
-                  <CardTitle className="text-2xl">{assessment.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-2xl">{assessment.name}</CardTitle>
+                    {hasDraftQuestions && (
+                      <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        Contains Draft questions
+                      </Badge>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                     <Badge variant="outline">{assessment.type}</Badge>
                     <Badge variant="outline">{assessment.semester}</Badge>
@@ -1515,14 +1763,38 @@ export const AssessmentViewPage = () => {
                   {assessment.description && <p className="text-sm text-muted-foreground">{assessment.description}</p>}
                 </div>
                 <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={() => setIsCanvasExportOpen(true)}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Export to Canvas
-                  </Button>
+                  {hasQuestions && !hasDraftQuestions ? (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => setIsCanvasExportOpen(true)}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      Export to Canvas
+                    </Button>
+                  ) : (
+                    <Tooltip 
+                      content={
+                        !hasQuestions 
+                          ? "No questions in assessment" 
+                          : hasDraftQuestions 
+                          ? "Cannot export: Assessment contains draft questions. Please review all draft questions before exporting."
+                          : "Export assessment to Canvas"
+                      }
+                      multiline
+                    >
+                      <span className="inline-block">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          disabled
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Export to Canvas
+                        </Button>
+                      </span>
+                    </Tooltip>
+                  )}
                   <Button
                     variant="destructive"
                     size="sm"
@@ -1593,6 +1865,8 @@ export const AssessmentViewPage = () => {
                     onAddSelected={handleFinalizeSection}
                     onCreateNewQuestion={handleCreateNewQuestion}
                     onAddVariant={handleAddVariant}
+                    onViewQuestion={handleViewQuestion}
+                    onToggleReview={handleToggleQuestionReview}
                     isSearching={isSearchingQuestions}
                     isCreatingSection={isCreatingSection}
                     searchError={questionSearchError}
@@ -1630,7 +1904,49 @@ export const AssessmentViewPage = () => {
             });
           }}
         />
-      )}
+       )}
+       {selectedVariant && (
+         <QuestionDetailView
+           entry={selectedVariant}
+           relatedVariants={questionVariantEntries.filter(
+             (entry) => entry.questionId === selectedVariant.questionId
+           )}
+           onClose={handleCloseDetail}
+           onCreateVariant={handleCreateVariant}
+           onDeleteVariant={handleDeleteVariant}
+           onSelectVariant={handleViewVariant}
+         />
+       )}
+       <DeleteConfirmationModal
+         open={deleteModalOpen}
+         onOpenChange={setDeleteModalOpen}
+         onConfirm={async () => {
+           if (!deleteAction) return;
+           if (deleteAction.type === 'assessment') {
+             await confirmDeleteAssessment();
+           } else if (deleteAction.type === 'section') {
+             await confirmDeleteSection();
+           } else if (deleteAction.type === 'variant') {
+             await confirmDeleteVariant();
+           }
+         }}
+         title={
+           deleteAction?.type === 'assessment'
+             ? `Delete assessment "${assessment?.name}"?`
+             : deleteAction?.type === 'section'
+             ? `Delete section "${(deleteAction.item as AssessmentSection)?.name}"?`
+             : 'Remove question from section?'
+         }
+         message={
+           deleteAction?.type === 'assessment'
+             ? 'This action cannot be undone. All sections and questions in this assessment will be removed.'
+             : deleteAction?.type === 'section'
+             ? 'This cannot be undone. All questions in this section will be removed from the assessment.'
+             : 'This question will be removed from the section. This action cannot be undone.'
+         }
+         confirmLabel="Delete"
+         isLoading={isDeletingAssessment}
+       />
     </div>
   );
 };

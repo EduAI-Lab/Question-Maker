@@ -89,7 +89,7 @@ export const getAssessmentsByUser = async (userId, options = {}) => {
                     {
                       model: Question_Metadata,
                       as: 'questionMetadata',
-                      attributes: ['id', 'description', 'type', 'questionOrder'],
+                      attributes: ['id', 'description', 'type', 'questionOrder', 'isDraft'],
                       include: [
                         {
                           model: Course,
@@ -166,7 +166,7 @@ export const getAssessmentById = async (assessmentId, userId) => {
                     {
                       model: Question_Metadata,
                       as: 'questionMetadata',
-                      attributes: ['id', 'description', 'type', 'questionOrder'],
+                      attributes: ['id', 'description', 'type', 'questionOrder', 'isDraft'],
                       include: [
                         {
                           model: Course,
@@ -293,6 +293,12 @@ export const deleteAssessment = async (assessmentId, userId) => {
     if (!assessment) {
       throw new Error('Assessment not found');
     }
+
+    // Clear assessmentId from all variants linked to this assessment
+    await Variants.update(
+      { assessmentId: null },
+      { where: { assessmentId: assessmentId } }
+    );
 
     await assessment.destroy();
     return true;

@@ -336,6 +336,7 @@ export const ApiTestPage = () => {
                     <SelectContent>
                       <SelectItem value="MCQ">MCQ</SelectItem>
                       <SelectItem value="SA">Short Answer</SelectItem>
+                      <SelectItem value="LA">Long Answer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

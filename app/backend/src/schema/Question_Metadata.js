@@ -12,7 +12,7 @@ export const Question_Metadata = sequelize.define('Question_Metadata', {
     allowNull: true
   },
   type: {
-    type: DataTypes.ENUM('MCQ', 'SA'),
+    type: DataTypes.ENUM('MCQ', 'SA', 'LA'),
     allowNull: false
   },
   courseId: {
@@ -38,6 +38,20 @@ export const Question_Metadata = sequelize.define('Question_Metadata', {
     allowNull: true,
     field: 'question_order',
     comment: 'Dictionary mapping assessment IDs to order numbers: {assessmentId: orderNumber}'
+  },
+  isAiGenerated: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'is_ai_generated',
+    comment: 'Indicates if this question was generated using AI'
+  },
+  isDraft: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+    field: 'is_draft',
+    comment: 'Indicates if this question is a draft and needs review before being added to assessments. All new questions start as drafts.'
   },
   createdAt: {
     type: DataTypes.DATE,
