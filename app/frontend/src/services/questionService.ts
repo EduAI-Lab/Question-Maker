@@ -25,7 +25,17 @@ const mapVariant = (variant: any): QuestionVariant => ({
       : [],
   referenceId: variant.referenceId ?? variant.reference_id ?? null,
   createdAt: variant.createdAt ?? variant.created_at,
-  updatedAt: variant.updatedAt ?? variant.updated_at
+  updatedAt: variant.updatedAt ?? variant.updated_at,
+  assessment: variant.assessment
+    ? {
+        id: variant.assessment.id,
+        name: variant.assessment.name,
+        type: variant.assessment.type,
+        semester: variant.assessment.semester,
+        createdAt: variant.assessment.createdAt ?? '',
+        updatedAt: variant.assessment.updatedAt ?? ''
+      }
+    : undefined
 });
 
 const mapQuestion = (item: any): Question => ({
@@ -131,8 +141,12 @@ export const questionService = {
       name: string;
       semester: string;
     };
-  }): Promise<Question[]> {
+  }): Promise<{ questions: Question[]; assessmentId: number | null }> {
     const response = await api.post('/api/questions/extract/save', payload);
-    return (response.data.data || []).map(mapQuestion);
+    const data = response.data.data;
+    return {
+      questions: (data.questions || []).map(mapQuestion),
+      assessmentId: data.assessmentId || null
+    };
   }
 };

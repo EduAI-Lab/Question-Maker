@@ -127,6 +127,28 @@ router.post('/generate-questions', authenticateToken, async (req, res) => {
 });
 
 /**
+ * @route GET /api/eduai/courses
+ * @desc Retrieve all courses from EduAI
+ * @access Private
+ */
+router.get('/courses', authenticateToken, async (req, res) => {
+  try {
+    const coursesData = await eduaiService.listCourses();
+
+    res.json({
+      success: true,
+      data: coursesData
+    });
+  } catch (error) {
+    console.error('EduAI list courses error:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve courses from EduAI',
+      details: error.message
+    });
+  }
+});
+
+/**
  * @route GET /api/eduai/courses/:courseId/topics
  * @desc Retrieve topics for a specific EduAI course
  * @access Private

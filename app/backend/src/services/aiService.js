@@ -282,6 +282,26 @@ const extractQuestionsWithEduAI = async (text, course) => {
   const model = "ollama:gpt-oss:120b";
   const extracted = [];
 
+  // Fetch topics for the course to include in the prompt
+  let topics = [];
+  if (course?.id) {
+    try {
+      topics = await Topics.findAll({
+        where: { courseId: course.id },
+        attributes: ['id', 'name'],
+        order: [['name', 'ASC']]
+      });
+    } catch (error) {
+      console.error("Failed to fetch topics for course", error.message);
+      // Continue without topics if fetch fails
+    }
+  }
+
+  // Format topics for the prompt
+  const topicsSection = topics.length > 0
+    ? `\n\nCourse topics:\n${topics.map(t => `- ID ${t.id}: ${t.name}`).join('\n')}\n`
+    : '';
+
   for (const chunk of chunks) {
     const numQuestions = calculateQuestionTarget(chunk);
     const difficultyDistribution = buildDifficultyCounts(numQuestions);
@@ -299,7 +319,7 @@ Requirements:
 - If a question has parts (a), (b), etc., keep them together in a single prompt using \\n for new lines.
 - Provide a concise "description" (<= 12 words) that summarizes the question without repeating it verbatim.
 - Format answers as null (omit if unknown). Do NOT fabricate answers.
-
+- Assign appropriate primary_topic_id and secondary_topic_ids based on the question content and the course topics provided below.${topicsSection}
 Source material:
 """
 ${chunk}

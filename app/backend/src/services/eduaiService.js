@@ -278,6 +278,53 @@ Please ensure the questions are appropriate for the course level and cover the k
   }
 
   /**
+   * Retrieve all courses from EduAI
+   * @returns {Promise<Array>} List of courses with their metadata
+   */
+  async listCourses() {
+    if (!this.isConfigured()) {
+      throw new Error(
+        "EduAI service is not configured. Please set EDUAI_API_KEY environment variable."
+      );
+    }
+
+    const url = `${this.baseURL}/api/courses`;
+
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+        },
+        timeout: 30000,
+      });
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        const errorMessage =
+          error.response.data?.error ||
+          error.response.data?.message ||
+          error.response.statusText;
+        const statusCode = error.response.status;
+        console.error("EduAI courses API error:", {
+          status: statusCode,
+          statusText: error.response.statusText,
+          data: error.response.data,
+          url,
+        });
+        throw new Error(`EduAI API error (${statusCode}): ${errorMessage}`);
+      } else if (error.request) {
+        console.error("EduAI courses request error:", error.request);
+        throw new Error("EduAI API request failed: No response received");
+      } else {
+        console.error("EduAI courses error:", error.message);
+        throw new Error(`EduAI API error: ${error.message}`);
+      }
+    }
+  }
+
+  /**
    * Retrieve topics for a given course from EduAI
    * @param {string} courseId - EduAI course identifier (e.g. COSC211)
    * @returns {Promise<Object>} Raw response containing course topics

@@ -294,6 +294,12 @@ export const deleteAssessment = async (assessmentId, userId) => {
       throw new Error('Assessment not found');
     }
 
+    // Clear assessmentId from all variants linked to this assessment
+    await Variants.update(
+      { assessmentId: null },
+      { where: { assessmentId: assessmentId } }
+    );
+
     await assessment.destroy();
     return true;
   } catch (error) {
