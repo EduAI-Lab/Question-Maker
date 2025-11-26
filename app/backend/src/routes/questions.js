@@ -277,7 +277,7 @@ router.post('/generate', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.post('/extract', authenticateToken, async (req, res, next) => {
   try {
-    const { text, courseId } = req.body;
+    const { text, courseId, model } = req.body;
 
     if (!text || typeof text !== 'string' || !text.trim()) {
       return res.status(400).json({
@@ -301,7 +301,7 @@ router.post('/extract', authenticateToken, async (req, res, next) => {
       });
     }
 
-    const questions = await extractQuestionsFromText(text, numericCourseId);
+    const questions = await extractQuestionsFromText(text, numericCourseId, model);
 
     res.json({
       success: true,

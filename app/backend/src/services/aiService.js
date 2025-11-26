@@ -272,7 +272,7 @@ const sanitizeEduAIQuestion = (question) => {
   };
 };
 
-const extractQuestionsWithEduAI = async (text, course) => {
+const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:120b") => {
   if (!eduaiService.isConfigured()) {
     throw new Error(
       "EduAI service is not configured. Please set EDUAI_API_KEY."
@@ -283,7 +283,6 @@ const extractQuestionsWithEduAI = async (text, course) => {
     (course?.code && course.code.trim()) || `COURSE-${course?.id ?? "UNKNOWN"}`;
   const courseCode = rawCode.replace(/\s+/g, "").toUpperCase();
   const chunks = chunkText(text, 4000);
-  const model = "ollama:gpt-oss:120b";
   const extracted = [];
 
   // Fetch topics for the course to include in the prompt
@@ -635,7 +634,7 @@ const enrichQuestionsWithTopics = async (questions, courseId) => {
   }
 };
 
-export const extractQuestionsFromText = async (rawText, courseId) => {
+export const extractQuestionsFromText = async (rawText, courseId, model) => {
   const normalized = normalizeExtractText(rawText);
   if (!normalized) {
     return [];
@@ -645,7 +644,7 @@ export const extractQuestionsFromText = async (rawText, courseId) => {
     attributes: ["id", "code", "name"],
   });
 
-  const extracted = await extractQuestionsWithEduAI(normalized, course);
+  const extracted = await extractQuestionsWithEduAI(normalized, course, model);
   return extracted;
 };
 

@@ -126,7 +126,7 @@ export const questionService = {
     return response.data.data;
   },
 
-  async extractQuestionsFromText(payload: { text: string; courseId: number }): Promise<ExtractedQuestion[]> {
+  async extractQuestionsFromText(payload: { text: string; courseId: number; model?: string }): Promise<ExtractedQuestion[]> {
     const response = await api.post('/api/questions/extract', payload);
     return response.data.data || [];
   },

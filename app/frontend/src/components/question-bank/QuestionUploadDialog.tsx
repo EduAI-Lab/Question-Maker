@@ -243,7 +243,8 @@ export const QuestionUploadDialog = ({
 
         setProcessingStage('extracting');
         setProgress(85);
-        const response = await questionService.extractQuestionsFromText({ text, courseId });
+        console.log('QuestionUploadDialog: Extracting questions with model:', aiModel);
+        const response = await questionService.extractQuestionsFromText({ text, courseId, model: aiModel });
         const drafts = (response || [])
             .filter((item): item is ExtractedQuestion & { summary: string } =>
                 Boolean(
@@ -297,7 +298,7 @@ export const QuestionUploadDialog = ({
             title: 'Questions extracted',
             description: `Parsed ${drafts.length} question${drafts.length === 1 ? '' : 's'} from the upload.`
         });
-    }, [courseId, toast]);
+    }, [courseId, toast, aiModel]);
 
     const processFile = useCallback(async (file: File) => {
         setError(null);
