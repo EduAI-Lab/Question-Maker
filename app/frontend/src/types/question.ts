@@ -1,5 +1,5 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
-export type QuestionType = 'MCQ' | 'SA';
+export type QuestionType = 'MCQ' | 'SA' | 'LA';
 export type ReasoningLevel = 'factual' | 'analytical' | 'application';
 export type AssessmentType = 'Assignment' | 'Lab' | 'Quiz' | 'Mid' | 'Final';
 

@@ -210,7 +210,7 @@ const populateDatabase = async () => {
     // Generate questions for COSC 211 (Machine Architecture) - 50 questions
     const cosc211Questions = [];
     const cosc211Topics = topics.slice(0, 6); // First 6 topics are COSC 211
-    const cosc211QuestionTypes = ['MCQ', 'SA'];
+    const cosc211QuestionTypes = ['MCQ', 'SA', 'LA'];
     const cosc211Descriptions = [
       // Instruction Set Architectures (8 questions)
       'Understanding instruction set architectures',
@@ -285,7 +285,7 @@ const populateDatabase = async () => {
     // Generate questions for COSC 121 (Computer Programming II) - 50 questions
     const cosc121Questions = [];
     const cosc121Topics = topics.slice(6, 12); // Last 6 topics are COSC 121
-    const cosc121QuestionTypes = ['MCQ', 'SA'];
+    const cosc121QuestionTypes = ['MCQ', 'SA', 'LA'];
     const cosc121Descriptions = [
       // Object-Oriented Design (9 questions)
       'Object-oriented design principles',
@@ -384,6 +384,15 @@ const populateDatabase = async () => {
         ];
         questionText = questionTemplates[variantNum % questionTemplates.length];
         answer = 'B) Option B'; // Default answer
+      } else if (qMeta.type === 'LA') {
+        // Generate LA (Long Answer) questions
+        const questionTemplates = [
+          `Discuss ${qMeta.description.toLowerCase()} in depth, including key trade-offs, examples, and its impact on system design.`,
+          `Provide a detailed explanation of ${qMeta.description.toLowerCase()}, covering motivations, methodology, and real-world applications.`,
+          `Evaluate ${qMeta.description.toLowerCase()} with supporting arguments, counterpoints, and a concise conclusion.`
+        ];
+        questionText = questionTemplates[variantNum % questionTemplates.length];
+        answer = `Comprehensive answer for ${qMeta.description}. Include context, detailed reasoning, comparative analysis, and practical implications.`;
       } else {
         // Generate SA (Short Answer) questions
         const questionTemplates = [
@@ -467,4 +476,3 @@ populateDatabase()
     console.error('\n❌ Script failed:', error);
     process.exit(1);
   });
-

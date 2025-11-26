@@ -153,7 +153,7 @@ Requirements:
     "difficulty": "easy/medium/hard",
     "reasoning_level": "factual/analytical/application",
     "bloom_level": "remember/understand/apply/analyze/evaluate/create",
-    "type": "MCQ/SA",
+    "type": "MCQ/SA/LA",
     "primary_topic_id": number | null,
     "secondary_topic_ids": number[]
   }
@@ -265,7 +265,10 @@ Please ensure the questions are appropriate for the course level and cover the k
             typeof question.type === "string" &&
             question.type.toUpperCase().trim() === "SA"
               ? "SA"
-              : "MCQ",
+              : typeof question.type === "string" &&
+                question.type.toUpperCase().trim() === "LA"
+                ? "LA"
+                : "MCQ",
           primary_topic_id: primaryTopicId,
           secondary_topic_ids: secondaryTopicIds,
         };

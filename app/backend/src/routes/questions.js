@@ -27,7 +27,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
     const type = req.body.type || 'MCQ';
     const questionOrder = req.body.questionOrder;
 
-    const allowedTypes = ['MCQ', 'SA'];
+    const allowedTypes = ['MCQ', 'SA', 'LA'];
     if (type && !allowedTypes.includes(type)) {
       return res.status(400).json({
         success: false,
@@ -176,7 +176,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
     }
 
     if (type !== undefined) {
-      const allowedTypes = ['MCQ', 'SA'];
+      const allowedTypes = ['MCQ', 'SA', 'LA'];
       if (!allowedTypes.includes(type)) {
         return res.status(400).json({
           success: false,

@@ -12,7 +12,7 @@ export const Question_Metadata = sequelize.define('Question_Metadata', {
     allowNull: true
   },
   type: {
-    type: DataTypes.ENUM('MCQ', 'SA'),
+    type: DataTypes.ENUM('MCQ', 'SA', 'LA'),
     allowNull: false
   },
   courseId: {

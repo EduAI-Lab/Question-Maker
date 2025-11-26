@@ -249,6 +249,7 @@ const convertVariantToCanvasQuestion = (variant, questionMetadata, position, sec
   const questionText = variant.questionText || '';
   const answerText = variant.answer || '';
   const isMCQ = questionMetadata.type === 'MCQ';
+  const isLongAnswer = questionMetadata.type === 'LA';
   
   const baseQuestion = {
     question_name: `${position}. ${questionMetadata.description || 'Question'}`,
@@ -271,10 +272,10 @@ const convertVariantToCanvasQuestion = (variant, questionMetadata, position, sec
       }))
     };
   } else {
-    // Short answer question
+    // Long/short answer question
     return {
       ...baseQuestion,
-      question_type: 'short_answer_question',
+      question_type: isLongAnswer ? 'essay_question' : 'short_answer_question',
       answers: [
         {
           answer_text: answerText || 'Sample answer',
@@ -350,4 +351,3 @@ export const getCanvasCourseMapping = async (userId, localCourseId) => {
     throw new Error(`Failed to get Canvas course mapping: ${error.message}`);
   }
 };
-
