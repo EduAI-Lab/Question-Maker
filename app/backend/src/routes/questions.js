@@ -29,7 +29,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
     const isAiGenerated = req.body.isAiGenerated;
     const isDraft = req.body.isDraft;
 
-    const allowedTypes = ['MCQ', 'SA'];
+    const allowedTypes = ['MCQ', 'SA', 'LA'];
     if (type && !allowedTypes.includes(type)) {
       return res.status(400).json({
         success: false,
@@ -180,7 +180,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
     }
 
     if (type !== undefined) {
-      const allowedTypes = ['MCQ', 'SA'];
+      const allowedTypes = ['MCQ', 'SA', 'LA'];
       if (!allowedTypes.includes(type)) {
         return res.status(400).json({
           success: false,

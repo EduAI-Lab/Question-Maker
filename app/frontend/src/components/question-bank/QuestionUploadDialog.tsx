@@ -44,7 +44,12 @@ type DraftQuestion = Required<Pick<ExtractedQuestion, 'question'>> &
     };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
-const questionTypes: QuestionType[] = ['SA', 'MCQ'];
+const questionTypes: QuestionType[] = ['SA', 'MCQ', 'LA'];
+const questionTypeLabels: Record<QuestionType, string> = {
+    MCQ: 'Multiple Choice',
+    SA: 'Short Answer',
+    LA: 'Long Answer'
+};
 const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
 const aiModelOptions = [
     { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
@@ -260,7 +265,7 @@ export const QuestionUploadDialog = ({
                         ? (item.difficulty as QuestionDifficulty)
                         : 'medium',
                     answer: item.answer ?? '',
-                    type: item.type && ['MCQ', 'SA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
+                    type: item.type && ['MCQ', 'SA', 'LA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
                     summary: item.summary.trim(),
                     primaryTopicId,
                     secondaryTopicIds,
@@ -811,7 +816,7 @@ export const QuestionUploadDialog = ({
                                                             <SelectContent>
                                                                 {questionTypes.map((type) => (
                                                                     <SelectItem key={type} value={type}>
-                                                                        {type === 'MCQ' ? 'Multiple Choice' : 'Short Answer'}
+                                                                        {questionTypeLabels[type]}
                                                                     </SelectItem>
                                                                 ))}
                                                             </SelectContent>

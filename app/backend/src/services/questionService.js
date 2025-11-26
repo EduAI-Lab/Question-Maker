@@ -82,7 +82,7 @@ export const createQuestion = async (userId, questionData) => {
       throw new Error('Course not found');
     }
 
-    const allowedTypes = ['MCQ', 'SA'];
+    const allowedTypes = ['MCQ', 'SA', 'LA'];
     const normalizedType = allowedTypes.includes(type) ? type : 'MCQ';
 
     const question = await Question_Metadata.create({
@@ -245,7 +245,7 @@ export const updateQuestion = async (questionId, userId, updateData) => {
     }
 
     if (updates.type !== undefined) {
-      const allowedTypes = ['MCQ', 'SA'];
+      const allowedTypes = ['MCQ', 'SA', 'LA'];
       if (!allowedTypes.includes(updates.type)) {
         throw new Error(`Invalid question type. Allowed values: ${allowedTypes.join(', ')}`);
       }
@@ -302,7 +302,7 @@ export const createMultipleQuestions = async (userId, questionsData) => {
       const description = q.description ?? q.content;
       const courseId = Number(q.courseId ?? q.classId);
       const primaryTopicId = Number(q.primaryTopicId ?? 1);
-      const type = ['MCQ', 'SA'].includes(q.type) ? q.type : 'MCQ';
+      const type = ['MCQ', 'SA', 'LA'].includes(q.type) ? q.type : 'MCQ';
       const questionOrder = q.questionOrder || {};
 
       const question = await createQuestion(userId, {
@@ -441,7 +441,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
         ? item.difficulty.toLowerCase().trim()
         : '';
 
-      const questionType = typeof item.type === 'string' && ['MCQ', 'SA'].includes(item.type)
+      const questionType = typeof item.type === 'string' && ['MCQ', 'SA', 'LA'].includes(item.type)
         ? item.type
         : 'SA';
 

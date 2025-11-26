@@ -238,7 +238,11 @@ const sanitizeEduAIQuestion = (question) => {
     ? question.difficulty.toLowerCase()
     : "medium";
 
-  const type = question?.type === "MCQ" ? "MCQ" : "SA";
+  const type = question?.type === "MCQ"
+    ? "MCQ"
+    : question?.type === "LA"
+      ? "LA"
+      : "SA";
   const primaryTopicId =
     Number.isInteger(question?.primary_topic_id) &&
     question.primary_topic_id > 0
@@ -378,7 +382,7 @@ Return a JSON array (no additional text). Each object must follow this shape exa
   "instructions": "Optional teaching notes or context (string, omit or set to null if not available)",
   "difficulty": "easy | medium | hard",
   "answer": "Optional short answer text or null",
-  "type": "MCQ | SA"
+  "type": "MCQ | SA | LA"
 }
 
 Guidelines:
@@ -444,7 +448,7 @@ const sanitizeExtractedQuestion = (raw) => {
     ? difficulty
     : "medium";
   const type =
-    typeof raw.type === "string" && ["MCQ", "SA"].includes(raw.type)
+    typeof raw.type === "string" && ["MCQ", "SA", "LA"].includes(raw.type)
       ? raw.type
       : "SA";
 

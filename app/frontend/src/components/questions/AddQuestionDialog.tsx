@@ -75,7 +75,12 @@ const defaultForm: FormState = {
 };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
-const questionTypes: QuestionType[] = ['MCQ', 'SA'];
+const questionTypes: QuestionType[] = ['MCQ', 'SA', 'LA'];
+const questionTypeLabels: Record<QuestionType, string> = {
+    MCQ: 'Multiple Choice',
+    SA: 'Short Answer',
+    LA: 'Long Answer'
+};
 
 export const AddQuestionDialog = ({
     open,
@@ -451,7 +456,9 @@ export const AddQuestionDialog = ({
             }
 
             const inferredType: QuestionType =
-                generated.type === 'SA' || generated.type === 'MCQ' ? generated.type : 'MCQ';
+                generated.type === 'SA' || generated.type === 'MCQ' || generated.type === 'LA'
+                    ? generated.type
+                    : 'MCQ';
             const inferredDifficulty: QuestionDifficulty =
                 generated.difficulty === 'easy' || generated.difficulty === 'hard'
                     ? generated.difficulty
@@ -822,7 +829,7 @@ export const AddQuestionDialog = ({
                                         <SelectContent>
                                             {questionTypes.map((type) => (
                                                 <SelectItem key={type} value={type} className="uppercase">
-                                                    {type}
+                                                    {questionTypeLabels[type]}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>

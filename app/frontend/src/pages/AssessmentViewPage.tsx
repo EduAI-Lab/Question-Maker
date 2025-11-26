@@ -30,7 +30,12 @@ import { QuestionDetailView } from '../components/question-detail/QuestionDetail
 import { QuestionMetadataCard } from '../components/assessments/QuestionMetadataCard';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
-const QUESTION_TYPES: QuestionType[] = ['MCQ', 'SA'];
+const QUESTION_TYPES: QuestionType[] = ['MCQ', 'SA', 'LA'];
+const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  MCQ: 'Multiple Choice',
+  SA: 'Short Answer',
+  LA: 'Long Answer'
+};
 
 const defaultReasoningData = (): ReasoningDataState => ({
   factual: { total: 40, easyBoundary: 60, hardBoundary: 90 },
@@ -722,7 +727,7 @@ const CreateSectionPanel = ({
                 size="sm"
                 onClick={() => toggleType(type)}
               >
-                {type}
+                {QUESTION_TYPE_LABELS[type]}
               </Button>
             ))}
           </div>
