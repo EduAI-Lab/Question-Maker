@@ -424,6 +424,23 @@ export const LandingPage = () => {
           loadError={assessmentsError}
           selectedCourseId={selectedCourse?.id ?? null}
           onExportToCanvas={(assessmentId, assessmentName) => {
+            // Safety check: prevent export if assessment has draft questions
+            const assessment = filteredAssessments.find(a => a.id === assessmentId);
+            if (assessment) {
+              const hasDrafts = assessment.sections?.some((section) =>
+                section.sectionVariants?.some(
+                  (link) => link.variant?.questionMetadata?.isDraft === true
+                )
+              );
+              if (hasDrafts) {
+                toast({
+                  title: 'Cannot export',
+                  description: 'Assessment contains draft questions. Please review all draft questions before exporting.',
+                  variant: 'destructive'
+                });
+                return;
+              }
+            }
             setSelectedAssessmentForExport({ id: assessmentId, name: assessmentName });
             setIsCanvasExportOpen(true);
           }}

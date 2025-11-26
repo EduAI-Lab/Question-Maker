@@ -89,7 +89,7 @@ export const getAssessmentsByUser = async (userId, options = {}) => {
                     {
                       model: Question_Metadata,
                       as: 'questionMetadata',
-                      attributes: ['id', 'description', 'type', 'questionOrder'],
+                      attributes: ['id', 'description', 'type', 'questionOrder', 'isDraft'],
                       include: [
                         {
                           model: Course,

@@ -348,12 +348,25 @@ const SectionCard = ({
   onDeleteVariant: (sectionId: number, variantId: number) => void;
 }) => {
   const questionCount = section.sectionVariants?.length ?? 0;
+  
+  // Check if this section has any draft questions
+  const hasDraftQuestions = section.sectionVariants?.some(
+    (link) => link.variant?.questionMetadata?.isDraft === true
+  ) ?? false;
 
   return (
     <Card className="border border-gray-200">
       <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col">
-          <CardTitle className="text-lg">{section.name}</CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-lg">{section.name}</CardTitle>
+            {hasDraftQuestions && (
+              <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Contains Draft questions
+              </Badge>
+            )}
+          </div>
           {section.sectionType && (
             <p className="text-sm text-muted-foreground capitalize">{section.sectionType}</p>
           )}
