@@ -149,6 +149,19 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
+  const handleUpdateQuestionFlags = (
+    questionId: number,
+    updates: Partial<Pick<Question, 'isAiGenerated' | 'isDraft'>>
+  ) => {
+    setQuestions((prev) =>
+      prev.map((question) =>
+        question.id === questionId
+          ? { ...question, ...updates }
+          : question
+      )
+    );
+  };
+
   const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
     if (createdQuestions.length === 0) {
       setIsUploadOpen(false);
@@ -457,6 +470,7 @@ export const LandingPage = () => {
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
+          onUpdateQuestionFlags={handleUpdateQuestionFlags}
         />
       )}
 

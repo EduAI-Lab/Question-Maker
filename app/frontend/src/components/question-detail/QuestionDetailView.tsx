@@ -52,6 +52,10 @@ interface QuestionDetailViewProps {
     onCreateVariant: (entry: QuestionVariantEntry) => void;
     onDeleteVariant: (entry: QuestionVariantEntry) => void;
     onSelectVariant: (entry: QuestionVariantEntry) => void;
+    onUpdateQuestionFlags: (
+        questionId: number,
+        updates: Partial<Pick<QuestionVariantEntry, 'isAiGenerated' | 'isDraft'>>
+    ) => void;
 }
 
 export const QuestionDetailView = ({
@@ -60,7 +64,8 @@ export const QuestionDetailView = ({
     onClose,
     onCreateVariant,
     onDeleteVariant,
-    onSelectVariant
+    onSelectVariant,
+    onUpdateQuestionFlags
 }: QuestionDetailViewProps) => {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
@@ -127,6 +132,7 @@ export const QuestionDetailView = ({
             };
             
             onSelectVariant(updatedEntry);
+            onUpdateQuestionFlags(entry.questionId, { isAiGenerated: updatedQuestion.isAiGenerated });
             
             toast({
                 title: 'AI tag toggled',
@@ -158,6 +164,7 @@ export const QuestionDetailView = ({
             };
             
             onSelectVariant(updatedEntry);
+            onUpdateQuestionFlags(entry.questionId, { isDraft: updatedQuestion.isDraft });
             
             toast({
                 title: 'Review status updated',
