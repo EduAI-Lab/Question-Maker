@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload, AlertTriangle } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
@@ -997,6 +997,7 @@ const MatchingQuestionsPanel = ({
 export const AssessmentViewPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const assessmentId = Number(id);
   const { toast } = useToast();
 
@@ -1697,10 +1698,19 @@ export const AssessmentViewPage = () => {
     return uniqueQuestionIds.size > 0;
   }, [sections]);
 
+  const handleBack = () => {
+    const fromTab = (location.state as any)?.fromTab;
+    if (fromTab === 'assessments') {
+      navigate('/landing?tab=assessments', { replace: true });
+    } else {
+      navigate('/landing', { replace: true });
+    }
+  };
+
   if (Number.isNaN(assessmentId)) {
     return (
       <div className="p-6">
-        <Button variant="ghost" onClick={() => navigate(-1)}>
+        <Button variant="ghost" onClick={handleBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -1713,7 +1723,7 @@ export const AssessmentViewPage = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Button variant="ghost" onClick={() => navigate(-1)}>
+          <Button variant="ghost" onClick={handleBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>

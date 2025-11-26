@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
@@ -19,10 +20,16 @@ import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModa
 export const LandingPage = () => {
   const LAST_SELECTED_COURSE_KEY = 'landing:last-selected-course';
 
+  const location = useLocation();
+  const navigate = useNavigate();
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [preferredCourseId, setPreferredCourseId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    return tab === 'assessments' ? 'assessments' : 'questions';
+  });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
   const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
@@ -84,6 +91,25 @@ export const LandingPage = () => {
       localStorage.setItem(LAST_SELECTED_COURSE_KEY, String(selectedCourse.id));
     }
   }, [selectedCourse]);
+
+  // Update tab based on URL query (e.g., /landing?tab=assessments)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'assessments' || tab === 'questions') {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
+  // Keep URL query in sync with selected tab to make refreshes stable
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const currentTab = params.get('tab');
+    if (currentTab === activeTab) return;
+
+    params.set('tab', activeTab);
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  }, [activeTab, location.pathname, location.search, navigate]);
 
   // Choose course based on preference when courses list updates
   useEffect(() => {
