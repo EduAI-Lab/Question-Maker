@@ -1,5 +1,43 @@
 # Question Maker Deployment Guide
 
+## Quick Start: Push to Production
+
+**Before you start:** Make sure you've committed and pushed your changes to the `main` branch from your local machine:
+```bash
+git add .
+git commit -m "Your commit message"
+git push origin main
+```
+
+**Then on the server, follow these 3 steps:**
+
+1. **SSH to the server:**
+   ```bash
+   ssh ssaada08@questionmaker.ok.ubc.ca
+   ```
+   *Note: Connect to UBC VPN first if not on campus*
+
+2. **Navigate to the repository:**
+   ```bash
+   cd /srv/www/questionmaker.ok.ubc.ca
+   ```
+
+3. **Run the deployment script:**
+   ```bash
+   ./pull-and-deploy.sh
+   ```
+
+The script will automatically:
+- Check for updates from the `main` branch
+- Pull the latest changes
+- Rebuild Docker containers
+- Restart services
+- Verify deployment health
+
+**View deployment logs:** `tail -f /var/log/question-maker/deploy.log`
+
+---
+
 This guide provides step-by-step instructions for deploying the Question Maker application using Docker on UBC servers.
 
 ## Prerequisites
