@@ -22,9 +22,11 @@ git push origin main
    cd /srv/www/questionmaker.ok.ubc.ca
    ```
 
-3. **Run the deployment script:**
+3. **After pulling, you can then run:**
    ```bash
-   ./pull-and-deploy.sh
+   docker compose build --no-cache
+   docker compose down
+   docker compose up -d
    ```
 
 The script will automatically:
