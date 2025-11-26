@@ -14,6 +14,7 @@ import { QuestionUploadDialog } from '../components/question-bank/QuestionUpload
 import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
 import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
 import { useToast } from '../components/ui/use-toast';
+import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
 export const LandingPage = () => {
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
@@ -33,6 +34,12 @@ export const LandingPage = () => {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
   const [selectedAssessmentForExport, setSelectedAssessmentForExport] = useState<{ id: number; name: string } | null>(null);
+  const [deleteAssessmentModalOpen, setDeleteAssessmentModalOpen] = useState(false);
+  const [assessmentToDelete, setAssessmentToDelete] = useState<{ id: number; name: string } | null>(null);
+  const [isDeletingAssessment, setIsDeletingAssessment] = useState(false);
+  const [deleteVariantModalOpen, setDeleteVariantModalOpen] = useState(false);
+  const [variantToDelete, setVariantToDelete] = useState<QuestionVariantEntry | null>(null);
+  const [isDeletingVariant, setIsDeletingVariant] = useState(false);
   const { toast } = useToast();
 
   const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
@@ -188,8 +195,16 @@ export const LandingPage = () => {
     setSelectedVariant(null);
   };
 
-  const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
+  const handleDeleteVariant = (entry: QuestionVariantEntry) => {
+    setVariantToDelete(entry);
+    setDeleteVariantModalOpen(true);
+  };
+
+  const confirmDeleteVariant = async () => {
+    if (!variantToDelete) return;
+    const entry = variantToDelete;
     try {
+      setIsDeletingVariant(true);
       const question = questions.find((item) => item.id === entry.questionId);
       if (!question) {
         return;
@@ -210,10 +225,17 @@ export const LandingPage = () => {
           )
         );
       }
+      setSelectedVariant(null);
     } catch (error) {
       console.error('Failed to delete variant', error);
+      toast({
+        title: 'Failed to delete question',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
     } finally {
-      setSelectedVariant(null);
+      setIsDeletingVariant(false);
+      setVariantToDelete(null);
     }
   };
 
@@ -246,6 +268,33 @@ export const LandingPage = () => {
       void loadTopicsForCourse(selectedCourse.id);
     }
     setIsUploadOpen(true);
+  };
+
+  const handleDeleteAssessment = (assessmentId: number, assessmentName: string) => {
+    setAssessmentToDelete({ id: assessmentId, name: assessmentName });
+    setDeleteAssessmentModalOpen(true);
+  };
+
+  const confirmDeleteAssessment = async () => {
+    if (!assessmentToDelete) return;
+    try {
+      setIsDeletingAssessment(true);
+      await assessmentService.deleteAssessment(assessmentToDelete.id);
+      setAssessments((prev) => prev.filter((item) => item.id !== assessmentToDelete.id));
+      toast({
+        title: 'Assessment deleted',
+        description: `"${assessmentToDelete.name}" has been removed.`
+      });
+      setAssessmentToDelete(null);
+    } catch (_error) {
+      toast({
+        title: 'Failed to delete assessment',
+        description: 'Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDeletingAssessment(false);
+    }
   };
 
   const handleCreateAssessment = async (params: AssessmentGenerationParams) => {
@@ -378,6 +427,7 @@ export const LandingPage = () => {
             setSelectedAssessmentForExport({ id: assessmentId, name: assessmentName });
             setIsCanvasExportOpen(true);
           }}
+          onDeleteAssessment={handleDeleteAssessment}
         />
         )}
       </div>
@@ -439,6 +489,44 @@ export const LandingPage = () => {
           }}
         />
       )}
+      <DeleteConfirmationModal
+        open={deleteVariantModalOpen}
+        onOpenChange={setDeleteVariantModalOpen}
+        onConfirm={confirmDeleteVariant}
+        title={
+          variantToDelete
+            ? (() => {
+                const question = questions.find((item) => item.id === variantToDelete.questionId);
+                const isLastVariant = question && (question.variants?.length ?? 0) <= 1;
+                return isLastVariant
+                  ? 'Delete question?'
+                  : 'Delete question variant?';
+              })()
+            : 'Delete question?'
+        }
+        message={
+          variantToDelete
+            ? (() => {
+                const question = questions.find((item) => item.id === variantToDelete.questionId);
+                const isLastVariant = question && (question.variants?.length ?? 0) <= 1;
+                return isLastVariant
+                  ? 'This will permanently delete the entire question and all its variants. This action cannot be undone.'
+                  : 'This will permanently delete this question variant. This action cannot be undone.';
+              })()
+            : 'This action cannot be undone.'
+        }
+        confirmLabel="Delete"
+        isLoading={isDeletingVariant}
+      />
+      <DeleteConfirmationModal
+        open={deleteAssessmentModalOpen}
+        onOpenChange={setDeleteAssessmentModalOpen}
+        onConfirm={confirmDeleteAssessment}
+        title={assessmentToDelete ? `Delete assessment "${assessmentToDelete.name}"?` : 'Delete assessment?'}
+        message="This action cannot be undone. All sections and questions in this assessment will be removed."
+        confirmLabel="Delete"
+        isLoading={isDeletingAssessment}
+      />
     </div>
   );
 };

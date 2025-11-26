@@ -5,6 +5,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Tooltip } from '../ui/tooltip';
 import { DualRangeSlider } from '../ui/DualRangeSlider';
 import { courseService } from '../../services/courseService';
 import { TopicSelect } from './TopicSelect';
@@ -154,6 +155,24 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
     assessmentDescription.trim().length > 0 &&
     assessmentSemester.trim().length > 0 &&
     primaryTopicIds.length > 0;
+
+  const getDisabledReason = (): string | null => {
+    if (!canGenerate) {
+      const reasons: string[] = [];
+      if (courseId <= 0) reasons.push('course');
+      if (assessmentName.trim().length === 0) reasons.push('name');
+      if (assessmentDescription.trim().length === 0) reasons.push('description');
+      if (assessmentSemester.trim().length === 0) reasons.push('semester');
+      if (primaryTopicIds.length === 0) reasons.push('at least one primary topic');
+      
+      if (reasons.length > 0) {
+        return `Missing required fields: ${reasons.join(', ')}`;
+      }
+    }
+    return null;
+  };
+
+  const disabledReason = getDisabledReason();
 
   const handleGenerate = () => {
     const difficultyDistribution = {
@@ -425,9 +444,19 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
           </CardContent>
         <CardFooter className="flex justify-end gap-3 border-t bg-muted/40 py-4">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleGenerate} disabled={!canGenerate}>
-            Save Blueprint
-          </Button>
+          {disabledReason ? (
+            <Tooltip content={disabledReason} multiline>
+              <span className="inline-block">
+                <Button onClick={handleGenerate} disabled={!canGenerate}>
+                  Save Blueprint
+                </Button>
+              </span>
+            </Tooltip>
+          ) : (
+            <Button onClick={handleGenerate} disabled={!canGenerate}>
+              Save Blueprint
+            </Button>
+          )}
         </CardFooter>
       </Card>
     </div>
