@@ -28,6 +28,7 @@ import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '.
 import { Topic } from '../../types/topic';
 import { questionService } from '../../services/questionService';
 import { eduaiService, EduAIModelOption } from '../../services/eduaiService';
+import { apiKeyStorage } from '../../services/apiKeyStorage';
 
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
@@ -106,6 +107,7 @@ export const QuestionUploadDialog = ({
     });
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
+    const [providerApiKey, setProviderApiKey] = useState('');
 
     useEffect(() => {
         if (!open) {
@@ -187,6 +189,23 @@ export const QuestionUploadDialog = ({
         void fetchModels();
     }, [open]);
 
+    // Load API key when model changes
+    useEffect(() => {
+        if (!aiModel) return;
+
+        const loadApiKey = async () => {
+            const provider = apiKeyStorage.getProviderFromModel(aiModel);
+            if (provider) {
+                const savedKey = await apiKeyStorage.getApiKey(provider);
+                setProviderApiKey(savedKey || '');
+            } else {
+                setProviderApiKey('');
+            }
+        };
+
+        void loadApiKey();
+    }, [aiModel]);
+
     const performPdfOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await getDocument({ data: arrayBuffer }).promise;
@@ -244,7 +263,14 @@ export const QuestionUploadDialog = ({
         setProcessingStage('extracting');
         setProgress(85);
         console.log('QuestionUploadDialog: Extracting questions with model:', aiModel);
-        const response = await questionService.extractQuestionsFromText({ text, courseId, model: aiModel });
+
+        const apiKeys = await apiKeyStorage.buildApiKeysForModel(aiModel);
+        const response = await questionService.extractQuestionsFromText({
+            text,
+            courseId,
+            model: aiModel,
+            apiKeys
+        });
         const drafts = (response || [])
             .filter((item): item is ExtractedQuestion & { summary: string } =>
                 Boolean(
@@ -658,6 +684,57 @@ export const QuestionUploadDialog = ({
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            {apiKeyStorage.requiresApiKey(aiModel) && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="provider-api-key">
+                                        {apiKeyStorage.getProviderFromModel(aiModel)?.toUpperCase()} API Key
+                                    </Label>
+                                    {providerApiKey ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                id="provider-api-key"
+                                                type="text"
+                                                value={`${providerApiKey.substring(0, 8)}${'•'.repeat(Math.max(0, providerApiKey.length - 8))}`}
+                                                disabled
+                                                className="flex-1"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const provider = apiKeyStorage.getProviderFromModel(aiModel);
+                                                    if (provider) {
+                                                        apiKeyStorage.removeApiKey(provider);
+                                                        setProviderApiKey('');
+                                                    }
+                                                }}
+                                            >
+                                                Change
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Input
+                                            id="provider-api-key"
+                                            type="password"
+                                            placeholder={`Enter your ${apiKeyStorage.getProviderFromModel(aiModel)?.toUpperCase()} API key`}
+                                            value={providerApiKey}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                setProviderApiKey(value);
+                                                const provider = apiKeyStorage.getProviderFromModel(aiModel);
+                                                if (provider && value) {
+                                                    void apiKeyStorage.setApiKey(provider, value);
+                                                }
+                                            }}
+                                        />
+                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        Your API key is stored locally in your browser and never sent to our servers.
+                                    </p>
+                                </div>
+                            )}
 
                             {(!lastFileName && draftQuestions.length === 0) && (
                                 <label

@@ -26,6 +26,7 @@ import { Topic } from '../../types/topic';
 import { useToast } from '../ui/use-toast';
 import eduaiService, { EduAIModelOption, EduAICourseOption } from '../../services/eduaiService';
 import { Course } from '../../types/question';
+import { apiKeyStorage } from '../../services/apiKeyStorage';
 
 interface AddQuestionDialogProps {
     open: boolean;
@@ -99,6 +100,7 @@ export const AddQuestionDialog = ({
     const [isGenerating, setIsGenerating] = useState(false);
     const [courseDetails, setCourseDetails] = useState<Course | null>(null);
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
+    const [providerApiKey, setProviderApiKey] = useState('');
     const [availableEduCourses, setAvailableEduCourses] = useState<EduAICourseOption[]>([]);
     const [isAiGenerated, setIsAiGenerated] = useState(false);
     const [markAsReviewed, setMarkAsReviewed] = useState(false); // false = draft (default), true = reviewed
@@ -211,6 +213,23 @@ export const AddQuestionDialog = ({
             isMounted = false;
         };
     }, [open]);
+
+    // Load API key when model changes
+    useEffect(() => {
+        if (!form.generationModel) return;
+
+        const loadApiKey = async () => {
+            const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
+            if (provider) {
+                const savedKey = await apiKeyStorage.getApiKey(provider);
+                setProviderApiKey(savedKey || '');
+            } else {
+                setProviderApiKey('');
+            }
+        };
+
+        void loadApiKey();
+    }, [form.generationModel]);
 
     useEffect(() => {
         if (!open || !courseId) {
@@ -439,15 +458,14 @@ export const AddQuestionDialog = ({
                 return sections.filter(Boolean).join('\n\n');
             })();
 
+            const apiKeys = await apiKeyStorage.buildApiKeysForModel(form.generationModel);
             const response = await eduaiService.generateQuestions({
                 prompt: promptWithTopics,
                 courseCode,
                 model: form.generationModel,
                 numQuestions: 1,
                 difficultyDistribution,
-                apiKeys: form.generationModel.startsWith('ollama')
-                    ? { ollama: { isEnabled: true } }
-                    : {}
+                apiKeys
             });
 
             const generated = response?.data?.questions?.[0];
@@ -827,6 +845,57 @@ export const AddQuestionDialog = ({
                                             </Select>
                                         </div>
                                     </div>
+
+                                    {apiKeyStorage.requiresApiKey(form.generationModel) && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="provider-api-key">
+                                                {apiKeyStorage.getProviderFromModel(form.generationModel)?.toUpperCase()} API Key
+                                            </Label>
+                                            {providerApiKey ? (
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        id="provider-api-key"
+                                                        type="text"
+                                                        value={`${providerApiKey.substring(0, 8)}${'•'.repeat(Math.max(0, providerApiKey.length - 8))}`}
+                                                        disabled
+                                                        className="flex-1"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
+                                                            if (provider) {
+                                                                apiKeyStorage.removeApiKey(provider);
+                                                                setProviderApiKey('');
+                                                            }
+                                                        }}
+                                                    >
+                                                        Change
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <Input
+                                                    id="provider-api-key"
+                                                    type="password"
+                                                    placeholder={`Enter your ${apiKeyStorage.getProviderFromModel(form.generationModel)?.toUpperCase()} API key`}
+                                                    value={providerApiKey}
+                                                    onChange={(e) => {
+                                                        const value = e.target.value;
+                                                        setProviderApiKey(value);
+                                                        const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
+                                                        if (provider && value) {
+                                                            void apiKeyStorage.setApiKey(provider, value);
+                                                        }
+                                                    }}
+                                                />
+                                            )}
+                                            <p className="text-xs text-muted-foreground">
+                                                Your API key is stored locally in your browser and never sent to our servers.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="space-y-2">
