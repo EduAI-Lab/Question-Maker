@@ -693,7 +693,7 @@ export const QuestionUploadDialog = ({
                                 </Select>
                                 {isExternalModel && (
                                     <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                                        External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
+                                        <span className="font-semibold">Warning:</span> External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
                                     </div>
                                 )}
                             </div>
