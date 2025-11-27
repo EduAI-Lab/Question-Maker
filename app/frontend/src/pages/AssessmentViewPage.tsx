@@ -1966,25 +1966,79 @@ export const AssessmentViewPage = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {orderedSections.map((section) => (
-                    <SectionCard
-                      key={section.id}
-                      section={section}
-                      onEdit={handleEditSection}
-                      onDelete={handleDeleteSection}
-                      onDeleteVariant={handleDeleteVariantFromSection}
-                    />
-                  ))}
+                  {orderedSections.map((section) =>
+                    editingSection?.id === section.id ? (
+                      <Card key={`editing-${section.id}`} className="border-primary/40 shadow-sm">
+                        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <CardTitle className="text-lg">
+                              Editing: {section.name || 'Untitled section'}
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                              Update details and questions, then save below.
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={handleCancelBuilder}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
+                            <CreateSectionPanel
+                              key={`edit-${section.id}`}
+                              isSearching={isSearchingQuestions}
+                              onSearchQuestions={handleSectionSearch}
+                              onCancel={handleCancelBuilder}
+                              blueprint={assessment?.blueprintConfig}
+                              availableTopics={availableTopics}
+                              defaultPrimaryTopics={assessment?.blueprintConfig?.primaryTopicIds ?? []}
+                              defaultSecondaryTopics={assessment?.blueprintConfig?.secondaryTopicIds ?? []}
+                              defaultExcludedTopics={assessment?.blueprintConfig?.excludedTopicIds ?? []}
+                              mode="edit"
+                              editingSection={editingSection}
+                            />
+                            <MatchingQuestionsPanel
+                              questions={matchingQuestions}
+                              selectedQuestionIds={selectedQuestionIds}
+                              onToggleQuestion={handleToggleQuestionSelection}
+                              onClearSelection={clearQuestionSelection}
+                              onAddSelected={handleFinalizeSection}
+                              onCreateNewQuestion={handleCreateNewQuestion}
+                              onAddVariant={handleAddVariant}
+                              onViewQuestion={handleViewQuestion}
+                              onToggleReview={handleToggleQuestionReview}
+                              isSearching={isSearchingQuestions}
+                              isCreatingSection={isCreatingSection}
+                              searchError={questionSearchError}
+                              hasSearched={hasSearched}
+                              topicsById={topicsById}
+                              canFinalizeSection={Boolean(pendingSectionDraft)}
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <SectionCard
+                        key={section.id}
+                        section={section}
+                        onEdit={handleEditSection}
+                        onDelete={handleDeleteSection}
+                        onDeleteVariant={handleDeleteVariantFromSection}
+                      />
+                    )
+                  )}
                 </div>
               )}
             </div>
 
-            {isBuilderVisible && assessment && (
+            {isBuilderVisible && assessment && !editingSection && (
               <>
                 <Separator />
                 <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
                   <CreateSectionPanel
-                    key={editingSection ? `edit-${editingSection.id}` : 'create'}
+                    key="create-section"
                     isSearching={isSearchingQuestions}
                     onSearchQuestions={handleSectionSearch}
                     onCancel={handleCancelBuilder}
@@ -1993,8 +2047,8 @@ export const AssessmentViewPage = () => {
                     defaultPrimaryTopics={assessment.blueprintConfig?.primaryTopicIds ?? []}
                     defaultSecondaryTopics={assessment.blueprintConfig?.secondaryTopicIds ?? []}
                     defaultExcludedTopics={assessment.blueprintConfig?.excludedTopicIds ?? []}
-                    mode={editingSection ? 'edit' : 'create'}
-                    editingSection={editingSection}
+                    mode="create"
+                    editingSection={null}
                   />
                   <MatchingQuestionsPanel
                     questions={matchingQuestions}
