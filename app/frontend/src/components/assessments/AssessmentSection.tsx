@@ -217,7 +217,11 @@ export const AssessmentSection = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(`/assessments/${assessment.id}`)}
+                        onClick={() =>
+                          navigate(`/assessments/${assessment.id}`, {
+                            state: { fromTab: 'assessments' }
+                          })
+                        }
                         className="flex items-center space-x-1"
                       >
                         <Eye className="h-4 w-4" />

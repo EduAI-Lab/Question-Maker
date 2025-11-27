@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
@@ -17,9 +18,18 @@ import { useToast } from '../components/ui/use-toast';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
 export const LandingPage = () => {
+  const LAST_SELECTED_COURSE_KEY = 'landing:last-selected-course';
+
+  const location = useLocation();
+  const navigate = useNavigate();
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>('questions');
+  const [preferredCourseId, setPreferredCourseId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'questions' | 'assessments'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    return tab === 'assessments' ? 'assessments' : 'questions';
+  });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
   const [isQuestionsLoading, setIsQuestionsLoading] = useState(false);
@@ -64,6 +74,44 @@ export const LandingPage = () => {
     }
   }, [topicsByCourse]);
 
+  // Load last selected course preference once
+  useEffect(() => {
+    const stored = localStorage.getItem(LAST_SELECTED_COURSE_KEY);
+    if (stored) {
+      const parsed = Number(stored);
+      if (Number.isInteger(parsed)) {
+        setPreferredCourseId(parsed);
+      }
+    }
+  }, []);
+
+  // Persist selection
+  useEffect(() => {
+    if (selectedCourse?.id) {
+      localStorage.setItem(LAST_SELECTED_COURSE_KEY, String(selectedCourse.id));
+    }
+  }, [selectedCourse]);
+
+  // Update tab based on URL query (e.g., /landing?tab=assessments)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get('tab');
+    if (tab === 'assessments' || tab === 'questions') {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
+
+  // Keep URL query in sync with selected tab to make refreshes stable
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const currentTab = params.get('tab');
+    if (currentTab === activeTab) return;
+
+    params.set('tab', activeTab);
+    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
+  }, [activeTab, location.pathname, location.search, navigate]);
+
+  // Choose course based on preference when courses list updates
   useEffect(() => {
     if (courses.length === 0) {
       setSelectedCourse(null);
@@ -71,10 +119,23 @@ export const LandingPage = () => {
       return;
     }
 
-    if (!selectedCourse || !courses.some(course => course.id === selectedCourse.id)) {
-      setSelectedCourse(courses[0]);
+    // If current selection is valid, keep it
+    if (selectedCourse && courses.some((course) => course.id === selectedCourse.id)) {
+      return;
     }
-  }, [courses, selectedCourse]);
+
+    // Try preferred id from storage
+    if (preferredCourseId) {
+      const match = courses.find((course) => course.id === preferredCourseId);
+      if (match) {
+        setSelectedCourse(match);
+        return;
+      }
+    }
+
+    // Fallback to first course
+    setSelectedCourse(courses[0]);
+  }, [courses, preferredCourseId, selectedCourse]);
 
   useEffect(() => {
     if (selectedCourse) {
