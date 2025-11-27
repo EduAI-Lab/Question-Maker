@@ -210,6 +210,24 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
+  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
+    setQuestions((prev) =>
+      prev.map((question) => {
+        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
+          const updatedVariants = [...question.variants];
+          updatedVariants[variantIndex] = {
+            ...updatedVariants[variantIndex],
+            ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+          };
+          return { ...question, variants: updatedVariants };
+        }
+        return question;
+      })
+    );
+  };
+
 
   const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
     if (createdQuestions.length === 0) {
@@ -519,6 +537,7 @@ export const LandingPage = () => {
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
+          onUpdateVariant={handleUpdateVariant}
         />
       )}
 

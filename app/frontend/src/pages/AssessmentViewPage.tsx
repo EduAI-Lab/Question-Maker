@@ -1254,6 +1254,24 @@ export const AssessmentViewPage = () => {
     setSelectedVariant(null);
   };
 
+  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
+    setMatchingQuestions((prev) =>
+      prev.map((question) => {
+        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
+          const updatedVariants = [...question.variants];
+          updatedVariants[variantIndex] = {
+            ...updatedVariants[variantIndex],
+            ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+          };
+          return { ...question, variants: updatedVariants };
+        }
+        return question;
+      })
+    );
+  };
+
   const handleViewVariant = async (entry: QuestionVariantEntry) => {
     setSelectedVariant(entry);
     // Refresh the question in the matching questions list if it was updated
@@ -1929,6 +1947,7 @@ export const AssessmentViewPage = () => {
            )}
            onClose={handleCloseDetail}
            onCreateVariant={handleCreateVariant}
+           onUpdateVariant={handleUpdateVariant}
            onDeleteVariant={handleDeleteVariant}
            onSelectVariant={handleViewVariant}
          />

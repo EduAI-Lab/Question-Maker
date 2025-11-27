@@ -52,6 +52,7 @@ interface QuestionDetailViewProps {
     onCreateVariant: (entry: QuestionVariantEntry) => void;
     onDeleteVariant: (entry: QuestionVariantEntry) => void;
     onSelectVariant: (entry: QuestionVariantEntry) => void;
+    onUpdateVariant?: (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => void;
 }
 
 export const QuestionDetailView = ({
@@ -60,7 +61,8 @@ export const QuestionDetailView = ({
     onClose,
     onCreateVariant,
     onDeleteVariant,
-    onSelectVariant
+    onSelectVariant,
+    onUpdateVariant
 }: QuestionDetailViewProps) => {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
@@ -131,6 +133,11 @@ export const QuestionDetailView = ({
             
             onSelectVariant(updatedEntry);
             
+            // Update parent state for hot reload
+            if (onUpdateVariant) {
+                onUpdateVariant(entry.variant.id, { isAiGenerated: newIsAiGenerated });
+            }
+            
             toast({
                 title: 'AI tag toggled',
                 description: `Variant is now ${newIsAiGenerated ? 'marked as' : 'unmarked from'} AI-generated.`
@@ -164,6 +171,11 @@ export const QuestionDetailView = ({
             };
             
             onSelectVariant(updatedEntry);
+            
+            // Update parent state for hot reload
+            if (onUpdateVariant) {
+                onUpdateVariant(entry.variant.id, { isDraft: newIsDraft });
+            }
             
             toast({
                 title: 'Review status updated',
