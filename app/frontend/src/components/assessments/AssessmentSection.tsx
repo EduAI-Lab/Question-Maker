@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Tooltip } from '../ui/tooltip';
-import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2, AlertTriangle, FileText } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
@@ -16,6 +16,7 @@ interface AssessmentSectionProps {
   isLoading?: boolean;
   loadError?: string | null;
   onExportToCanvas?: (assessmentId: number, assessmentName: string) => void;
+  onExportToTxt?: (assessmentId: number, assessmentName: string) => void;
   onDeleteAssessment?: (assessmentId: number, assessmentName: string) => void;
 }
 
@@ -116,6 +117,7 @@ export const AssessmentSection = ({
   isLoading = false,
   loadError,
   onExportToCanvas,
+  onExportToTxt,
   onDeleteAssessment
 }: AssessmentSectionProps) => {
   const navigate = useNavigate();
@@ -251,18 +253,54 @@ export const AssessmentSection = ({
                                </Button>
                              </span>
                            </Tooltip>
-                         ) : (
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => onExportToCanvas(assessment.id, assessment.name)}
-                             className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
-                           >
-                             <Upload className="h-4 w-4" />
-                             <span>Export to Canvas</span>
-                           </Button>
-                         )
+                       ) : (
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => onExportToCanvas(assessment.id, assessment.name)}
+                           className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                         >
+                           <Upload className="h-4 w-4" />
+                           <span>Export to Canvas</span>
+                         </Button>
+                       )
                        )}
+                       {onExportToTxt && (
+                       totalQuestionCount === 0 || hasDrafts ? (
+                         <Tooltip
+                           content={
+                             totalQuestionCount === 0
+                               ? "No questions in assessment"
+                               : hasDrafts
+                               ? "Cannot export: Assessment contains draft questions. Please review all draft questions before exporting."
+                               : "Export assessment to TXT"
+                           }
+                           multiline
+                         >
+                           <span className="inline-block">
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               disabled
+                               className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                             >
+                               <FileText className="h-4 w-4" />
+                               <span>Export TXT</span>
+                             </Button>
+                           </span>
+                         </Tooltip>
+                       ) : (
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => onExportToTxt(assessment.id, assessment.name)}
+                           className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                         >
+                           <FileText className="h-4 w-4" />
+                           <span>Export TXT</span>
+                         </Button>
+                       )
+                     )}
                        {onDeleteAssessment && (
                          <Button
                            variant="ghost"

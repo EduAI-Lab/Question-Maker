@@ -464,6 +464,89 @@ export const LandingPage = () => {
     return variantEntries.filter((entry) => entry.questionId === selectedVariant.questionId);
   }, [variantEntries, selectedVariant?.questionId]);
 
+  const handleExportAssessmentToTxt = useCallback(
+    (assessmentId: number, assessmentName: string) => {
+      const assessment = filteredAssessments.find((a) => a.id === assessmentId);
+
+      if (!assessment) {
+        toast({
+          title: 'Export failed',
+          description: 'Assessment not found.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const hasDrafts = assessment.sections?.some((section) =>
+        section.sectionVariants?.some(
+          (link) => link.variant?.questionMetadata?.isDraft === true
+        )
+      );
+
+      if (hasDrafts) {
+        toast({
+          title: 'Cannot export',
+          description: 'Assessment contains draft questions. Please review all draft questions before exporting.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const entries: Array<{ order: number; text: string }> = [];
+
+      assessment.sections?.forEach((section) => {
+        section.sectionVariants?.forEach((link) => {
+          const variant = link.variant;
+          if (!variant) return;
+
+          const text =
+            variant.questionText?.trim() ||
+            variant.questionMetadata?.description?.trim() ||
+            '';
+          if (!text) return;
+
+          const orderValue =
+            link.displayOrder ??
+            variant.questionMetadata?.questionOrder?.[assessment.id];
+          const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
+
+          entries.push({ order, text });
+        });
+      });
+
+      if (entries.length === 0) {
+        toast({
+          title: 'Cannot export',
+          description: 'No questions to export for this assessment.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      entries.sort((a, b) => a.order - b.order);
+      const content = entries.map((entry, index) => `${index + 1}. ${entry.text}`).join('\n\n');
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const slug = (assessmentName || 'assessment')
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase() || 'assessment';
+      link.href = url;
+      link.download = `${slug}-questions.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export started',
+        description: 'Questions downloaded as a TXT file.'
+      });
+    },
+    [filteredAssessments, toast]
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNavigation
@@ -518,6 +601,7 @@ export const LandingPage = () => {
             setSelectedAssessmentForExport({ id: assessmentId, name: assessmentName });
             setIsCanvasExportOpen(true);
           }}
+          onExportToTxt={handleExportAssessmentToTxt}
           onDeleteAssessment={handleDeleteAssessment}
         />
         )}
