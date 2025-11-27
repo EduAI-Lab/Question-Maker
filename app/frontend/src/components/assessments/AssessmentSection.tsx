@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Tooltip } from '../ui/tooltip';
-import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, ChevronUp, ChevronDown, Eye, Upload, Trash2, AlertTriangle, FileText } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
 
@@ -16,6 +16,7 @@ interface AssessmentSectionProps {
   isLoading?: boolean;
   loadError?: string | null;
   onExportToCanvas?: (assessmentId: number, assessmentName: string) => void;
+  onExportToTxt?: (assessmentId: number, assessmentName: string) => void;
   onDeleteAssessment?: (assessmentId: number, assessmentName: string) => void;
 }
 
@@ -98,13 +99,31 @@ const buildQuestionEntries = (assessment: Assessment): QuestionEntry[] => {
   return Array.from(map.values()).sort((a, b) => a.order - b.order);
 };
 
+const calculateDifficultyDistribution = (assessment: Assessment): { easy: number; medium: number; hard: number } => {
+  const questions = buildQuestionEntries(assessment);
+  const counts = { easy: 0, medium: 0, hard: 0 };
+  
+  questions.forEach((question) => {
+    const difficulty = question.difficulty.toLowerCase();
+    if (difficulty === 'easy') {
+      counts.easy++;
+    } else if (difficulty === 'hard') {
+      counts.hard++;
+    } else {
+      counts.medium++;
+    }
+  });
+  
+  return counts;
+};
+
 const hasDraftQuestions = (assessment: Assessment): boolean => {
   if (!assessment.sections || assessment.sections.length === 0) {
     return false;
   }
   return assessment.sections.some((section) =>
     section.sectionVariants?.some(
-      (link) => link.variant?.questionMetadata?.isDraft === true
+      (link) => link.variant?.isDraft === true
     )
   );
 };
@@ -116,6 +135,7 @@ export const AssessmentSection = ({
   isLoading = false,
   loadError,
   onExportToCanvas,
+  onExportToTxt,
   onDeleteAssessment
 }: AssessmentSectionProps) => {
   const navigate = useNavigate();
@@ -153,7 +173,7 @@ export const AssessmentSection = ({
       return 'Loading assessments...';
     }
     if (!selectedCourseId) {
-      return 'Select a course to manage its assessments.';
+      return 'Select a course above to manage assessments. No courses? Click the profile icon (👤) to add one.';
     }
     return 'Lab / Midterm / Quiz / Final';
   }, [isLoading, selectedCourseId]);
@@ -188,7 +208,7 @@ export const AssessmentSection = ({
             const assessmentQuestions = buildQuestionEntries(assessment);
             const totalQuestionCount = countTotalQuestions(assessment);
             const blueprint = assessment.blueprintConfig;
-            const difficulty = blueprint?.difficultyDistribution;
+            const difficultyDistribution = calculateDifficultyDistribution(assessment);
             const primaryCount = blueprint?.primaryTopicIds?.length ?? 0;
             const secondaryCount = blueprint?.secondaryTopicIds?.length ?? 0;
             const hasDrafts = hasDraftQuestions(assessment);
@@ -251,18 +271,54 @@ export const AssessmentSection = ({
                                </Button>
                              </span>
                            </Tooltip>
-                         ) : (
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => onExportToCanvas(assessment.id, assessment.name)}
-                             className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
-                           >
-                             <Upload className="h-4 w-4" />
-                             <span>Export to Canvas</span>
-                           </Button>
-                         )
+                       ) : (
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => onExportToCanvas(assessment.id, assessment.name)}
+                           className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                         >
+                           <Upload className="h-4 w-4" />
+                           <span>Export to Canvas</span>
+                         </Button>
+                       )
                        )}
+                       {onExportToTxt && (
+                       totalQuestionCount === 0 || hasDrafts ? (
+                         <Tooltip
+                           content={
+                             totalQuestionCount === 0
+                               ? "No questions in assessment"
+                               : hasDrafts
+                               ? "Cannot export: Assessment contains draft questions. Please review all draft questions before exporting."
+                               : "Export assessment to TXT"
+                           }
+                           multiline
+                         >
+                           <span className="inline-block">
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               disabled
+                               className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                             >
+                               <FileText className="h-4 w-4" />
+                               <span>Export TXT</span>
+                             </Button>
+                           </span>
+                         </Tooltip>
+                       ) : (
+                         <Button
+                           variant="outline"
+                           size="sm"
+                           onClick={() => onExportToTxt(assessment.id, assessment.name)}
+                           className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                         >
+                           <FileText className="h-4 w-4" />
+                           <span>Export TXT</span>
+                         </Button>
+                       )
+                     )}
                        {onDeleteAssessment && (
                          <Button
                            variant="ghost"
@@ -299,9 +355,9 @@ export const AssessmentSection = ({
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>Primary topics: {primaryCount}</span>
                           <span>Secondary topics: {secondaryCount}</span>
-                          {difficulty && (
+                          {totalQuestionCount > 0 && (
                             <span>
-                              Difficulty mix: {difficulty.easy}% / {difficulty.medium}% / {difficulty.hard}%
+                              Difficulty mix: {difficultyDistribution.easy} easy / {difficultyDistribution.medium} medium / {difficultyDistribution.hard} hard
                             </span>
                           )}
                         </div>

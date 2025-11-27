@@ -52,10 +52,7 @@ interface QuestionDetailViewProps {
     onCreateVariant: (entry: QuestionVariantEntry) => void;
     onDeleteVariant: (entry: QuestionVariantEntry) => void;
     onSelectVariant: (entry: QuestionVariantEntry) => void;
-    onUpdateQuestionFlags: (
-        questionId: number,
-        updates: Partial<Pick<QuestionVariantEntry, 'isAiGenerated' | 'isDraft'>>
-    ) => void;
+    onUpdateVariant?: (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => void;
 }
 
 export const QuestionDetailView = ({
@@ -65,7 +62,7 @@ export const QuestionDetailView = ({
     onCreateVariant,
     onDeleteVariant,
     onSelectVariant,
-    onUpdateQuestionFlags
+    onUpdateVariant
 }: QuestionDetailViewProps) => {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
@@ -121,22 +118,29 @@ export const QuestionDetailView = ({
     const handleToggleAiTag = async () => {
         try {
             setIsToggling(true);
-            const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
+            const updatedVariant = await questionService.updateVariant(entry.variant.id, {
                 isAiGenerated: !entry.isAiGenerated
             });
+            
+            const newIsAiGenerated = updatedVariant.isAiGenerated ?? !entry.isAiGenerated;
             
             // Update the entry with the new value
             const updatedEntry: QuestionVariantEntry = {
                 ...entry,
-                isAiGenerated: updatedQuestion.isAiGenerated
+                isAiGenerated: newIsAiGenerated,
+                variant: { ...entry.variant, ...updatedVariant }
             };
             
             onSelectVariant(updatedEntry);
-            onUpdateQuestionFlags(entry.questionId, { isAiGenerated: updatedQuestion.isAiGenerated });
+            
+            // Update parent state for hot reload
+            if (onUpdateVariant) {
+                onUpdateVariant(entry.variant.id, { isAiGenerated: newIsAiGenerated });
+            }
             
             toast({
                 title: 'AI tag toggled',
-                description: `Question is now ${updatedQuestion.isAiGenerated ? 'marked as' : 'unmarked from'} AI-generated.`
+                description: `Variant is now ${newIsAiGenerated ? 'marked as' : 'unmarked from'} AI-generated.`
             });
         } catch (error: any) {
             toast({
@@ -153,22 +157,29 @@ export const QuestionDetailView = ({
         try {
             setIsTogglingDraft(true);
             
-            const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
+            const updatedVariant = await questionService.updateVariant(entry.variant.id, {
                 isDraft: !entry.isDraft
             });
+            
+            const newIsDraft = updatedVariant.isDraft ?? !entry.isDraft;
             
             // Update the entry with the new value
             const updatedEntry: QuestionVariantEntry = {
                 ...entry,
-                isDraft: updatedQuestion.isDraft
+                isDraft: newIsDraft,
+                variant: { ...entry.variant, ...updatedVariant }
             };
             
             onSelectVariant(updatedEntry);
-            onUpdateQuestionFlags(entry.questionId, { isDraft: updatedQuestion.isDraft });
+            
+            // Update parent state for hot reload
+            if (onUpdateVariant) {
+                onUpdateVariant(entry.variant.id, { isDraft: newIsDraft });
+            }
             
             toast({
                 title: 'Review status updated',
-                description: `Question is now ${updatedQuestion.isDraft ? 'marked as draft' : 'marked as reviewed'}.`
+                description: `Variant is now ${newIsDraft ? 'marked as draft' : 'marked as reviewed'}.`
             });
         } catch (error: any) {
             toast({
@@ -186,8 +197,9 @@ export const QuestionDetailView = ({
     }, [entry.variant.id]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-            <div className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+            <div className="relative flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
                 <Button
                     variant="ghost"
                     size="icon"
@@ -401,7 +413,7 @@ export const QuestionDetailView = ({
                             onClick={handleToggleAiTag}
                             disabled={isToggling}
                             className="flex items-center gap-2 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
-                            title="Test: Toggle AI Generated tag"
+                            title="Toggle AI Generated status"
                         >
                             <Sparkles className="h-3 w-3" />
                             <span>{entry.isAiGenerated ? 'Remove AI Tag' : 'Add AI Tag'}</span>

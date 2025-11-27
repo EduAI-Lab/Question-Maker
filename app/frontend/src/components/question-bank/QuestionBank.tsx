@@ -3,7 +3,8 @@ import { QuestionVariantEntry } from '../../types/question';
 import { QuestionCard } from './QuestionCard';
 import { SearchAndFilters } from './SearchAndFilters';
 import { QuestionBankHeader } from './QuestionBankHeader';
-import { Loader2 } from 'lucide-react';
+import { Loader2, User, Info } from 'lucide-react';
+import { Button } from '../ui/button';
 
 interface QuestionBankProps {
   variants: QuestionVariantEntry[];
@@ -16,6 +17,7 @@ interface QuestionBankProps {
   emptyMessage?: string;
   disableAdd?: boolean;
   disableUpload?: boolean;
+  onOpenProfile?: () => void;
 }
 
 export const QuestionBank = ({
@@ -28,7 +30,8 @@ export const QuestionBank = ({
   courseName,
   emptyMessage,
   disableAdd = false,
-  disableUpload = false
+  disableUpload = false,
+  onOpenProfile
 }: QuestionBankProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'type'>('newest');
@@ -101,7 +104,20 @@ export const QuestionBank = ({
 
           {filteredVariants.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-gray-500">{emptyMessage || 'No variants available for this course yet.'}</p>
+              {!courseName && onOpenProfile ? (
+                <div className="flex flex-col items-center space-y-4 py-4">
+                  <div className="flex items-center gap-2 text-blue-600">
+                    <Info className="h-5 w-5" />
+                    <p className="text-gray-700 font-medium">{emptyMessage || 'No courses available.'}</p>
+                  </div>
+                  <Button onClick={onOpenProfile} className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span>Open Profile to Add Courses</span>
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-gray-500">{emptyMessage || 'No variants available for this course yet.'}</p>
+              )}
             </div>
           )}
         </div>

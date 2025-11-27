@@ -4,9 +4,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { AlertCircle, Loader2, Moon, Sun } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../components/theme-provider';
 import { FloatingLetters } from '../components/FloatingLetters';
 
 export const LoginPage = () => {
@@ -16,7 +15,7 @@ export const LoginPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const { login, register, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const theme = 'light';
 
   if (authLoading) {
     return (
@@ -51,31 +50,12 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className={`min-h-screen ${
-      theme === 'light' 
-        ? 'bg-gradient-to-b from-gray-100 via-gray-200 to-gray-100' 
-        : 'bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900'
-    } flex items-center justify-center p-4 relative overflow-hidden`}>
+    <div className="min-h-screen bg-gradient-to-b from-gray-100 via-gray-200 to-gray-100 flex items-center justify-center p-4 relative overflow-hidden">
       <FloatingLetters />
-      
-      <div className="absolute top-4 right-4">
-        <Button
-          variant={theme === 'light' ? 'outline' : 'ghost'}
-          size="icon"
-          onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-          className={`${theme === 'light' ? 'border-gray-200' : 'text-white'}`}
-        >
-          {theme === "light" ? (
-            <Moon className="h-5 w-5" />
-          ) : (
-            <Sun className="h-5 w-5" />
-          )}
-        </Button>
-      </div>
 
       <Card className="w-full max-w-md relative bg-background/80 backdrop-blur-sm">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">EduQuery.ai</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Question Maker</CardTitle>
           <CardDescription className="text-center">
             AI-Powered Question Generation Platform
           </CardDescription>

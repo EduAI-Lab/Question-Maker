@@ -14,7 +14,7 @@ const router = express.Router();
 // @access  Private
 router.post('/:id/variants', authenticateToken, async (req, res, next) => {
   try {
-    const { questionText, difficulty, assessmentId, secondaryTopicsId, answer, referenceId } = req.body;
+    const { questionText, difficulty, assessmentId, secondaryTopicsId, answer, referenceId, isAiGenerated, isDraft } = req.body;
 
     if (!questionText || !questionText.trim()) {
       return res.status(400).json({
@@ -31,7 +31,9 @@ router.post('/:id/variants', authenticateToken, async (req, res, next) => {
         assessmentId,
         secondaryTopicsId,
         answer,
-        referenceId
+        referenceId,
+        isAiGenerated,
+        isDraft
       },
       req.user.id
     );
@@ -67,7 +69,7 @@ router.get('/:id/variants', authenticateToken, async (req, res, next) => {
 // @access  Private
 router.put('/variants/:variantId', authenticateToken, async (req, res, next) => {
   try {
-    const { questionText, difficulty, assessmentId, secondaryTopicsId, answer, referenceId } = req.body;
+    const { questionText, difficulty, assessmentId, secondaryTopicsId, answer, referenceId, isAiGenerated, isDraft } = req.body;
 
     const variant = await updateVariant(
       req.params.variantId,
@@ -77,7 +79,9 @@ router.put('/variants/:variantId', authenticateToken, async (req, res, next) => 
         assessmentId,
         secondaryTopicsId,
         answer,
-        referenceId
+        referenceId,
+        isAiGenerated,
+        isDraft
       },
       req.user.id
     );

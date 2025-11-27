@@ -27,6 +27,8 @@ import { useToast } from '../ui/use-toast';
 import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '../../types/question';
 import { Topic } from '../../types/topic';
 import { questionService } from '../../services/questionService';
+import { eduaiService, EduAIModelOption } from '../../services/eduaiService';
+import { apiKeyStorage } from '../../services/apiKeyStorage';
 
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
@@ -51,12 +53,6 @@ const questionTypeLabels: Record<QuestionType, string> = {
     LA: 'Long Answer'
 };
 const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
-const aiModelOptions = [
-    { id: 'gpt-4o', label: 'OpenAI GPT-4o' },
-    { id: 'claude-3-5-sonnet', label: 'Claude 3.5 Sonnet' },
-    { id: 'gemini-1-5-pro', label: 'Gemini 1.5 Pro' },
-    { id: 'llama-3-1-70b', label: 'Llama 3.1 70B' }
-] as const;
 
 interface QuestionUploadDialogProps {
     open: boolean;
@@ -109,7 +105,17 @@ export const QuestionUploadDialog = ({
         const year = now.getFullYear();
         return `Fall ${year}`;
     });
-    const [aiModel, setAiModel] = useState('gpt-4o');
+    const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
+    const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
+    const [providerApiKey, setProviderApiKey] = useState('');
+    const selectedModel = useMemo(
+        () => availableModels.find((model) => model.id === aiModel),
+        [aiModel, availableModels]
+    );
+    const isExternalModel = useMemo(
+        () => (selectedModel ? selectedModel.provider !== 'ollama' : !aiModel.startsWith('ollama')),
+        [aiModel, selectedModel]
+    );
 
     useEffect(() => {
         if (!open) {
@@ -175,6 +181,39 @@ export const QuestionUploadDialog = ({
         }
     }, [open, topics]);
 
+    useEffect(() => {
+        if (!open) return;
+
+        const fetchModels = async () => {
+            try {
+                const models = await eduaiService.listModels();
+                setAvailableModels(models);
+            } catch (error) {
+                console.error('Failed to fetch AI models:', error);
+                setAvailableModels([]);
+            }
+        };
+
+        void fetchModels();
+    }, [open]);
+
+    // Load API key when model changes
+    useEffect(() => {
+        if (!aiModel) return;
+
+        const loadApiKey = async () => {
+            const provider = apiKeyStorage.getProviderFromModel(aiModel);
+            if (provider) {
+                const savedKey = await apiKeyStorage.getApiKey(provider);
+                setProviderApiKey(savedKey || '');
+            } else {
+                setProviderApiKey('');
+            }
+        };
+
+        void loadApiKey();
+    }, [aiModel]);
+
     const performPdfOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await getDocument({ data: arrayBuffer }).promise;
@@ -231,7 +270,15 @@ export const QuestionUploadDialog = ({
 
         setProcessingStage('extracting');
         setProgress(85);
-        const response = await questionService.extractQuestionsFromText({ text, courseId });
+        console.log('QuestionUploadDialog: Extracting questions with model:', aiModel);
+
+        const apiKeys = await apiKeyStorage.buildApiKeysForModel(aiModel);
+        const response = await questionService.extractQuestionsFromText({
+            text,
+            courseId,
+            model: aiModel,
+            apiKeys
+        });
         const drafts = (response || [])
             .filter((item): item is ExtractedQuestion & { summary: string } =>
                 Boolean(
@@ -285,7 +332,7 @@ export const QuestionUploadDialog = ({
             title: 'Questions extracted',
             description: `Parsed ${drafts.length} question${drafts.length === 1 ? '' : 's'} from the upload.`
         });
-    }, [courseId, toast]);
+    }, [courseId, toast, aiModel]);
 
     const processFile = useCallback(async (file: File) => {
         setError(null);
@@ -618,14 +665,89 @@ export const QuestionUploadDialog = ({
                                         <SelectValue placeholder="Select a model" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {aiModelOptions.map((option) => (
-                                            <SelectItem key={option.id} value={option.id}>
-                                                {option.label}
+                                        {availableModels.length === 0 ? (
+                                            <SelectItem value="__no_models" disabled>
+                                                No models available yet
                                             </SelectItem>
-                                        ))}
+                                        ) : (
+                                            <>
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">UBC Hosted</div>
+                                                {availableModels
+                                                    .filter((option) => option.provider === 'ollama')
+                                                    .map((option) => (
+                                                        <SelectItem key={option.id} value={option.id}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">External</div>
+                                                {availableModels
+                                                    .filter((option) => option.provider !== 'ollama')
+                                                    .map((option) => (
+                                                        <SelectItem key={option.id} value={option.id}>
+                                                            {option.label} ({option.provider})
+                                                        </SelectItem>
+                                                    ))}
+                                            </>
+                                        )}
                                     </SelectContent>
                                 </Select>
+                                {isExternalModel && (
+                                    <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        <span className="font-semibold">Warning:</span> External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
+                                    </div>
+                                )}
                             </div>
+
+                            {apiKeyStorage.requiresApiKey(aiModel) && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="provider-api-key">
+                                        {apiKeyStorage.getProviderFromModel(aiModel)?.toUpperCase()} API Key
+                                    </Label>
+                                    {providerApiKey ? (
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                id="provider-api-key"
+                                                type="text"
+                                                value={`${providerApiKey.substring(0, 8)}${'•'.repeat(Math.max(0, providerApiKey.length - 8))}`}
+                                                disabled
+                                                className="flex-1"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const provider = apiKeyStorage.getProviderFromModel(aiModel);
+                                                    if (provider) {
+                                                        apiKeyStorage.removeApiKey(provider);
+                                                        setProviderApiKey('');
+                                                    }
+                                                }}
+                                            >
+                                                Change
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Input
+                                            id="provider-api-key"
+                                            type="password"
+                                            placeholder={`Enter your ${apiKeyStorage.getProviderFromModel(aiModel)?.toUpperCase()} API key`}
+                                            value={providerApiKey}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                setProviderApiKey(value);
+                                                const provider = apiKeyStorage.getProviderFromModel(aiModel);
+                                                if (provider && value) {
+                                                    void apiKeyStorage.setApiKey(provider, value);
+                                                }
+                                            }}
+                                        />
+                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        Your API key is stored locally in your browser and never sent to our servers.
+                                    </p>
+                                </div>
+                            )}
 
                             {(!lastFileName && draftQuestions.length === 0) && (
                                 <label
