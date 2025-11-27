@@ -1507,6 +1507,13 @@ export const AssessmentViewPage = () => {
     resetBuilderContext();
     setEditingSection(null);
     setIsBuilderVisible(true);
+    // Scroll to create section card
+    setTimeout(() => {
+      const el = document.getElementById('create-section-card');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const primeSelectionFromSection = (section: AssessmentSection) => {
@@ -2069,7 +2076,7 @@ export const AssessmentViewPage = () => {
             {isBuilderVisible && assessment && !editingSection && (
               <>
                 <Separator />
-                <Card className="border-primary/40 shadow-sm">
+                <Card id="create-section-card" className="border-primary/40 shadow-sm">
                   <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <CardTitle className="text-lg">Create Section</CardTitle>
