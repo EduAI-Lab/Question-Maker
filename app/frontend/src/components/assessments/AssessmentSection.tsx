@@ -173,7 +173,7 @@ export const AssessmentSection = ({
       return 'Loading assessments...';
     }
     if (!selectedCourseId) {
-      return 'Select a course to manage its assessments.';
+      return 'Select a course above to manage assessments. No courses? Click the profile icon (👤) to add one.';
     }
     return 'Lab / Midterm / Quiz / Final';
   }, [isLoading, selectedCourseId]);
