@@ -696,15 +696,17 @@ const CreateSectionPanel = ({
 
   return (
     <Card className="border border-gray-200">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{isEditing ? 'Edit Section' : 'Create Section'}</CardTitle>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-      </CardHeader>
+        {!isEditing && (
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Create Section</CardTitle>
+            <Button variant="ghost" size="sm" onClick={onCancel}>
+              Cancel
+            </Button>
+          </CardHeader>
+        )}
       <CardContent className="space-y-5">
         <div className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2">
             <Label htmlFor="section-name">
               Section Name <span className="text-red-500">*</span>
             </Label>
@@ -1589,6 +1591,13 @@ export const AssessmentViewPage = () => {
     const { filters, payload } = buildDraftFromSection(section);
     try {
       await handleSectionSearch(filters, payload, section.id);
+      // Scroll edited card into view
+      setTimeout(() => {
+        const el = document.getElementById(`section-card-${section.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     } catch {
       // errors are surfaced via toast/error state in handleSectionSearch
     }
@@ -1988,7 +1997,11 @@ export const AssessmentViewPage = () => {
                 <div className="space-y-3">
                   {orderedSections.map((section) =>
                     editingSection?.id === section.id ? (
-                      <Card key={`editing-${section.id}`} className="border-primary/40 shadow-sm">
+                      <Card
+                        key={`editing-${section.id}`}
+                        id={`section-card-${section.id}`}
+                        className="border-primary/40 shadow-sm"
+                      >
                         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <CardTitle className="text-lg">
@@ -1999,7 +2012,7 @@ export const AssessmentViewPage = () => {
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={handleCancelBuilder}>
+                            <Button variant="ghost" size="sm" onClick={handleCancelBuilder}>
                               Cancel
                             </Button>
                           </div>
@@ -2042,6 +2055,7 @@ export const AssessmentViewPage = () => {
                     ) : (
                       <SectionCard
                         key={section.id}
+                        id={`section-card-${section.id}`}
                         section={section}
                         onEdit={handleEditSection}
                         onDelete={handleDeleteSection}
