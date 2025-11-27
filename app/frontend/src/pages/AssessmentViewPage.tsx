@@ -851,6 +851,22 @@ const MatchingQuestionsPanel = ({
 }: MatchingQuestionsPanelProps) => {
   const selectedCount = selectedQuestionIds.size;
 
+  // Sort questions to put selected ones first
+  const sortedQuestions = useMemo(() => {
+    const selected: Question[] = [];
+    const unselected: Question[] = [];
+
+    questions.forEach((question) => {
+      if (selectedQuestionIds.has(question.id)) {
+        selected.push(question);
+      } else {
+        unselected.push(question);
+      }
+    });
+
+    return [...selected, ...unselected];
+  }, [questions, selectedQuestionIds]);
+
   const renderContent = () => {
     if (isSearching) {
       return (
@@ -887,7 +903,7 @@ const MatchingQuestionsPanel = ({
     return (
       <div className="space-y-3">
         <div className="max-h-[480px] space-y-3 overflow-y-auto pr-1">
-          {questions.map((question) => {
+          {sortedQuestions.map((question) => {
             const isSelected = selectedQuestionIds.has(question.id);
 
             return (
