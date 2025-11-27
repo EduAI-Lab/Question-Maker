@@ -104,7 +104,7 @@ const hasDraftQuestions = (assessment: Assessment): boolean => {
   }
   return assessment.sections.some((section) =>
     section.sectionVariants?.some(
-      (link) => link.variant?.questionMetadata?.isDraft === true
+      (link) => link.variant?.isDraft === true
     )
   );
 };

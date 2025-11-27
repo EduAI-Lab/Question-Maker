@@ -653,9 +653,7 @@ export const AddQuestionDialog = ({
                 courseId,
                 primaryTopicId,
                 type: form.questionType,
-                questionOrder,
-                isAiGenerated: shouldMarkAsAiGenerated,
-                isDraft: !markAsReviewed // Inverted: if marked as reviewed, then NOT a draft
+                questionOrder
             });
 
             await questionService.createVariant(createdQuestion.id, {
@@ -664,7 +662,9 @@ export const AddQuestionDialog = ({
                 answer: form.variantAnswer.trim() || null,
                 assessmentId: form.variantAssessmentId === 'none' ? undefined : parseNumber(form.variantAssessmentId),
                 secondaryTopicsId: form.variantSecondaryTopics.length ? form.variantSecondaryTopics : undefined,
-                referenceId: parseNumber(form.variantReferenceId)
+                referenceId: parseNumber(form.variantReferenceId),
+                isAiGenerated: shouldMarkAsAiGenerated,
+                isDraft: !markAsReviewed // Inverted: if marked as reviewed, then NOT a draft
             });
 
             const hydrated = await questionService.getQuestion(createdQuestion.id);

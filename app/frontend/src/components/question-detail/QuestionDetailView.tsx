@@ -52,10 +52,6 @@ interface QuestionDetailViewProps {
     onCreateVariant: (entry: QuestionVariantEntry) => void;
     onDeleteVariant: (entry: QuestionVariantEntry) => void;
     onSelectVariant: (entry: QuestionVariantEntry) => void;
-    onUpdateQuestionFlags: (
-        questionId: number,
-        updates: Partial<Pick<QuestionVariantEntry, 'isAiGenerated' | 'isDraft'>>
-    ) => void;
 }
 
 export const QuestionDetailView = ({
@@ -64,8 +60,7 @@ export const QuestionDetailView = ({
     onClose,
     onCreateVariant,
     onDeleteVariant,
-    onSelectVariant,
-    onUpdateQuestionFlags
+    onSelectVariant
 }: QuestionDetailViewProps) => {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
@@ -121,22 +116,24 @@ export const QuestionDetailView = ({
     const handleToggleAiTag = async () => {
         try {
             setIsToggling(true);
-            const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
+            const updatedVariant = await questionService.updateVariant(entry.variant.id, {
                 isAiGenerated: !entry.isAiGenerated
             });
+            
+            const newIsAiGenerated = updatedVariant.isAiGenerated ?? !entry.isAiGenerated;
             
             // Update the entry with the new value
             const updatedEntry: QuestionVariantEntry = {
                 ...entry,
-                isAiGenerated: updatedQuestion.isAiGenerated
+                isAiGenerated: newIsAiGenerated,
+                variant: { ...entry.variant, ...updatedVariant }
             };
             
             onSelectVariant(updatedEntry);
-            onUpdateQuestionFlags(entry.questionId, { isAiGenerated: updatedQuestion.isAiGenerated });
             
             toast({
                 title: 'AI tag toggled',
-                description: `Question is now ${updatedQuestion.isAiGenerated ? 'marked as' : 'unmarked from'} AI-generated.`
+                description: `Variant is now ${newIsAiGenerated ? 'marked as' : 'unmarked from'} AI-generated.`
             });
         } catch (error: any) {
             toast({
@@ -153,22 +150,24 @@ export const QuestionDetailView = ({
         try {
             setIsTogglingDraft(true);
             
-            const updatedQuestion = await questionService.updateQuestion(entry.questionId, {
+            const updatedVariant = await questionService.updateVariant(entry.variant.id, {
                 isDraft: !entry.isDraft
             });
+            
+            const newIsDraft = updatedVariant.isDraft ?? !entry.isDraft;
             
             // Update the entry with the new value
             const updatedEntry: QuestionVariantEntry = {
                 ...entry,
-                isDraft: updatedQuestion.isDraft
+                isDraft: newIsDraft,
+                variant: { ...entry.variant, ...updatedVariant }
             };
             
             onSelectVariant(updatedEntry);
-            onUpdateQuestionFlags(entry.questionId, { isDraft: updatedQuestion.isDraft });
             
             toast({
                 title: 'Review status updated',
-                description: `Question is now ${updatedQuestion.isDraft ? 'marked as draft' : 'marked as reviewed'}.`
+                description: `Variant is now ${newIsDraft ? 'marked as draft' : 'marked as reviewed'}.`
             });
         } catch (error: any) {
             toast({

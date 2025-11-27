@@ -187,8 +187,8 @@ export const LandingPage = () => {
           courseName: question.course?.name,
           courseCode: question.course?.code,
           secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-          isAiGenerated: question.isAiGenerated,
-          isDraft: question.isDraft,
+          isAiGenerated: variant.isAiGenerated,
+          isDraft: variant.isDraft,
           variant
         };
       });
@@ -210,18 +210,6 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
-  const handleUpdateQuestionFlags = (
-    questionId: number,
-    updates: Partial<Pick<Question, 'isAiGenerated' | 'isDraft'>>
-  ) => {
-    setQuestions((prev) =>
-      prev.map((question) =>
-        question.id === questionId
-          ? { ...question, ...updates }
-          : question
-      )
-    );
-  };
 
   const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
     if (createdQuestions.length === 0) {
@@ -503,7 +491,7 @@ export const LandingPage = () => {
             if (assessment) {
               const hasDrafts = assessment.sections?.some((section) =>
                 section.sectionVariants?.some(
-                  (link) => link.variant?.questionMetadata?.isDraft === true
+                  (link) => link.variant?.isDraft === true
                 )
               );
               if (hasDrafts) {
@@ -531,7 +519,6 @@ export const LandingPage = () => {
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
-          onUpdateQuestionFlags={handleUpdateQuestionFlags}
         />
       )}
 
