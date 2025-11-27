@@ -1658,7 +1658,7 @@ export const AssessmentViewPage = () => {
       return;
     }
 
-    if (selectedQuestionIds.size === 0) {
+    if (selectedQuestionIds.size === 0 && !pendingSectionId) {
       toast({
         title: 'Select questions first',
         description: 'Choose at least one question before adding the section.',
@@ -1679,7 +1679,7 @@ export const AssessmentViewPage = () => {
     });
 
     const missingVariants = variantSelections.filter((entry) => !entry.variantId);
-    if (missingVariants.length === variantSelections.length) {
+    if (variantSelections.length > 0 && missingVariants.length === variantSelections.length) {
       toast({
         title: 'No variants available',
         description: 'Selected questions do not have variants to attach.',
@@ -1701,24 +1701,35 @@ export const AssessmentViewPage = () => {
       let sectionId = pendingSectionId ?? null;
       if (pendingSectionId) {
         await assessmentService.updateSection(assessment.id, pendingSectionId, payload);
-        // Get existing variant IDs to avoid duplicates
+        // Existing links for this section
+        const existingLinks = editingSection?.sectionVariants ?? [];
         const existingVariantIds = new Set(
-          (editingSection?.sectionVariants ?? [])
+          existingLinks
             .map((link) => link.variantId)
             .filter((id): id is number => typeof id === 'number')
         );
-        
-        // Only add variants that aren't already in the section (additive behavior)
+
+        // Determine removals (links no longer selected)
+        const selectedVariantIds = new Set(
+          variantSelections
+            .map((entry) => entry.variantId)
+            .filter((id): id is number => typeof id === 'number')
+        );
+        const linksToRemove = existingLinks.filter(
+          (link) => typeof link.variantId === 'number' && !selectedVariantIds.has(link.variantId as number)
+        );
+
+        // Add only new selections
         const newVariantSelections = variantSelections.filter(
           (entry) => entry.variantId !== undefined && !existingVariantIds.has(entry.variantId as number)
         );
-        
-        // Calculate display order starting from the current max order
-        const maxDisplayOrder = Math.max(
-          ...(editingSection?.sectionVariants ?? []).map((link) => link.displayOrder ?? 0),
-          -1
-        );
-        
+
+        // Preserve existing display orders for kept variants; append new ones after current max of kept
+        const keptDisplayOrders = existingLinks
+          .filter((link) => typeof link.variantId === 'number' && selectedVariantIds.has(link.variantId as number))
+          .map((link) => link.displayOrder ?? 0);
+        const maxDisplayOrder = keptDisplayOrders.length > 0 ? Math.max(...keptDisplayOrders) : -1;
+
         const successfulVariantAdds = await Promise.all(
           newVariantSelections.map((entry, index) =>
             assessmentService.addVariantToSection(assessment.id, pendingSectionId, {
@@ -1727,13 +1738,22 @@ export const AssessmentViewPage = () => {
             })
           )
         );
-        
+
+        if (linksToRemove.length > 0) {
+          await Promise.all(
+            linksToRemove
+              .map((link) =>
+                link.variantId
+                  ? assessmentService.removeVariantFromSection(assessment.id, pendingSectionId, link.variantId)
+                  : Promise.resolve()
+              )
+          );
+        }
+
         await refreshSections();
         toast({
           title: 'Section updated',
-          description: `${successfulVariantAdds.length} question${
-            successfulVariantAdds.length === 1 ? '' : 's'
-          } added to this section.`
+          description: `${newVariantSelections.length} added, ${linksToRemove.length} removed.`
         });
         handleCancelBuilder();
         return;
