@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Layers3, Plus, ChevronDown, Trash2, Upload, AlertTriangle, FileText } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
@@ -1024,6 +1024,7 @@ export const AssessmentViewPage = () => {
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
+  const [isTxtExporting, setIsTxtExporting] = useState(false);
   const [lastFilters, setLastFilters] = useState<QuestionSearchFilters | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<QuestionVariantEntry | null>(null);
   
@@ -1044,6 +1045,85 @@ export const AssessmentViewPage = () => {
     setPendingSectionId(null);
     setLastFilters(null);
     setIsAddQuestionOpen(false);
+  };
+
+  const handleExportTxt = () => {
+    if (!assessment) return;
+
+    if (!hasQuestions) {
+      toast({
+        title: 'Cannot export',
+        description: 'No questions in assessment.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (hasDraftQuestions) {
+      toast({
+        title: 'Cannot export',
+        description: 'Assessment contains draft questions. Please review all draft questions before exporting.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsTxtExporting(true);
+
+    try {
+      const entries: Array<{ order: number; text: string }> = [];
+
+      assessment.sections?.forEach((section) => {
+        section.sectionVariants?.forEach((link) => {
+          const variant = link.variant;
+          if (!variant) return;
+
+          const text =
+            variant.questionText?.trim() ||
+            variant.questionMetadata?.description?.trim() ||
+            '';
+          if (!text) return;
+
+          const orderValue =
+            link.displayOrder ?? variant.questionMetadata?.questionOrder?.[assessment.id];
+          const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
+
+          entries.push({ order, text });
+        });
+      });
+
+      if (entries.length === 0) {
+        toast({
+          title: 'Cannot export',
+          description: 'No questions to export for this assessment.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      entries.sort((a, b) => a.order - b.order);
+      const content = entries.map((entry, index) => `${index + 1}. ${entry.text}`).join('\n\n');
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const slug = (assessment.name || 'assessment')
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase() || 'assessment';
+      link.href = url;
+      link.download = `${slug}-questions.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export started',
+        description: 'Questions downloaded as a TXT file.'
+      });
+    } finally {
+      setIsTxtExporting(false);
+    }
   };
 
   const handleCancelBuilder = () => {
@@ -1764,14 +1844,27 @@ export const AssessmentViewPage = () => {
                 </div>
                 <div className="flex gap-2">
                   {hasQuestions && !hasDraftQuestions ? (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => setIsCanvasExportOpen(true)}
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      Export to Canvas
-                    </Button>
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsCanvasExportOpen(true)}
+                        className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Export to Canvas
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleExportTxt}
+                        disabled={isTxtExporting}
+                        className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        {isTxtExporting ? 'Exporting…' : 'Export TXT'}
+                      </Button>
+                    </>
                   ) : (
                     <Tooltip 
                       content={
@@ -1779,19 +1872,31 @@ export const AssessmentViewPage = () => {
                           ? "No questions in assessment" 
                           : hasDraftQuestions 
                           ? "Cannot export: Assessment contains draft questions. Please review all draft questions before exporting."
-                          : "Export assessment to Canvas"
+                          : "Export assessment"
                       }
                       multiline
                     >
                       <span className="inline-block">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          disabled
-                        >
-                          <Upload className="mr-2 h-4 w-4" />
-                          Export to Canvas
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Upload className="mr-2 h-4 w-4" />
+                            Export to Canvas
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            Export TXT
+                          </Button>
+                        </div>
                       </span>
                     </Tooltip>
                   )}
