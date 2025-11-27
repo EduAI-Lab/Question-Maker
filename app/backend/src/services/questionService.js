@@ -54,9 +54,7 @@ export const createQuestion = async (userId, questionData) => {
       courseId,
       primaryTopicId,
       type = 'MCQ',
-      questionOrder = {},
-      isAiGenerated = false,
-      isDraft = true // All new questions start as drafts until reviewed
+      questionOrder = {}
     } = questionData;
 
     if (!description || !description.trim()) {
@@ -90,9 +88,7 @@ export const createQuestion = async (userId, questionData) => {
       primaryTopicId: parsedPrimaryTopicId,
       type: normalizedType,
       description: description.trim(),
-      questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {},
-      isAiGenerated: Boolean(isAiGenerated),
-      isDraft: Boolean(isDraft)
+      questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {}
     });
 
     return question;
@@ -127,7 +123,7 @@ export const getQuestionsByUser = async (userId, options = {}) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'createdAt', 'updatedAt'],
+          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'isAiGenerated', 'isDraft', 'createdAt', 'updatedAt'],
           include: [
             {
               model: Assessments,
@@ -170,7 +166,7 @@ export const getQuestionById = async (questionId, userId) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'createdAt', 'updatedAt'],
+          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'isAiGenerated', 'isDraft', 'createdAt', 'updatedAt'],
           include: [
             {
               model: Assessments,
@@ -255,12 +251,10 @@ export const updateQuestion = async (questionId, userId, updateData) => {
       throw new Error('questionOrder must be an object');
     }
 
-    if (updates.isAiGenerated !== undefined) { //mock for AI generated questions
-      updates.isAiGenerated = Boolean(updates.isAiGenerated);
-    }
-
-    if (updates.isDraft !== undefined) {
-      updates.isDraft = Boolean(updates.isDraft);
+    // isAiGenerated and isDraft are variant-level fields and should not be updated via updateQuestion
+    // They should be updated via updateVariant instead
+    if (updates.isAiGenerated !== undefined || updates.isDraft !== undefined) {
+      throw new Error('isAiGenerated and isDraft are variant-level fields. Use updateVariant to update individual variants.');
     }
 
     await question.update(updates);
@@ -480,8 +474,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
         courseId,
         primaryTopicId: primaryTopicForQuestion,
         type: questionType,
-        questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {},
-        isAiGenerated: Boolean(isAiGenerated)
+        questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {}
       }, { transaction });
 
       const variant = await Variants.create({
@@ -491,7 +484,9 @@ export const saveExtractedQuestions = async (userId, payload) => {
         answer: typeof item.answer === 'string' && item.answer.trim() ? item.answer.trim() : null,
         assessmentId: createdAssessment ? createdAssessment.id : null,
         secondaryTopicsId: secondaryTopics,
-        referenceId: null
+        referenceId: null,
+        isAiGenerated: Boolean(isAiGenerated),
+        isDraft: true // All new variants start as drafts
       }, { transaction });
 
       // Link variant to section if assessment and section were created
@@ -672,7 +667,9 @@ export const createVariant = async (questionId, variantData, userId) => {
       assessmentId: variantData.assessmentId || null,
       secondaryTopicsId: secondaryTopics,
       answer: variantData.answer || null,
-      referenceId: variantData.referenceId || null
+      referenceId: variantData.referenceId || null,
+      isAiGenerated: variantData.isAiGenerated !== undefined ? Boolean(variantData.isAiGenerated) : false,
+      isDraft: variantData.isDraft !== undefined ? Boolean(variantData.isDraft) : true
     });
 
     return variant;
@@ -708,6 +705,12 @@ export const updateVariant = async (variantId, variantData, userId) => {
       ...variantData,
       ...(variantData.secondaryTopicsId !== undefined && {
         secondaryTopicsId: normalizeSecondaryTopics(variantData.secondaryTopicsId)
+      }),
+      ...(variantData.isAiGenerated !== undefined && {
+        isAiGenerated: Boolean(variantData.isAiGenerated)
+      }),
+      ...(variantData.isDraft !== undefined && {
+        isDraft: Boolean(variantData.isDraft)
       })
     };
 

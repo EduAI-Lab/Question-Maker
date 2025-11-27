@@ -614,7 +614,9 @@ export const AddQuestionDialog = ({
                     answer: form.variantAnswer.trim() || null,
                     assessmentId: form.variantAssessmentId === 'none' ? undefined : parseNumber(form.variantAssessmentId),
                     secondaryTopicsId: form.variantSecondaryTopics.length ? form.variantSecondaryTopics : undefined,
-                    referenceId: parseNumber(form.variantReferenceId)
+                    referenceId: parseNumber(form.variantReferenceId),
+                    isAiGenerated,
+                    isDraft: !markAsReviewed
                 });
 
                 const updated = await questionService.getQuestion(questionId);
@@ -653,9 +655,7 @@ export const AddQuestionDialog = ({
                 courseId,
                 primaryTopicId,
                 type: form.questionType,
-                questionOrder,
-                isAiGenerated: shouldMarkAsAiGenerated,
-                isDraft: !markAsReviewed // Inverted: if marked as reviewed, then NOT a draft
+                questionOrder
             });
 
             await questionService.createVariant(createdQuestion.id, {
@@ -664,7 +664,9 @@ export const AddQuestionDialog = ({
                 answer: form.variantAnswer.trim() || null,
                 assessmentId: form.variantAssessmentId === 'none' ? undefined : parseNumber(form.variantAssessmentId),
                 secondaryTopicsId: form.variantSecondaryTopics.length ? form.variantSecondaryTopics : undefined,
-                referenceId: parseNumber(form.variantReferenceId)
+                referenceId: parseNumber(form.variantReferenceId),
+                isAiGenerated: shouldMarkAsAiGenerated,
+                isDraft: !markAsReviewed // Inverted: if marked as reviewed, then NOT a draft
             });
 
             const hydrated = await questionService.getQuestion(createdQuestion.id);
@@ -1139,12 +1141,12 @@ export const AddQuestionDialog = ({
                             id="mark-as-reviewed"
                             checked={markAsReviewed}
                             onChange={(e) => setMarkAsReviewed(e.target.checked)}
-                            disabled={isSubmitting || mode === 'variant'}
+                            disabled={isSubmitting}
                             className="h-4 w-4 rounded border-gray-300"
                         />
                         <label
                             htmlFor="mark-as-reviewed"
-                            className={`text-sm ${mode === 'variant' ? 'text-muted-foreground' : 'text-foreground'} cursor-pointer`}
+                            className="text-sm text-foreground cursor-pointer"
                         >
                             Mark as reviewed
                         </label>

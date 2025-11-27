@@ -357,7 +357,7 @@ const SectionCard = ({
   
   // Check if this section has any draft questions
   const hasDraftQuestions = section.sectionVariants?.some(
-    (link) => link.variant?.questionMetadata?.isDraft === true
+    (link) => link.variant?.isDraft === true
   ) ?? false;
 
   return (
@@ -830,7 +830,7 @@ interface MatchingQuestionsPanelProps {
   onCreateNewQuestion: () => void;
   onAddVariant: (question: Question) => void;
   onViewQuestion?: (question: Question) => void;
-  onToggleReview: (questionId: number, nextDraft: boolean) => void;
+  onToggleReview: (variantId: number, nextDraft: boolean) => void;
   isSearching: boolean;
   isCreatingSection: boolean;
   searchError: string | null;
@@ -1200,8 +1200,8 @@ export const AssessmentViewPage = () => {
           courseCode: question.course?.code,
           secondaryTopicNames:
             secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-          isAiGenerated: question.isAiGenerated,
-          isDraft: question.isDraft,
+          isAiGenerated: variant.isAiGenerated,
+          isDraft: variant.isDraft,
           variant
         };
       })
@@ -1322,8 +1322,8 @@ export const AssessmentViewPage = () => {
       courseCode: question.course?.code,
       secondaryTopicNames:
         secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-      isAiGenerated: question.isAiGenerated,
-      isDraft: question.isDraft,
+      isAiGenerated: primaryVariant.isAiGenerated,
+      isDraft: primaryVariant.isDraft,
       variant: primaryVariant
     };
 
@@ -1332,6 +1332,24 @@ export const AssessmentViewPage = () => {
 
   const handleCloseDetail = () => {
     setSelectedVariant(null);
+  };
+
+  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
+    setMatchingQuestions((prev) =>
+      prev.map((question) => {
+        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
+          const updatedVariants = [...question.variants];
+          updatedVariants[variantIndex] = {
+            ...updatedVariants[variantIndex],
+            ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+          };
+          return { ...question, variants: updatedVariants };
+        }
+        return question;
+      })
+    );
   };
 
   const handleViewVariant = async (entry: QuestionVariantEntry) => {
@@ -1437,8 +1455,8 @@ export const AssessmentViewPage = () => {
       secondaryTopicNames: primaryVariant.secondaryTopicsId
         ?.map((id) => availableTopics.find((t) => t.id === id)?.name)
         .filter(Boolean) as string[] | undefined,
-      isAiGenerated: question.isAiGenerated,
-      isDraft: question.isDraft,
+      isAiGenerated: variantWithAssessment.isAiGenerated,
+      isDraft: variantWithAssessment.isDraft,
       variant: variantWithAssessment
     };
     setPresetVariant(variantEntry);
@@ -1457,20 +1475,36 @@ export const AssessmentViewPage = () => {
     });
   };
 
-  const handleToggleQuestionReview = async (questionId: number, nextDraft: boolean) => {
+  const handleToggleQuestionReview = async (variantId: number, nextDraft: boolean) => {
     try {
-      const updated = await questionService.updateQuestion(questionId, { isDraft: nextDraft });
+      const updatedVariant = await questionService.updateVariant(variantId, { isDraft: nextDraft });
+      const newIsDraft = updatedVariant.isDraft ?? nextDraft;
+      
+      // Update the matching questions to reflect the variant change
       setMatchingQuestions((prev) =>
-        prev.map((question) =>
-          question.id === questionId ? { ...question, isDraft: updated.isDraft } : question
-        )
+        prev.map((question) => {
+          const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+          if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
+            const updatedVariants = [...question.variants];
+            updatedVariants[variantIndex] = updatedVariant;
+            return { ...question, variants: updatedVariants };
+          }
+          return question;
+        })
       );
-      if (selectedVariant?.questionId === questionId) {
-        setSelectedVariant({ ...selectedVariant, isDraft: updated.isDraft });
+      
+      // Update selected variant if it's the one being toggled
+      if (selectedVariant?.variant.id === variantId) {
+        setSelectedVariant({ 
+          ...selectedVariant, 
+          isDraft: newIsDraft,
+          variant: { ...selectedVariant.variant, ...updatedVariant }
+        });
       }
+      
       toast({
         title: 'Review status updated',
-        description: `Question is now ${updated.isDraft ? 'marked as draft' : 'marked as reviewed'}.`
+        description: `Variant is now ${newIsDraft ? 'marked as draft' : 'marked as reviewed'}.`
       });
     } catch (error: any) {
       toast({
@@ -1759,7 +1793,7 @@ export const AssessmentViewPage = () => {
     if (!sections || sections.length === 0) return false;
     return sections.some((section) =>
       section.sectionVariants?.some(
-        (link) => link.variant?.questionMetadata?.isDraft === true
+        (link) => link.variant?.isDraft === true
       )
     );
   }, [sections]);
@@ -2018,6 +2052,7 @@ export const AssessmentViewPage = () => {
            )}
            onClose={handleCloseDetail}
            onCreateVariant={handleCreateVariant}
+           onUpdateVariant={handleUpdateVariant}
            onDeleteVariant={handleDeleteVariant}
            onSelectVariant={handleViewVariant}
          />

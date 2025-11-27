@@ -11,7 +11,7 @@ interface QuestionMetadataCardProps {
   onToggleSelection: () => void;
   onAddVariant: () => void;
   topicsById: Record<number, Topic>;
-  onToggleReview?: (questionId: number, nextDraft: boolean) => void;
+  onToggleReview?: (variantId: number, nextDraft: boolean) => void;
 }
 
 const getTopicName = (topicsById: Record<number, Topic>, topicId?: number | null) => {
@@ -103,19 +103,19 @@ export const QuestionMetadataCard = ({
                     {variants.length} variants
                   </Badge>
                 )}
-                {question.isDraft !== undefined && (
+                {activeVariant && activeVariant.isDraft !== undefined && (
                   <Badge
                     variant="default"
                     className={
-                      question.isDraft
+                      activeVariant.isDraft
                         ? 'bg-amber-100 text-amber-800 border-amber-200'
                         : 'bg-green-100 text-green-800 border-green-200'
                     }
                   >
-                    {question.isDraft ? 'Draft' : 'Reviewed'}
+                    {activeVariant.isDraft ? 'Draft' : 'Reviewed'}
                   </Badge>
                 )}
-                {question.isAiGenerated && (
+                {activeVariant && activeVariant.isAiGenerated && (
                   <Badge variant="outline" className="text-xs border-purple-200 text-purple-800">
                     AI
                   </Badge>
@@ -136,18 +136,18 @@ export const QuestionMetadataCard = ({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {onToggleReview && question.isDraft !== undefined && (
+              {onToggleReview && activeVariant && activeVariant.isDraft !== undefined && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onToggleReview(question.id, !question.isDraft);
+                    onToggleReview(activeVariant.id, !activeVariant.isDraft);
                   }}
                   className="text-xs"
                 >
-                  {question.isDraft ? 'Mark Reviewed' : 'Mark Draft'}
+                  {activeVariant.isDraft ? 'Mark Reviewed' : 'Mark Draft'}
                 </Button>
               )}
               <Button

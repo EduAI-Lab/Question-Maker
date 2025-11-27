@@ -24,6 +24,8 @@ const mapVariant = (variant: any): QuestionVariant => ({
       ? variant.secondary_topics_id
       : [],
   referenceId: variant.referenceId ?? variant.reference_id ?? null,
+  isAiGenerated: variant.isAiGenerated ?? variant.is_ai_generated ?? false,
+  isDraft: variant.isDraft ?? variant.is_draft ?? false,
   createdAt: variant.createdAt ?? variant.created_at,
   updatedAt: variant.updatedAt ?? variant.updated_at,
   assessment: variant.assessment
@@ -45,8 +47,6 @@ const mapQuestion = (item: any): Question => ({
   courseId: item.courseId,
   primaryTopicId: item.primaryTopicId,
   questionOrder: item.questionOrder ?? null,
-  isAiGenerated: item.isAiGenerated ?? item.is_ai_generated ?? false,
-  isDraft: item.isDraft ?? item.is_draft ?? false,
   createdAt: item.createdAt,
   updatedAt: item.updatedAt,
   course: item.course
@@ -102,8 +102,24 @@ export const questionService = {
     secondaryTopicsId?: number[];
     answer?: string | null;
     referenceId?: number;
+    isAiGenerated?: boolean;
+    isDraft?: boolean;
   }): Promise<QuestionVariant> {
     const response = await api.post(`/api/questions/${questionId}/variants`, payload);
+    return mapVariant(response.data.data);
+  },
+
+  async updateVariant(variantId: number, payload: {
+    questionText?: string;
+    difficulty?: QuestionDifficulty;
+    assessmentId?: number;
+    secondaryTopicsId?: number[];
+    answer?: string | null;
+    referenceId?: number;
+    isAiGenerated?: boolean;
+    isDraft?: boolean;
+  }): Promise<QuestionVariant> {
+    const response = await api.put(`/api/questions/variants/${variantId}`, payload);
     return mapVariant(response.data.data);
   },
 

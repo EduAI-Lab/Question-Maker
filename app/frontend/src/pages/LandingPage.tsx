@@ -187,8 +187,8 @@ export const LandingPage = () => {
           courseName: question.course?.name,
           courseCode: question.course?.code,
           secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-          isAiGenerated: question.isAiGenerated,
-          isDraft: question.isDraft,
+          isAiGenerated: variant.isAiGenerated,
+          isDraft: variant.isDraft,
           variant
         };
       });
@@ -210,18 +210,24 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
-  const handleUpdateQuestionFlags = (
-    questionId: number,
-    updates: Partial<Pick<Question, 'isAiGenerated' | 'isDraft'>>
-  ) => {
+  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
     setQuestions((prev) =>
-      prev.map((question) =>
-        question.id === questionId
-          ? { ...question, ...updates }
-          : question
-      )
+      prev.map((question) => {
+        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
+          const updatedVariants = [...question.variants];
+          updatedVariants[variantIndex] = {
+            ...updatedVariants[variantIndex],
+            ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+          };
+          return { ...question, variants: updatedVariants };
+        }
+        return question;
+      })
     );
   };
+
 
   const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
     if (createdQuestions.length === 0) {
@@ -586,7 +592,7 @@ export const LandingPage = () => {
             if (assessment) {
               const hasDrafts = assessment.sections?.some((section) =>
                 section.sectionVariants?.some(
-                  (link) => link.variant?.questionMetadata?.isDraft === true
+                  (link) => link.variant?.isDraft === true
                 )
               );
               if (hasDrafts) {
@@ -615,7 +621,7 @@ export const LandingPage = () => {
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
-          onUpdateQuestionFlags={handleUpdateQuestionFlags}
+          onUpdateVariant={handleUpdateVariant}
         />
       )}
 
