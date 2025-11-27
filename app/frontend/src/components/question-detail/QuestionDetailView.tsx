@@ -413,7 +413,7 @@ export const QuestionDetailView = ({
                             onClick={handleToggleAiTag}
                             disabled={isToggling}
                             className="flex items-center gap-2 text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
-                            title="Test: Toggle AI Generated tag"
+                            title="Toggle AI Generated status"
                         >
                             <Sparkles className="h-3 w-3" />
                             <span>{entry.isAiGenerated ? 'Remove AI Tag' : 'Add AI Tag'}</span>
