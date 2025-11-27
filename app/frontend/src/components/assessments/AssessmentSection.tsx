@@ -98,6 +98,24 @@ const buildQuestionEntries = (assessment: Assessment): QuestionEntry[] => {
   return Array.from(map.values()).sort((a, b) => a.order - b.order);
 };
 
+const calculateDifficultyDistribution = (assessment: Assessment): { easy: number; medium: number; hard: number } => {
+  const questions = buildQuestionEntries(assessment);
+  const counts = { easy: 0, medium: 0, hard: 0 };
+  
+  questions.forEach((question) => {
+    const difficulty = question.difficulty.toLowerCase();
+    if (difficulty === 'easy') {
+      counts.easy++;
+    } else if (difficulty === 'hard') {
+      counts.hard++;
+    } else {
+      counts.medium++;
+    }
+  });
+  
+  return counts;
+};
+
 const hasDraftQuestions = (assessment: Assessment): boolean => {
   if (!assessment.sections || assessment.sections.length === 0) {
     return false;
@@ -188,7 +206,7 @@ export const AssessmentSection = ({
             const assessmentQuestions = buildQuestionEntries(assessment);
             const totalQuestionCount = countTotalQuestions(assessment);
             const blueprint = assessment.blueprintConfig;
-            const difficulty = blueprint?.difficultyDistribution;
+            const difficultyDistribution = calculateDifficultyDistribution(assessment);
             const primaryCount = blueprint?.primaryTopicIds?.length ?? 0;
             const secondaryCount = blueprint?.secondaryTopicIds?.length ?? 0;
             const hasDrafts = hasDraftQuestions(assessment);
@@ -299,9 +317,9 @@ export const AssessmentSection = ({
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>Primary topics: {primaryCount}</span>
                           <span>Secondary topics: {secondaryCount}</span>
-                          {difficulty && (
+                          {totalQuestionCount > 0 && (
                             <span>
-                              Difficulty mix: {difficulty.easy}% / {difficulty.medium}% / {difficulty.hard}%
+                              Difficulty mix: {difficultyDistribution.easy} easy / {difficultyDistribution.medium} medium / {difficultyDistribution.hard} hard
                             </span>
                           )}
                         </div>
