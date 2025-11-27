@@ -1016,7 +1016,7 @@ export const AssessmentViewPage = () => {
     try {
       const entries: Array<{ order: number; text: string }> = [];
 
-      assessment.sections?.forEach((section) => {
+      sections.forEach((section) => {
         section.sectionVariants?.forEach((link) => {
           const variant = link.variant;
           if (!variant) return;
