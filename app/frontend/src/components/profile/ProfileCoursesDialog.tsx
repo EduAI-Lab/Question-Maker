@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Dialog,
     DialogContent,
@@ -9,11 +10,12 @@ import {
 } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Loader2 } from 'lucide-react';
+import { Loader2, LogOut } from 'lucide-react';
 import { Class } from '../../types/class';
 import { eduaiService, EduAICourseOption, EduAITopicOption } from '../../services/eduaiService';
 import { courseService } from '../../services/courseService';
 import { useToast } from '../ui/use-toast';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface ProfileCoursesDialogProps {
     open: boolean;
@@ -38,6 +40,8 @@ export const ProfileCoursesDialog = ({
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
+    const { logout } = useAuth();
+    const navigate = useNavigate();
 
     const existingCourseCodeSet = useMemo(() => {
         const codes = new Set<string>();
@@ -116,6 +120,16 @@ export const ProfileCoursesDialog = ({
         if (!value && !isSaving) {
             onClose();
         }
+    };
+
+    const handleLogout = () => {
+        logout();
+        onClose();
+        navigate('/login');
+        toast({
+            title: 'Logged out',
+            description: 'You have been successfully logged out.'
+        });
     };
 
     const handleSave = async () => {
@@ -281,13 +295,23 @@ export const ProfileCoursesDialog = ({
                     )}
                 </div>
 
-                <DialogFooter>
-                    <Button variant="ghost" onClick={onClose} disabled={isSaving}>
-                        Cancel
+                <DialogFooter className="flex items-center justify-between">
+                    <Button
+                        variant="outline"
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 text-destructive hover:text-destructive"
+                    >
+                        <LogOut className="h-4 w-4" />
+                        <span>Logout</span>
                     </Button>
-                    <Button onClick={handleSave} disabled={isSaving || isLoading}>
-                        {isSaving ? 'Linking…' : 'Add selected courses'}
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="ghost" onClick={onClose} disabled={isSaving}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={isSaving || isLoading}>
+                            {isSaving ? 'Linking…' : 'Add selected courses'}
+                        </Button>
+                    </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
