@@ -24,6 +24,7 @@ git push origin main
 
 3. **After pulling, you can then run:**
    ```bash
+   git pull origin main
    docker compose build --no-cache
    docker compose down
    docker compose up -d
