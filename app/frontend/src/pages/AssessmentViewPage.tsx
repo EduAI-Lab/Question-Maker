@@ -346,22 +346,24 @@ const SectionCard = ({
   section,
   onEdit,
   onDelete,
-  onDeleteVariant
+  onDeleteVariant,
+  id
 }: {
   section: AssessmentSection;
   onEdit: (section: AssessmentSection) => void;
   onDelete: (section: AssessmentSection) => void;
   onDeleteVariant: (sectionId: number, variantId: number) => void;
+  id?: string;
 }) => {
   const questionCount = section.sectionVariants?.length ?? 0;
-  
+
   // Check if this section has any draft questions
   const hasDraftQuestions = section.sectionVariants?.some(
     (link) => link.variant?.isDraft === true
   ) ?? false;
 
   return (
-    <Card className="border border-gray-200">
+    <Card className="border border-gray-200" id={id}>
       <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col">
           <div className="flex items-center gap-2">
@@ -693,18 +695,11 @@ const CreateSectionPanel = ({
     );
   };
 
-
   return (
     <Card className="border border-gray-200">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>{isEditing ? 'Edit Section' : 'Create Section'}</CardTitle>
-        <Button variant="ghost" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-      </CardHeader>
       <CardContent className="space-y-5">
         <div className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2">
             <Label htmlFor="section-name">
               Section Name <span className="text-red-500">*</span>
             </Label>
@@ -826,17 +821,13 @@ interface MatchingQuestionsPanelProps {
   selectedQuestionIds: Set<number>;
   onToggleQuestion: (question: Question) => void;
   onClearSelection: () => void;
-  onAddSelected: () => void;
-  onCreateNewQuestion: () => void;
   onAddVariant: (question: Question) => void;
   onViewQuestion?: (question: Question) => void;
   onToggleReview: (variantId: number, nextDraft: boolean) => void;
   isSearching: boolean;
-  isCreatingSection: boolean;
   searchError: string | null;
   hasSearched: boolean;
   topicsById: Record<number, Topic>;
-  canFinalizeSection: boolean;
 }
 
 const getTopicName = (topicsById: Record<number, Topic>, topicId?: number | null) => {
@@ -850,35 +841,31 @@ const MatchingQuestionsPanel = ({
   selectedQuestionIds,
   onToggleQuestion,
   onClearSelection,
-  onAddSelected,
-  onCreateNewQuestion,
   onAddVariant,
   onViewQuestion,
   onToggleReview,
   isSearching,
-  isCreatingSection,
   searchError,
   hasSearched,
-  topicsById,
-  canFinalizeSection
+  topicsById
 }: MatchingQuestionsPanelProps) => {
   const selectedCount = selectedQuestionIds.size;
 
-  const getDisabledReason = (): string | null => {
-    if (isCreatingSection) return null; // Don't show tooltip while creating
-    if (selectedCount === 0 && !canFinalizeSection) {
-      return 'Select at least one question and configure section';
-    }
-    if (selectedCount === 0) {
-      return 'Select at least one question';
-    }
-    if (!canFinalizeSection) {
-      return 'Configure section details first (run "Search Questions")';
-    }
-    return null;
-  };
+  // Sort questions to put selected ones first
+  const sortedQuestions = useMemo(() => {
+    const selected: Question[] = [];
+    const unselected: Question[] = [];
 
-  const disabledReason = getDisabledReason();
+    questions.forEach((question) => {
+      if (selectedQuestionIds.has(question.id)) {
+        selected.push(question);
+      } else {
+        unselected.push(question);
+      }
+    });
+
+    return [...selected, ...unselected];
+  }, [questions, selectedQuestionIds]);
 
   const renderContent = () => {
     if (isSearching) {
@@ -916,7 +903,7 @@ const MatchingQuestionsPanel = ({
     return (
       <div className="space-y-3">
         <div className="max-h-[480px] space-y-3 overflow-y-auto pr-1">
-          {questions.map((question) => {
+          {sortedQuestions.map((question) => {
             const isSelected = selectedQuestionIds.has(question.id);
 
             return (
@@ -949,46 +936,18 @@ const MatchingQuestionsPanel = ({
       </CardHeader>
       <CardContent className="space-y-4">
         {renderContent()}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4 text-sm">
-          <div className="flex items-center gap-3 text-muted-foreground">
+        {selectedCount > 0 && (
+          <div className="flex items-center gap-3 border-t pt-4 text-sm text-muted-foreground">
             <span>{selectedCount} selected</span>
-            {selectedCount > 0 && (
-              <button
-                type="button"
-                onClick={onClearSelection}
-                className="text-xs font-medium text-primary hover:underline"
-              >
-                Clear selection
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onClearSelection}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Clear selection
+            </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={onCreateNewQuestion}>
-              Create New Question
-            </Button>
-            {disabledReason ? (
-              <Tooltip content={disabledReason} multiline>
-                <span className="inline-block">
-                  <Button
-                    type="button"
-                    disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
-                    onClick={onAddSelected}
-                  >
-                    {isCreatingSection ? 'Adding...' : 'Save to Section'}
-                  </Button>
-                </span>
-              </Tooltip>
-            ) : (
-              <Button
-                type="button"
-                disabled={selectedCount === 0 || !canFinalizeSection || isCreatingSection}
-                onClick={onAddSelected}
-              >
-                {isCreatingSection ? 'Adding...' : 'Save to Section'}
-              </Button>
-            )}
-          </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -1073,7 +1032,7 @@ export const AssessmentViewPage = () => {
     try {
       const entries: Array<{ order: number; text: string }> = [];
 
-      assessment.sections?.forEach((section) => {
+      sections.forEach((section) => {
         section.sectionVariants?.forEach((link) => {
           const variant = link.variant;
           if (!variant) return;
@@ -1548,6 +1507,13 @@ export const AssessmentViewPage = () => {
     resetBuilderContext();
     setEditingSection(null);
     setIsBuilderVisible(true);
+    // Scroll to create section card
+    setTimeout(() => {
+      const el = document.getElementById('create-section-card');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const primeSelectionFromSection = (section: AssessmentSection) => {
@@ -1589,6 +1555,13 @@ export const AssessmentViewPage = () => {
     const { filters, payload } = buildDraftFromSection(section);
     try {
       await handleSectionSearch(filters, payload, section.id);
+      // Scroll edited card into view
+      setTimeout(() => {
+        const el = document.getElementById(`section-card-${section.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
     } catch {
       // errors are surfaced via toast/error state in handleSectionSearch
     }
@@ -1658,7 +1631,7 @@ export const AssessmentViewPage = () => {
       return;
     }
 
-    if (selectedQuestionIds.size === 0) {
+    if (selectedQuestionIds.size === 0 && !pendingSectionId) {
       toast({
         title: 'Select questions first',
         description: 'Choose at least one question before adding the section.',
@@ -1679,7 +1652,7 @@ export const AssessmentViewPage = () => {
     });
 
     const missingVariants = variantSelections.filter((entry) => !entry.variantId);
-    if (missingVariants.length === variantSelections.length) {
+    if (variantSelections.length > 0 && missingVariants.length === variantSelections.length) {
       toast({
         title: 'No variants available',
         description: 'Selected questions do not have variants to attach.',
@@ -1701,24 +1674,35 @@ export const AssessmentViewPage = () => {
       let sectionId = pendingSectionId ?? null;
       if (pendingSectionId) {
         await assessmentService.updateSection(assessment.id, pendingSectionId, payload);
-        // Get existing variant IDs to avoid duplicates
+        // Existing links for this section
+        const existingLinks = editingSection?.sectionVariants ?? [];
         const existingVariantIds = new Set(
-          (editingSection?.sectionVariants ?? [])
+          existingLinks
             .map((link) => link.variantId)
             .filter((id): id is number => typeof id === 'number')
         );
-        
-        // Only add variants that aren't already in the section (additive behavior)
+
+        // Determine removals (links no longer selected)
+        const selectedVariantIds = new Set(
+          variantSelections
+            .map((entry) => entry.variantId)
+            .filter((id): id is number => typeof id === 'number')
+        );
+        const linksToRemove = existingLinks.filter(
+          (link) => typeof link.variantId === 'number' && !selectedVariantIds.has(link.variantId as number)
+        );
+
+        // Add only new selections
         const newVariantSelections = variantSelections.filter(
           (entry) => entry.variantId !== undefined && !existingVariantIds.has(entry.variantId as number)
         );
-        
-        // Calculate display order starting from the current max order
-        const maxDisplayOrder = Math.max(
-          ...(editingSection?.sectionVariants ?? []).map((link) => link.displayOrder ?? 0),
-          -1
-        );
-        
+
+        // Preserve existing display orders for kept variants; append new ones after current max of kept
+        const keptDisplayOrders = existingLinks
+          .filter((link) => typeof link.variantId === 'number' && selectedVariantIds.has(link.variantId as number))
+          .map((link) => link.displayOrder ?? 0);
+        const maxDisplayOrder = keptDisplayOrders.length > 0 ? Math.max(...keptDisplayOrders) : -1;
+
         const successfulVariantAdds = await Promise.all(
           newVariantSelections.map((entry, index) =>
             assessmentService.addVariantToSection(assessment.id, pendingSectionId, {
@@ -1727,13 +1711,22 @@ export const AssessmentViewPage = () => {
             })
           )
         );
-        
+
+        if (linksToRemove.length > 0) {
+          await Promise.all(
+            linksToRemove
+              .map((link) =>
+                link.variantId
+                  ? assessmentService.removeVariantFromSection(assessment.id, pendingSectionId, link.variantId)
+                  : Promise.resolve()
+              )
+          );
+        }
+
         await refreshSections();
         toast({
           title: 'Section updated',
-          description: `${successfulVariantAdds.length} question${
-            successfulVariantAdds.length === 1 ? '' : 's'
-          } added to this section.`
+          description: `${newVariantSelections.length} added, ${linksToRemove.length} removed.`
         });
         handleCancelBuilder();
         return;
@@ -1966,54 +1959,214 @@ export const AssessmentViewPage = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {orderedSections.map((section) => (
-                    <SectionCard
-                      key={section.id}
-                      section={section}
-                      onEdit={handleEditSection}
-                      onDelete={handleDeleteSection}
-                      onDeleteVariant={handleDeleteVariantFromSection}
-                    />
-                  ))}
+                  {orderedSections.map((section) =>
+                    editingSection?.id === section.id ? (
+                      <Card
+                        key={`editing-${section.id}`}
+                        id={`section-card-${section.id}`}
+                        className="border-primary/40 shadow-sm"
+                      >
+                        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <CardTitle className="text-lg">
+                              Editing: {section.name || 'Untitled section'}
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                              Update details and questions, then save below.
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
+                              Create New Question
+                            </Button>
+                            {(() => {
+                              const selectedCount = selectedQuestionIds.size;
+                              const canFinalize = Boolean(pendingSectionDraft);
+                              const getDisabledReason = (): string | null => {
+                                if (isCreatingSection) return null;
+                                if (selectedCount === 0 && !canFinalize) {
+                                  return 'Select at least one question and configure section';
+                                }
+                                if (selectedCount === 0) {
+                                  return 'Select at least one question';
+                                }
+                                if (!canFinalize) {
+                                  return 'Configure section details first (run "Search Questions")';
+                                }
+                                return null;
+                              };
+                              const disabledReason = getDisabledReason();
+
+                              if (disabledReason) {
+                                return (
+                                  <Tooltip content={disabledReason} multiline>
+                                    <span className="inline-block">
+                                      <Button
+                                        size="sm"
+                                        disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                        onClick={handleFinalizeSection}
+                                      >
+                                        {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                                      </Button>
+                                    </span>
+                                  </Tooltip>
+                                );
+                              }
+                              return (
+                                <Button
+                                  size="sm"
+                                  disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                  onClick={handleFinalizeSection}
+                                >
+                                  {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                                </Button>
+                              );
+                            })()}
+                            <Button variant="ghost" size="sm" onClick={handleCancelBuilder}>
+                              Cancel
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
+                            <CreateSectionPanel
+                              key={`edit-${section.id}`}
+                              isSearching={isSearchingQuestions}
+                              onSearchQuestions={handleSectionSearch}
+                              onCancel={handleCancelBuilder}
+                              blueprint={assessment?.blueprintConfig}
+                              availableTopics={availableTopics}
+                              defaultPrimaryTopics={assessment?.blueprintConfig?.primaryTopicIds ?? []}
+                              defaultSecondaryTopics={assessment?.blueprintConfig?.secondaryTopicIds ?? []}
+                              defaultExcludedTopics={assessment?.blueprintConfig?.excludedTopicIds ?? []}
+                              mode="edit"
+                              editingSection={editingSection}
+                            />
+                            <MatchingQuestionsPanel
+                              questions={matchingQuestions}
+                              selectedQuestionIds={selectedQuestionIds}
+                              onToggleQuestion={handleToggleQuestionSelection}
+                              onClearSelection={clearQuestionSelection}
+                              onAddVariant={handleAddVariant}
+                              onViewQuestion={handleViewQuestion}
+                              onToggleReview={handleToggleQuestionReview}
+                              isSearching={isSearchingQuestions}
+                              searchError={questionSearchError}
+                              hasSearched={hasSearched}
+                              topicsById={topicsById}
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      <SectionCard
+                        key={section.id}
+                        id={`section-card-${section.id}`}
+                        section={section}
+                        onEdit={handleEditSection}
+                        onDelete={handleDeleteSection}
+                        onDeleteVariant={handleDeleteVariantFromSection}
+                      />
+                    )
+                  )}
                 </div>
               )}
             </div>
 
-            {isBuilderVisible && assessment && (
+            {isBuilderVisible && assessment && !editingSection && (
               <>
                 <Separator />
-                <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
-                  <CreateSectionPanel
-                    key={editingSection ? `edit-${editingSection.id}` : 'create'}
-                    isSearching={isSearchingQuestions}
-                    onSearchQuestions={handleSectionSearch}
-                    onCancel={handleCancelBuilder}
-                    blueprint={assessment.blueprintConfig}
-                    availableTopics={availableTopics}
-                    defaultPrimaryTopics={assessment.blueprintConfig?.primaryTopicIds ?? []}
-                    defaultSecondaryTopics={assessment.blueprintConfig?.secondaryTopicIds ?? []}
-                    defaultExcludedTopics={assessment.blueprintConfig?.excludedTopicIds ?? []}
-                    mode={editingSection ? 'edit' : 'create'}
-                    editingSection={editingSection}
-                  />
-                  <MatchingQuestionsPanel
-                    questions={matchingQuestions}
-                    selectedQuestionIds={selectedQuestionIds}
-                    onToggleQuestion={handleToggleQuestionSelection}
-                    onClearSelection={clearQuestionSelection}
-                    onAddSelected={handleFinalizeSection}
-                    onCreateNewQuestion={handleCreateNewQuestion}
-                    onAddVariant={handleAddVariant}
-                    onViewQuestion={handleViewQuestion}
-                    onToggleReview={handleToggleQuestionReview}
-                    isSearching={isSearchingQuestions}
-                    isCreatingSection={isCreatingSection}
-                    searchError={questionSearchError}
-                    hasSearched={hasSearched}
-                    topicsById={topicsById}
-                    canFinalizeSection={Boolean(pendingSectionDraft)}
-                  />
-                </div>
+                <Card id="create-section-card" className="border-primary/40 shadow-sm">
+                  <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Create Section</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Configure filters, search for questions, and save to create a section.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
+                        Create New Question
+                      </Button>
+                      {(() => {
+                        const selectedCount = selectedQuestionIds.size;
+                        const canFinalize = Boolean(pendingSectionDraft);
+                        const getDisabledReason = (): string | null => {
+                          if (isCreatingSection) return null;
+                          if (selectedCount === 0 && !canFinalize) {
+                            return 'Select at least one question and configure section';
+                          }
+                          if (selectedCount === 0) {
+                            return 'Select at least one question';
+                          }
+                          if (!canFinalize) {
+                            return 'Configure section details first (run "Search Questions")';
+                          }
+                          return null;
+                        };
+                        const disabledReason = getDisabledReason();
+
+                        if (disabledReason) {
+                          return (
+                            <Tooltip content={disabledReason} multiline>
+                              <span className="inline-block">
+                                <Button
+                                  size="sm"
+                                  disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                  onClick={handleFinalizeSection}
+                                >
+                                  {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                                </Button>
+                              </span>
+                            </Tooltip>
+                          );
+                        }
+                        return (
+                          <Button
+                            size="sm"
+                            disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                            onClick={handleFinalizeSection}
+                          >
+                            {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                          </Button>
+                        );
+                      })()}
+                      <Button variant="ghost" size="sm" onClick={handleCancelBuilder}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
+                      <CreateSectionPanel
+                        key="create-section"
+                        isSearching={isSearchingQuestions}
+                        onSearchQuestions={handleSectionSearch}
+                        onCancel={handleCancelBuilder}
+                        blueprint={assessment.blueprintConfig}
+                        availableTopics={availableTopics}
+                        defaultPrimaryTopics={assessment.blueprintConfig?.primaryTopicIds ?? []}
+                        defaultSecondaryTopics={assessment.blueprintConfig?.secondaryTopicIds ?? []}
+                        defaultExcludedTopics={assessment.blueprintConfig?.excludedTopicIds ?? []}
+                        mode="create"
+                        editingSection={null}
+                      />
+                      <MatchingQuestionsPanel
+                        questions={matchingQuestions}
+                        selectedQuestionIds={selectedQuestionIds}
+                        onToggleQuestion={handleToggleQuestionSelection}
+                        onClearSelection={clearQuestionSelection}
+                        onAddVariant={handleAddVariant}
+                        onViewQuestion={handleViewQuestion}
+                        onToggleReview={handleToggleQuestionReview}
+                        isSearching={isSearchingQuestions}
+                        searchError={questionSearchError}
+                        hasSearched={hasSearched}
+                        topicsById={topicsById}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               </>
             )}
           </>
