@@ -1011,16 +1011,94 @@ export const AddQuestionDialog = ({
                                                             No models available
                                                         </SelectItem>
                                                     ) : (
-                                                        availableModels.map((model) => (
-                                                            <SelectItem key={model.id} value={model.id} className="text-xs">
-                                                                {model.label}
-                                                                {model.provider ? ` (${model.provider})` : ''}
-                                                            </SelectItem>
-                                                        ))
+                                                        <>
+                                                            {availableModels.some((model) => model.provider === 'ollama') && (
+                                                                <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
+                                                                    UBC Hosted
+                                                                </div>
+                                                            )}
+                                                            {availableModels
+                                                                .filter((model) => model.provider === 'ollama')
+                                                                .map((model) => (
+                                                                    <SelectItem key={model.id} value={model.id} className="text-xs">
+                                                                        {model.label}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            {availableModels.some((model) => model.provider !== 'ollama') && (
+                                                                <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
+                                                                    External
+                                                                </div>
+                                                            )}
+                                                            {availableModels
+                                                                .filter((model) => model.provider !== 'ollama')
+                                                                .map((model) => (
+                                                                    <SelectItem key={model.id} value={model.id} className="text-xs">
+                                                                        {model.label} {model.provider ? `(${model.provider})` : ''}
+                                                                    </SelectItem>
+                                                                ))}
+                                                        </>
                                                     )}
                                                 </SelectContent>
                                             </Select>
                                         </div>
+
+                                        {isExternalGenerationModel && (
+                                            <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                <span className="font-semibold">Warning:</span> External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
+                                            </div>
+                                        )}
+
+                                        {apiKeyStorage.requiresApiKey(form.generationModel) && (
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="provider-api-key" className="text-xs font-medium">
+                                                    {apiKeyStorage.getProviderFromModel(form.generationModel)?.toUpperCase()} API Key
+                                                </Label>
+                                                {providerApiKey ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            id="provider-api-key"
+                                                            type="text"
+                                                            value={`${providerApiKey.substring(0, 8)}${'•'.repeat(Math.max(0, providerApiKey.length - 8))}`}
+                                                            disabled
+                                                            className="h-9 text-xs flex-1"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
+                                                                if (provider) {
+                                                                    apiKeyStorage.removeApiKey(provider);
+                                                                    setProviderApiKey('');
+                                                                }
+                                                            }}
+                                                        >
+                                                            Change
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <Input
+                                                        id="provider-api-key"
+                                                        type="password"
+                                                        placeholder={`Enter your ${apiKeyStorage.getProviderFromModel(form.generationModel)?.toUpperCase()} API key`}
+                                                        value={providerApiKey}
+                                                        className="h-9 text-xs"
+                                                        onChange={(event) => {
+                                                            const value = event.target.value;
+                                                            setProviderApiKey(value);
+                                                            const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
+                                                            if (provider && value) {
+                                                                void apiKeyStorage.setApiKey(provider, value);
+                                                            }
+                                                        }}
+                                                    />
+                                                )}
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    Your API key is stored locally in your browser and never sent to our servers.
+                                                </p>
+                                            </div>
+                                        )}
 
                                         <div className="space-y-1.5">
                                             <Label htmlFor="ai-difficulty" className="text-xs font-medium">Difficulty</Label>
