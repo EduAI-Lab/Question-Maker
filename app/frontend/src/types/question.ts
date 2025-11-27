@@ -11,8 +11,6 @@ export interface QuestionMetadata {
     courseId: number;
     primaryTopicId: number;
     questionOrder: Record<number, number> | null; // Maps assessment IDs to order numbers
-    isAiGenerated?: boolean; // Indicates if this question was generated using AI
-    isDraft?: boolean; // Indicates if this question is a draft and needs review
     createdAt: string;
     updatedAt: string;
     // Relations
@@ -32,6 +30,8 @@ export interface QuestionVariant {
     secondaryTopicsId: number[] | null;
     referenceId: number | null;
     answer: string | null;
+    isAiGenerated?: boolean; // Indicates if this variant was generated using AI
+    isDraft?: boolean; // Indicates if this variant is a draft and needs review
     createdAt?: string;
     updatedAt?: string;
     // Relations
@@ -108,8 +108,6 @@ export interface QuestionCreate {
     primaryTopicId: number;
     type: QuestionType;
     questionOrder?: Record<number, number> | null;
-    isAiGenerated?: boolean;
-    isDraft?: boolean;
 }
 
 export interface QuestionGenerationParams {

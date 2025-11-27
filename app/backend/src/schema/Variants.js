@@ -59,6 +59,20 @@ export const Variants = sequelize.define('Variants', {
       key: 'id'
     }
   },
+  isAiGenerated: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'is_ai_generated',
+    comment: 'Indicates if this variant was generated using AI'
+  },
+  isDraft: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+    field: 'is_draft',
+    comment: 'Indicates if this variant is a draft and needs review before being added to assessments. All new variants start as drafts.'
+  },
   answer: {
     type: DataTypes.TEXT,
     allowNull: true

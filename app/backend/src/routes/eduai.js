@@ -184,7 +184,7 @@ router.get('/courses/:courseId/topics', authenticateToken, async (req, res) => {
 router.get('/test-api-key', authenticateToken, async (req, res) => {
   try {
     const result = await eduaiService.testApiKey();
-    
+
     if (result.success) {
       res.json({
         success: true,
@@ -200,9 +200,27 @@ router.get('/test-api-key', authenticateToken, async (req, res) => {
     }
   } catch (error) {
     console.error('EduAI API key test error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to test EduAI API key',
-      details: error.message 
+      details: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/eduai/ai-models
+ * @desc Retrieve available AI models from EduAI
+ * @access Private
+ */
+router.get('/ai-models', authenticateToken, async (req, res) => {
+  try {
+    const models = await eduaiService.listAIModels();
+    res.json(models);
+  } catch (error) {
+    console.error('EduAI list models error:', error);
+    res.status(500).json({
+      error: 'Failed to retrieve AI models from EduAI',
+      details: error.message
     });
   }
 });

@@ -187,8 +187,8 @@ export const LandingPage = () => {
           courseName: question.course?.name,
           courseCode: question.course?.code,
           secondaryTopicNames: secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-          isAiGenerated: question.isAiGenerated,
-          isDraft: question.isDraft,
+          isAiGenerated: variant.isAiGenerated,
+          isDraft: variant.isDraft,
           variant
         };
       });
@@ -198,7 +198,7 @@ export const LandingPage = () => {
   const emptyStateMessage = selectedCourse
     ? questionsError || 'No questions found for this course yet. Try adding or uploading questions.'
     : courses.length === 0
-      ? 'No courses available yet. Create a course to get started.'
+      ? 'No courses available. Click the profile icon (👤) in the top-right corner to add your first course.'
       : 'Select a course to view its questions.';
 
   const filteredAssessments = useMemo(() => {
@@ -210,18 +210,24 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
-  const handleUpdateQuestionFlags = (
-    questionId: number,
-    updates: Partial<Pick<Question, 'isAiGenerated' | 'isDraft'>>
-  ) => {
+  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
     setQuestions((prev) =>
-      prev.map((question) =>
-        question.id === questionId
-          ? { ...question, ...updates }
-          : question
-      )
+      prev.map((question) => {
+        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
+          const updatedVariants = [...question.variants];
+          updatedVariants[variantIndex] = {
+            ...updatedVariants[variantIndex],
+            ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+          };
+          return { ...question, variants: updatedVariants };
+        }
+        return question;
+      })
     );
   };
+
 
   const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
     if (createdQuestions.length === 0) {
@@ -464,6 +470,89 @@ export const LandingPage = () => {
     return variantEntries.filter((entry) => entry.questionId === selectedVariant.questionId);
   }, [variantEntries, selectedVariant?.questionId]);
 
+  const handleExportAssessmentToTxt = useCallback(
+    (assessmentId: number, assessmentName: string) => {
+      const assessment = filteredAssessments.find((a) => a.id === assessmentId);
+
+      if (!assessment) {
+        toast({
+          title: 'Export failed',
+          description: 'Assessment not found.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const hasDrafts = assessment.sections?.some((section) =>
+        section.sectionVariants?.some(
+          (link) => link.variant?.questionMetadata?.isDraft === true
+        )
+      );
+
+      if (hasDrafts) {
+        toast({
+          title: 'Cannot export',
+          description: 'Assessment contains draft questions. Please review all draft questions before exporting.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const entries: Array<{ order: number; text: string }> = [];
+
+      assessment.sections?.forEach((section) => {
+        section.sectionVariants?.forEach((link) => {
+          const variant = link.variant;
+          if (!variant) return;
+
+          const text =
+            variant.questionText?.trim() ||
+            variant.questionMetadata?.description?.trim() ||
+            '';
+          if (!text) return;
+
+          const orderValue =
+            link.displayOrder ??
+            variant.questionMetadata?.questionOrder?.[assessment.id];
+          const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
+
+          entries.push({ order, text });
+        });
+      });
+
+      if (entries.length === 0) {
+        toast({
+          title: 'Cannot export',
+          description: 'No questions to export for this assessment.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      entries.sort((a, b) => a.order - b.order);
+      const content = entries.map((entry, index) => `${index + 1}. ${entry.text}`).join('\n\n');
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const slug = (assessmentName || 'assessment')
+        .replace(/[^a-z0-9]+/gi, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase() || 'assessment';
+      link.href = url;
+      link.download = `${slug}-questions.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export started',
+        description: 'Questions downloaded as a TXT file.'
+      });
+    },
+    [filteredAssessments, toast]
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNavigation
@@ -489,6 +578,7 @@ export const LandingPage = () => {
             emptyMessage={emptyStateMessage}
             disableAdd={!selectedCourse}
             disableUpload={!selectedCourse}
+            onOpenProfile={() => setIsProfileDialogOpen(true)}
           />
         ) : (
         <AssessmentSection
@@ -503,7 +593,7 @@ export const LandingPage = () => {
             if (assessment) {
               const hasDrafts = assessment.sections?.some((section) =>
                 section.sectionVariants?.some(
-                  (link) => link.variant?.questionMetadata?.isDraft === true
+                  (link) => link.variant?.isDraft === true
                 )
               );
               if (hasDrafts) {
@@ -518,6 +608,7 @@ export const LandingPage = () => {
             setSelectedAssessmentForExport({ id: assessmentId, name: assessmentName });
             setIsCanvasExportOpen(true);
           }}
+          onExportToTxt={handleExportAssessmentToTxt}
           onDeleteAssessment={handleDeleteAssessment}
         />
         )}
@@ -531,7 +622,7 @@ export const LandingPage = () => {
           onCreateVariant={handleCreateVariant}
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
-          onUpdateQuestionFlags={handleUpdateQuestionFlags}
+          onUpdateVariant={handleUpdateVariant}
         />
       )}
 
