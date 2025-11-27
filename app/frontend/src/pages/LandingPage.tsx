@@ -198,7 +198,7 @@ export const LandingPage = () => {
   const emptyStateMessage = selectedCourse
     ? questionsError || 'No questions found for this course yet. Try adding or uploading questions.'
     : courses.length === 0
-      ? 'No courses available yet. Create a course to get started.'
+      ? 'No courses available. Click the profile icon (👤) in the top-right corner to add your first course.'
       : 'Select a course to view its questions.';
 
   const filteredAssessments = useMemo(() => {
@@ -578,6 +578,7 @@ export const LandingPage = () => {
             emptyMessage={emptyStateMessage}
             disableAdd={!selectedCourse}
             disableUpload={!selectedCourse}
+            onOpenProfile={() => setIsProfileDialogOpen(true)}
           />
         ) : (
         <AssessmentSection

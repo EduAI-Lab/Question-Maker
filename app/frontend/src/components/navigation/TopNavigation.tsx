@@ -78,15 +78,23 @@ export const TopNavigation = ({
 
                 {/* Right: User Profile */}
                 <div className="flex items-center space-x-2">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full"
-                        onClick={onProfileClick}
-                        aria-label="Open profile"
-                    >
-                        <User className="h-6 w-6" />
-                    </Button>
+                    <div className="relative">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full"
+                            onClick={onProfileClick}
+                            aria-label="Open profile"
+                        >
+                            <User className="h-6 w-6" />
+                        </Button>
+                        {courses.length === 0 && !isLoadingCourses && (
+                            <span className="absolute top-0 right-0 flex h-3 w-3">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
