@@ -249,14 +249,15 @@ export const CreateSectionPanel = ({
 
     const handleSubmit = async () => {
         if (!sectionName.trim()) return;
-        const hasRequiredFilters =
-            selectedTypes.length > 0 &&
-            selectedReasoning.length > 0 &&
-            selectedDifficulty.length > 0;
+    const hasRequiredFilters =
+      selectedTypes.length > 0 &&
+      selectedReasoning.length > 0 &&
+      selectedDifficulty.length > 0 &&
+      (primaryTopicIds.length > 0 || secondaryTopicIds.length > 0 || excludedTopicIds.length > 0);
 
-        if (!hasRequiredFilters) {
-            return;
-        }
+    if (!hasRequiredFilters) {
+      return;
+    }
 
         // Normalize reasoning data - distribute evenly if multiple selected, or use first one
         const reasoningCount = selectedReasoning.length;
@@ -409,17 +410,18 @@ export const CreateSectionPanel = ({
                     </div>
                 </div>
                 {(() => {
-                    const hasAnyFilter =
-                        selectedTypes.length > 0 &&
-                        selectedReasoning.length > 0 &&
-                        selectedDifficulty.length > 0;
+          const hasAnyFilter =
+            selectedTypes.length > 0 &&
+            selectedReasoning.length > 0 &&
+            selectedDifficulty.length > 0 &&
+            (primaryTopicIds.length > 0 || secondaryTopicIds.length > 0 || excludedTopicIds.length > 0);
 
-                    const disabled = isSearching || !sectionName.trim() || !hasAnyFilter;
-                    const tooltipContent = isSearching
-                        ? 'Searching for questions...'
-                        : !sectionName.trim()
-                            ? 'Section name is required'
-                            : 'Select at least one option for Question Type, Reasoning Focus, and Difficulty';
+          const disabled = isSearching || !sectionName.trim() || !hasAnyFilter;
+          const tooltipContent = isSearching
+            ? 'Searching for questions...'
+            : !sectionName.trim()
+            ? 'Section name is required'
+            : 'Select Question Type, Reasoning Focus, Difficulty, and at least one topic';
 
                     if (disabled) {
                         return (
