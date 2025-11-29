@@ -25,7 +25,7 @@ import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModa
 import { SectionCard } from './assessments/SectionCard';
 import { CreateSectionPanel } from './assessments/CreateSectionPanel';
 import { MatchingQuestionsPanel } from './assessments/MatchingQuestionsPanel';
-import { QuestionSearchFilters } from './assessments/assessmentViewTypes';
+import { QuestionSearchFilters, defaultReasoningData } from './assessments/assessmentViewTypes';
 import { questionMatchesFilters, buildDraftFromSection } from './assessments/assessmentViewUtils';
 
 export const AssessmentViewPage = () => {
@@ -50,6 +50,9 @@ export const AssessmentViewPage = () => {
   const [isCreatingSection, setIsCreatingSection] = useState(false);
   const [questionSearchError, setQuestionSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isSectionNameFilled, setIsSectionNameFilled] = useState(false);
+  const [sectionNameValue, setSectionNameValue] = useState('');
+  const [prefillFromQuestion, setPrefillFromQuestion] = useState<{ sectionName: string; question: Question } | null>(null);
   const [pendingSectionDraft, setPendingSectionDraft] =
     useState<AssessmentSectionCreateInput | null>(null);
   const [pendingSectionId, setPendingSectionId] = useState<number | null>(null);
@@ -164,6 +167,9 @@ export const AssessmentViewPage = () => {
     resetBuilderContext();
     setEditingSection(null);
     setIsBuilderVisible(false);
+    setIsSectionNameFilled(false);
+    setSectionNameValue('');
+    setPrefillFromQuestion(null);
   };
 
   useEffect(() => {
@@ -267,32 +273,40 @@ export const AssessmentViewPage = () => {
         limit: 200
       });
       const filtered = questions.filter((question) => questionMatchesFilters(question, filters));
-      setMatchingQuestions(filtered);
-      if (existingSectionId) {
-        setSelectedQuestionIds((prev) => {
-          const next = new Set<number>();
-          filtered.forEach((question) => {
-            if (prev.has(question.id)) {
-              next.add(question.id);
-            }
-          });
-          return next;
+
+      // Ensure already-selected questions remain visible/selected even if filters exclude them
+      const selectedIds = new Set(selectedQuestionIds);
+      const selectedQuestions = questions.filter((q) => selectedIds.has(q.id));
+      const combined = [...filtered];
+      const existingIds = new Set(filtered.map((q) => q.id));
+      selectedQuestions.forEach((q) => {
+        if (!existingIds.has(q.id)) {
+          combined.push(q);
+        }
+      });
+
+      setMatchingQuestions(combined);
+
+      setSelectedQuestionIds((prev) => {
+        const next = new Set<number>();
+        combined.forEach((question) => {
+          if (prev.has(question.id)) {
+            next.add(question.id);
+          }
         });
-        setSelectedVariantByQuestion((prev) => {
-          const next: Record<number, number> = {};
-          filtered.forEach((question) => {
-            if (prev[question.id]) {
-              next[question.id] = prev[question.id];
-            } else if (question.variants?.[0]?.id) {
-              next[question.id] = question.variants[0].id;
-            }
-          });
-          return next;
+        return next;
+      });
+      setSelectedVariantByQuestion((prev) => {
+        const next: Record<number, number> = {};
+        combined.forEach((question) => {
+          if (prev[question.id]) {
+            next[question.id] = prev[question.id];
+          } else if (selectedIds.has(question.id) && question.variants?.[0]?.id) {
+            next[question.id] = question.variants[0].id;
+          }
         });
-      } else {
-        setSelectedQuestionIds(new Set());
-        setSelectedVariantByQuestion({});
-      }
+        return next;
+      });
     } catch (_error) {
       setQuestionSearchError('Failed to search for questions. Please try again.');
       setPendingSectionDraft(null);
@@ -450,6 +464,14 @@ export const AssessmentViewPage = () => {
       });
       return;
     }
+    if (!isSectionNameFilled) {
+      toast({
+        title: 'Add a section name first',
+        description: 'Enter a section name before creating a question for it.',
+        variant: 'destructive'
+      });
+      return;
+    }
     setPresetVariant(null);
     setIsAddQuestionOpen(true);
   };
@@ -499,14 +521,77 @@ export const AssessmentViewPage = () => {
 
   const handleQuestionCreated = (newQuestion: Question) => {
     setIsAddQuestionOpen(false);
+    const primaryVariantId = newQuestion.variants?.[0]?.id;
+
     if (lastFilters && pendingSectionDraft) {
       void handleSectionSearch(lastFilters, pendingSectionDraft, pendingSectionId);
-      return;
+    } else {
+      setMatchingQuestions((prev) => {
+        const filtered = prev.filter((question) => question.id !== newQuestion.id);
+        return [newQuestion, ...filtered];
+      });
+      setHasSearched(true);
+      // Build minimal filters/payload from the new question to enable saving
+      const derivedFilters: QuestionSearchFilters = {
+        questionTypes: [newQuestion.type],
+        primaryTopicIds:
+          pendingSectionDraft?.topicFilters?.primaryTopicIds ??
+          assessment?.blueprintConfig?.primaryTopicIds ??
+          [],
+        secondaryTopicIds:
+          pendingSectionDraft?.topicFilters?.secondaryTopicIds ??
+          assessment?.blueprintConfig?.secondaryTopicIds ??
+          [],
+        excludedTopicIds:
+          pendingSectionDraft?.topicFilters?.excludedTopicIds ??
+          assessment?.blueprintConfig?.excludedTopicIds ??
+          [],
+        difficulty:
+          newQuestion.variants?.[0]?.difficulty &&
+          ['easy', 'medium', 'hard'].includes(newQuestion.variants[0].difficulty as string)
+            ? [newQuestion.variants![0].difficulty as 'easy' | 'medium' | 'hard']
+            : null
+      };
+
+      const derivedPayload = {
+        name: sectionNameValue.trim(),
+        sectionType: [newQuestion.type].join(', '),
+        questionTypes: [newQuestion.type],
+        topicFilters: {
+          primaryTopicIds: derivedFilters.primaryTopicIds,
+          secondaryTopicIds: derivedFilters.secondaryTopicIds,
+          excludedTopicIds: derivedFilters.excludedTopicIds
+        },
+        metadata: {
+          questionTarget: 10,
+          selectedReasoning: [],
+          questionTypes: [newQuestion.type],
+          difficulty: derivedFilters.difficulty ?? []
+        },
+        reasoningData: defaultReasoningData(),
+        difficultySettings: {
+          easyBoundary: defaultReasoningData().factual.easyBoundary,
+          hardBoundary: defaultReasoningData().factual.hardBoundary
+        }
+      } as AssessmentSectionCreateInput;
+
+      setPendingSectionDraft(derivedPayload);
+      setLastFilters(derivedFilters);
+      setPrefillFromQuestion({ sectionName: sectionNameValue.trim(), question: newQuestion });
+      void handleSectionSearch(derivedFilters, derivedPayload, pendingSectionId).then(() => {
+        setSelectedQuestionIds((prev) => {
+          const next = new Set(prev);
+          next.add(newQuestion.id);
+          return next;
+        });
+        if (primaryVariantId) {
+          setSelectedVariantByQuestion((prev) => ({
+            ...prev,
+            [newQuestion.id]: primaryVariantId
+          }));
+        }
+      });
     }
-    setMatchingQuestions((prev) => {
-      const filtered = prev.filter((question) => question.id !== newQuestion.id);
-      return [newQuestion, ...filtered];
-    });
   };
 
   const handleToggleQuestionReview = async (variantId: number, nextDraft: boolean) => {
@@ -581,6 +666,9 @@ export const AssessmentViewPage = () => {
   const startCreateSection = () => {
     resetBuilderContext();
     setEditingSection(null);
+    setIsSectionNameFilled(false);
+    setSectionNameValue('');
+    setPrefillFromQuestion(null);
     setIsBuilderVisible(true);
     // Scroll to create section card
     setTimeout(() => {
@@ -625,6 +713,8 @@ export const AssessmentViewPage = () => {
   const handleEditSection = async (section: AssessmentSection) => {
     resetBuilderContext();
     setEditingSection(section);
+    setIsSectionNameFilled(Boolean(section.name?.trim()));
+    setSectionNameValue(section.name ?? '');
     primeSelectionFromSection(section);
     setIsBuilderVisible(true);
     const { filters, payload } = buildDraftFromSection(section);
@@ -1051,9 +1141,19 @@ export const AssessmentViewPage = () => {
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
-                              Create New Question
-                            </Button>
+                            {isSectionNameFilled ? (
+                              <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
+                                Create New Question
+                              </Button>
+                            ) : (
+                              <Tooltip content="Section name is required" multiline>
+                                <span className="inline-block">
+                                  <Button variant="outline" size="sm" disabled>
+                                    Create New Question
+                                  </Button>
+                                </span>
+                              </Tooltip>
+                            )}
                             {(() => {
                               const selectedCount = selectedQuestionIds.size;
                               const canFinalize = Boolean(pendingSectionDraft);
@@ -1109,6 +1209,11 @@ export const AssessmentViewPage = () => {
                               isSearching={isSearchingQuestions}
                               onSearchQuestions={handleSectionSearch}
                               onCancel={handleCancelBuilder}
+                              onSectionNameChange={(name) => {
+                                setIsSectionNameFilled(Boolean(name.trim()));
+                                setSectionNameValue(name);
+                              }}
+                              prefillFromQuestion={prefillFromQuestion}
                               blueprint={assessment?.blueprintConfig}
                               availableTopics={availableTopics}
                               defaultPrimaryTopics={assessment?.blueprintConfig?.primaryTopicIds ?? []}
@@ -1160,9 +1265,19 @@ export const AssessmentViewPage = () => {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
-                        Create New Question
-                      </Button>
+                      {isSectionNameFilled ? (
+                        <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
+                          Create New Question
+                        </Button>
+                      ) : (
+                        <Tooltip content="Section name is required" multiline>
+                          <span className="inline-block">
+                            <Button variant="outline" size="sm" disabled>
+                              Create New Question
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      )}
                       {(() => {
                         const selectedCount = selectedQuestionIds.size;
                         const canFinalize = Boolean(pendingSectionDraft);
@@ -1218,6 +1333,11 @@ export const AssessmentViewPage = () => {
                         isSearching={isSearchingQuestions}
                         onSearchQuestions={handleSectionSearch}
                         onCancel={handleCancelBuilder}
+                        onSectionNameChange={(name) => {
+                          setIsSectionNameFilled(Boolean(name.trim()));
+                          setSectionNameValue(name);
+                        }}
+                        prefillFromQuestion={prefillFromQuestion}
                         blueprint={assessment.blueprintConfig}
                         availableTopics={availableTopics}
                         defaultPrimaryTopics={assessment.blueprintConfig?.primaryTopicIds ?? []}

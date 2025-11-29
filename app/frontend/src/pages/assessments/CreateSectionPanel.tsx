@@ -4,7 +4,8 @@ import {
   AssessmentSection,
   AssessmentSectionCreateInput,
   QuestionType,
-  ReasoningDataState
+  ReasoningDataState,
+  Question
 } from '../../types/question';
 import { Topic } from '../../types/topic';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
@@ -33,6 +34,8 @@ interface CreateSectionPanelProps {
     existingSectionId?: number
   ) => Promise<void>;
   onCancel: () => void;
+  onSectionNameChange?: (name: string) => void;
+  prefillFromQuestion?: { sectionName: string; question: Question } | null;
   blueprint?: AssessmentBlueprintConfig | null;
   availableTopics: Topic[];
   defaultPrimaryTopics: number[];
@@ -46,6 +49,8 @@ export const CreateSectionPanel = ({
   isSearching,
   onSearchQuestions,
   onCancel,
+  onSectionNameChange,
+  prefillFromQuestion,
   blueprint,
   availableTopics,
   defaultPrimaryTopics,
@@ -177,6 +182,26 @@ export const CreateSectionPanel = ({
     setSelectedDifficulty([]);
     setReasoningData(defaultReasoningData());
   }, [isEditing]);
+
+  useEffect(() => {
+    onSectionNameChange?.(sectionName);
+  }, [sectionName, onSectionNameChange]);
+
+  useEffect(() => {
+    if (!prefillFromQuestion || isEditing) return;
+    const { sectionName: prefillName, question } = prefillFromQuestion;
+    setSectionName((prev) => prev || prefillName);
+    setSelectedTypes([question.type]);
+    const firstVariant = question.variants?.[0];
+    const difficulty = firstVariant?.difficulty;
+    if (difficulty && ['easy', 'medium', 'hard'].includes(difficulty)) {
+      setSelectedDifficulty([difficulty as 'easy' | 'medium' | 'hard']);
+    }
+    const reasoning = firstVariant?.reasoningLevel;
+    if (reasoning && ['factual', 'analytical', 'application'].includes(reasoning)) {
+      setSelectedReasoning([reasoning as keyof ReasoningDataState]);
+    }
+  }, [prefillFromQuestion, isEditing]);
 
   const toggleType = (type: QuestionType) => {
     setSelectedTypes((prev) =>
