@@ -47,6 +47,19 @@ export const assessmentService = {
     return response.data.data;
   },
 
+  async updateAssessment(assessmentId: number, payload: AssessmentGenerationParams): Promise<Assessment> {
+    const response = await api.put(`/api/assessments/${assessmentId}`, {
+      type: payload.type,
+      name: payload.name,
+      semester: payload.semester,
+      description: payload.description,
+      courseId: payload.courseId,
+      blueprintConfig: toBlueprintConfig(payload)
+    });
+
+    return response.data.data;
+  },
+
   async getAssessment(id: number): Promise<Assessment> {
     const response = await api.get(`/api/assessments/${id}`);
     return response.data.data;

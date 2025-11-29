@@ -27,6 +27,7 @@ import { CreateSectionPanel } from './assessments/CreateSectionPanel';
 import { MatchingQuestionsPanel } from './assessments/MatchingQuestionsPanel';
 import { QuestionSearchFilters, defaultReasoningData } from './assessments/assessmentViewTypes';
 import { questionMatchesFilters, buildDraftFromSection } from './assessments/assessmentViewUtils';
+import GenerateAssessmentModal from '../components/assessments/GenerateAssessmentModal';
 
 export const AssessmentViewPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -53,6 +54,7 @@ export const AssessmentViewPage = () => {
   const [isSectionNameFilled, setIsSectionNameFilled] = useState(false);
   const [sectionNameValue, setSectionNameValue] = useState('');
   const [prefillFromQuestion, setPrefillFromQuestion] = useState<{ sectionName: string; question: Question } | null>(null);
+  const [isEditAssessmentOpen, setIsEditAssessmentOpen] = useState(false);
   const [pendingSectionDraft, setPendingSectionDraft] =
     useState<AssessmentSectionCreateInput | null>(null);
   const [pendingSectionId, setPendingSectionId] = useState<number | null>(null);
@@ -474,6 +476,25 @@ export const AssessmentViewPage = () => {
     }
     setPresetVariant(null);
     setIsAddQuestionOpen(true);
+  };
+
+  const handleUpdateAssessmentBlueprint = async (params: AssessmentGenerationParams) => {
+    if (!assessment) return;
+    try {
+      const updated = await assessmentService.updateAssessment(assessment.id, params);
+      setAssessment(updated);
+      toast({
+        title: 'Assessment updated',
+        description: 'Blueprint details have been saved.'
+      });
+      setIsEditAssessmentOpen(false);
+    } catch (error: any) {
+      toast({
+        title: 'Failed to update assessment',
+        description: error?.response?.data?.error || 'Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const handleAddVariant = (question: Question) => {
@@ -1035,6 +1056,13 @@ export const AssessmentViewPage = () => {
                   {assessment.description && <p className="text-sm text-muted-foreground">{assessment.description}</p>}
                 </div>
                 <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditAssessmentOpen(true)}
+                  >
+                    Edit Blueprint
+                  </Button>
                   {hasQuestions && !hasDraftQuestions ? (
                     <>
                       <Button
@@ -1392,9 +1420,39 @@ export const AssessmentViewPage = () => {
           }}
         />
        )}
-       {selectedVariant && (
-         <QuestionDetailView
-           entry={selectedVariant}
+      {assessment && (
+        <GenerateAssessmentModal
+          open={isEditAssessmentOpen}
+          onClose={() => setIsEditAssessmentOpen(false)}
+          onUpdate={handleUpdateAssessmentBlueprint}
+          mode="edit"
+          initialValues={{
+            name: assessment.name,
+            type: assessment.type,
+            description: assessment.description ?? '',
+            semester: assessment.semester ?? '',
+            courseId: assessment.courseId ?? assessment.course?.id ?? 0,
+            primaryTopicIds: assessment.blueprintConfig?.primaryTopicIds ?? [],
+            secondaryTopicIds: assessment.blueprintConfig?.secondaryTopicIds ?? [],
+            excludedTopicIds: assessment.blueprintConfig?.excludedTopicIds ?? [],
+            difficultyDistribution: assessment.blueprintConfig?.difficultyDistribution ?? {
+              easy: 0,
+              medium: 0,
+              hard: 0
+            },
+            reasoningDistribution: assessment.blueprintConfig?.reasoningDistribution ?? {
+              factual: 0,
+              analytical: 0,
+              application: 0
+            },
+            reasoningData: assessment.blueprintConfig?.reasoningData ?? defaultReasoningData()
+          }}
+          courseId={assessment.courseId ?? assessment.course?.id ?? 0}
+        />
+      )}
+      {selectedVariant && (
+        <QuestionDetailView
+          entry={selectedVariant}
            relatedVariants={questionVariantEntries.filter(
              (entry) => entry.questionId === selectedVariant.questionId
            )}
