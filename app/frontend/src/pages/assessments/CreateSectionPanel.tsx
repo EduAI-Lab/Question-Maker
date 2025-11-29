@@ -249,6 +249,14 @@ export const CreateSectionPanel = ({
 
   const handleSubmit = async () => {
     if (!sectionName.trim()) return;
+    const hasRequiredFilters =
+      selectedTypes.length > 0 &&
+      selectedReasoning.length > 0 &&
+      selectedDifficulty.length > 0;
+
+    if (!hasRequiredFilters) {
+      return;
+    }
 
     // Normalize reasoning data - distribute evenly if multiple selected, or use first one
     const reasoningCount = selectedReasoning.length;
@@ -403,30 +411,37 @@ export const CreateSectionPanel = ({
             </div>
           </div>
         </div>
-        {isSearching || !sectionName.trim() ? (
-          <Tooltip
-            content={isSearching ? 'Searching for questions...' : 'Section name is required'}
-            multiline
-          >
-            <span className="inline-block w-full">
-              <Button
-                className="w-full"
-                disabled={isSearching || !sectionName.trim()}
-                onClick={handleSubmit}
-              >
-                {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
-              </Button>
-            </span>
-          </Tooltip>
-        ) : (
-          <Button
-            className="w-full"
-            disabled={isSearching || !sectionName.trim()}
-            onClick={handleSubmit}
-          >
-            {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
-          </Button>
-        )}
+        {(() => {
+          const hasAnyFilter =
+            selectedTypes.length > 0 &&
+            selectedReasoning.length > 0 &&
+            selectedDifficulty.length > 0;
+
+          const disabled = isSearching || !sectionName.trim() || !hasAnyFilter;
+          const tooltipContent = isSearching
+            ? 'Searching for questions...'
+            : !sectionName.trim()
+            ? 'Section name is required'
+            : 'Select at least one option for Question Type, Reasoning Focus, and Difficulty';
+
+          if (disabled) {
+            return (
+              <Tooltip content={tooltipContent} multiline>
+                <span className="inline-block w-full">
+                  <Button className="w-full" disabled onClick={handleSubmit}>
+                    {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
+                  </Button>
+                </span>
+              </Tooltip>
+            );
+          }
+
+          return (
+            <Button className="w-full" onClick={handleSubmit}>
+              {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
+            </Button>
+          );
+        })()}
       </CardContent>
     </Card>
   );
