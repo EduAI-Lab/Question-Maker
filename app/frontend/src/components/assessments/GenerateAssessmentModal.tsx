@@ -14,23 +14,36 @@ interface GenerateAssessmentModalProps {
   open: boolean;
   onClose: () => void;
   onGenerate?: (params: AssessmentGenerationParams) => void;
+  onUpdate?: (params: AssessmentGenerationParams) => void;
+  initialValues?: Partial<AssessmentGenerationParams>;
+  mode?: 'create' | 'edit';
   courseId: number;
 }
 
 type Topic = { id: number; name: string };
 
-export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }: GenerateAssessmentModalProps) => {
-  const [assessmentName, setAssessmentName] = React.useState('');
-  const [assessmentType, setAssessmentType] = React.useState<AssessmentType>('Assignment');
-  const [assessmentDescription, setAssessmentDescription] = React.useState('');
+export const GenerateAssessmentModal = ({
+  open,
+  onClose,
+  onGenerate,
+  onUpdate,
+  initialValues,
+  mode = 'create',
+  courseId
+}: GenerateAssessmentModalProps) => {
+  const isEdit = mode === 'edit';
+  const [assessmentName, setAssessmentName] = React.useState(initialValues?.name ?? '');
+  const [assessmentType, setAssessmentType] = React.useState<AssessmentType>(initialValues?.type ?? 'Assignment');
+  const [assessmentDescription, setAssessmentDescription] = React.useState(initialValues?.description ?? '');
   const [assessmentSemester, setAssessmentSemester] = React.useState(() => {
+    if (initialValues?.semester) return initialValues.semester;
     const now = new Date();
     return `Fall ${now.getFullYear()}`;
   });
   const [availableTopics, setAvailableTopics] = React.useState<Topic[]>([]);
-  const [primaryTopicIds, setPrimaryTopicIds] = React.useState<number[]>([]);
-  const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>([]);
-  const [excludedTopicIds, setExcludedTopicIds] = React.useState<number[]>([]);
+  const [primaryTopicIds, setPrimaryTopicIds] = React.useState<number[]>(initialValues?.primaryTopicIds ?? []);
+  const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>(initialValues?.secondaryTopicIds ?? []);
+  const [excludedTopicIds, setExcludedTopicIds] = React.useState<number[]>(initialValues?.excludedTopicIds ?? []);
 
   React.useEffect(() => {
     if (!open) return;
@@ -40,11 +53,13 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
         const topics = await courseService.getCourseTopics(courseId);
         if (!isActive) return;
         setAvailableTopics(topics);
-        if (topics.length) {
-          setPrimaryTopicIds((prev) => (prev.length ? prev : [topics[0].id]));
-          setSecondaryTopicIds((prev) => prev.filter((id) => topics.some((t) => t.id === id)));
-          setExcludedTopicIds((prev) => prev.filter((id) => topics.some((t) => t.id === id)));
+        if (topics.length && !primaryTopicIds.length) {
+          setPrimaryTopicIds([topics[0].id]);
+        } else {
+          setPrimaryTopicIds((prev) => prev.filter((id) => topics.some((t) => t.id === id)));
         }
+        setSecondaryTopicIds((prev) => prev.filter((id) => topics.some((t) => t.id === id)));
+        setExcludedTopicIds((prev) => prev.filter((id) => topics.some((t) => t.id === id)));
       } catch (e) {
         // ignore for now; could add toast later
       }
@@ -111,7 +126,7 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
       }
     };
 
-    onGenerate?.({
+    const payload: AssessmentGenerationParams = {
       courseId,
       name: assessmentName.trim(),
       type: assessmentType,
@@ -123,7 +138,13 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
       difficultyDistribution,
       reasoningDistribution,
       reasoningData
-    });
+    };
+
+    if (isEdit && onUpdate) {
+      onUpdate(payload);
+    } else {
+      onGenerate?.(payload);
+    }
     onClose();
   };
 
@@ -132,7 +153,7 @@ export const GenerateAssessmentModal = ({ open, onClose, onGenerate, courseId }:
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <Card className="relative flex w-full max-w-4xl max-h-[90vh] flex-col overflow-hidden">
         <CardHeader className="border-b">
-          <CardTitle>Create Assessment Blueprint</CardTitle>
+          <CardTitle>{isEdit ? 'Edit Assessment Blueprint' : 'Create Assessment Blueprint'}</CardTitle>
         </CardHeader>
         <CardContent className="flex-1 space-y-6 overflow-y-auto py-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
