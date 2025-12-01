@@ -100,7 +100,7 @@ Entry points: Question detail view or “Create Variant” actions in the list.
 ----------------------------
 1) Open the question, choose “Create Variant”
 2) From the right-hand panel, enter an AI prompt (e.g., “Make it harder and add an edge case”).
-2) Pick model (UBC Hosted vs External + API key, same rules as 3.2).
+2) Pick model (Internal vs External + API key, same rules as 3.2).
 3) Generate, then review/edit the variant text and difficulty; adjust topics.
 4) Save (draft or reviewed).
 
