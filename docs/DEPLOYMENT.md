@@ -13,6 +13,9 @@ git push origin main
 
 1. **SSH to the server:**
    ```bash
+   ssh [yourcwl]@questionmaker.ok.ubc.ca
+
+   <!-- Example -->
    ssh ssaada08@questionmaker.ok.ubc.ca
    ```
    *Note: Connect to UBC VPN first if not on campus*
