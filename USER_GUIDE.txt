@@ -1,465 +1,194 @@
 ================================================================================
-                    EDUQUERY.AI - USER GUIDE FOR PROFESSORS
+                             QUESTION MAKER USER GUIDE
 ================================================================================
-
-Version: 1.0
-Last Updated: November 2025
-Intended Audience: Professors and Course Instructors
+Version: 1.1 (Draft refresh)
+Audience: Professors and course instructors using Question Maker
 
 ================================================================================
 TABLE OF CONTENTS
 ================================================================================
-
-1. INTRODUCTION
-2. GETTING STARTED
-3. MANAGING COURSES AND TOPICS
-4. WORKING WITH QUESTIONS
-   4.1 Creating Questions Manually
-   4.2 Uploading Questions from Documents (Assignment Upload)
-   4.3 Viewing and Managing Your Question Bank
-   4.4 Creating Question Variants
-5. BUILDING ASSESSMENTS
-   5.1 Creating a New Assessment
-   5.2 Understanding Assessment Blueprints
-   5.3 Adding Sections to Assessments
-   5.4 Selecting Questions for Sections
-   5.5 Organizing Questions Within Sections
-6. EXPORTING TO CANVAS LMS
-
-================================================================================
-1. INTRODUCTION
-================================================================================
-
-Welcome to EduQuery.ai, a comprehensive assessment management platform
-designed to help professors create, organize, and deploy educational
-assessments efficiently.
-
-Key Features:
-- Create and manage questions with multiple variants
-- Upload assignment documents (PDFs or images) using AI extraction
-  (AI is stored in protected UBCO servers unless explicitly opting for an External model)
-- Organize questions by courses and topics automatically populated from EduAI
-- Build assessments with configurable blueprints
-- Export assessments directly to Canvas LMS
+1. Before You Start
+2. Onboarding: Add Courses and Topics
+3. Create Questions
+   3.1 Manually
+   3.2 With EduAI (AI-assisted)
+4. Create Variants of a Question
+   4.1 Manually
+   4.2 With EduAI (AI-assisted)
+5. Upload an Assessment PDF/Image → Extract Questions → Auto-Create Assessment
+6. Build Assessments
+   6.1 Create an Assessment Blueprint
+   6.2 Edit an Assessment Blueprint
+   6.3 Create Sections and Select Questions
+   6.4 Create Questions/Variants inline while building a section
+   6.5 Export to Canvas
+   6.6 Export to TXT
+7. AI Models and API Keys
 
 ================================================================================
-2. GETTING STARTED
+1. BEFORE YOU START
 ================================================================================
-
-When you first log in, you'll see the main dashboard with two tabs:
-- QUESTIONS TAB: Manage your question bank
-- ASSESSMENTS TAB: Create and manage assessments
-
-The top of the screen shows:
-- Course selector dropdown (to switch between your courses)
-- Profile icon (to manage your courses)
-
-First Steps:
-1. Click on your profile icon
-2. Select "Add Course" to see a list of available courses from EduAI
-3. Choose the courses you teach from the list
-4. Click "Add Selected Courses"
-
-Note: Courses are pulled from EduAI and cannot be manually created. The
-system will automatically populate topics for your course based on
-information retrieved from EduAI.
+- Account creation and login is required. New users are prompted to register (email/password).
+- Default upon logging in is the Questions tab. Switch between Questions and Assessments via the top tabs.
+- Draft vs Reviewed: Newly added variants are drafts unless you mark them reviewed (uncheck “Draft”). Drafts block exports to Canvas/TXT.
 
 ================================================================================
-3. MANAGING COURSES AND TOPICS
+2. ONBOARDING: ADD COURSES AND TOPICS
 ================================================================================
-
-ADDING COURSES:
-Courses in EduQuery.ai are synchronized with EduAI. You cannot manually
-create courses.
-
-1. Click the profile icon in the top navigation
-2. Select "Add Course"
-3. You'll see a list of courses available from EduAI
-4. Select the courses you teach
-5. Click "Add Selected Courses"
-
-The selected courses will now appear in your course selector dropdown.
-
-TOPICS:
-Topics are automatically populated from EduAI based on your course
-structure and content. You do not need to manually add topics.
-
-- Primary topics: Main course themes automatically retrieved from EduAI
-- Secondary topics: Subtopics and specific concepts from EduAI
-
-The system uses these topics to:
-- Organize questions within your course
-- Filter questions when building assessments
-- Classify questions during AI extraction
-
-SWITCHING BETWEEN COURSES:
-- Use the course selector dropdown at the top of the page
-- All questions and assessments shown are specific to the selected course
+Flow: Top nav profile icon (👤) → “Link courses from EduAI”.
+1) Open the profile button in the top-right of the Landing page.
+2) In “Link courses from EduAI”, pick the courses you teach.
+   - “Already added” badge means it’s already in your library.
+   - Each course imports its topics automatically from EduAI.
+3) Click “Add selected courses”. Courses + topics are created locally.
+4) (Optional) Use the “Logout” button in this dialog to end the session.
+Tip: Add courses before creating questions or assessments.
 
 ================================================================================
-4. WORKING WITH QUESTIONS
+3. CREATE QUESTIONS
 ================================================================================
+Entry point: Questions tab → “Add Question”.
 
-------------------------------------------------------------------------
-4.1 CREATING QUESTIONS MANUALLY
-------------------------------------------------------------------------
+3.1 Manually
+------------
+1) Select a course from the top selector.
+2) Click “Add Question”.
+3) Fill Question Metadata:
+   - Primary Topic (required)
+   - Description (short label for the question)
+   - Type: MCQ / SA / LA
+4) Fill Variant Details (every question needs at least one variant):
+   - Question Text (required)
+   - Difficulty (easy/medium/hard)
+   - Optional: Answer, Secondary Topics, link to an Assessment, Reference ID
+   - Draft toggle: leave on to keep as draft; turn off to mark reviewed.
+5) Save. The new question appears in the Questions list.
 
-To create a new question from scratch:
-
-1. Go to the QUESTIONS tab
-2. Click "Add Question" button
-3. Fill in the question details:
-
-   QUESTION METADATA:
-   - Question Description: A brief description or title for the question
-   - Question Type: Choose "Multiple Choice" or "Short Answer"
-   - Primary Topic: Select or create the main topic for this question
-
-   QUESTION VARIANT:
-   Each question must have at least one variant. A variant is a specific
-   version of the question with:
-
-   - Question Text: The actual question text students will see
-   - Difficulty Level: Easy, Medium, or Hard
-   - Reasoning Level:
-     * Factual (recall and recognition)
-     * Analytical (analysis and interpretation)
-     * Application (applying concepts to solve problems)
-   - Secondary Topics: Optional subtopics this variant covers
-   - Answer: The correct answer or solution
-
-4. Click "Save" to add the question to your question bank
-
-------------------------------------------------------------------------
-4.2 UPLOADING QUESTIONS FROM DOCUMENTS (ASSIGNMENT UPLOAD)
-------------------------------------------------------------------------
-
-This feature allows you to upload assignment documents and automatically
-extract questions using AI. This is designed for processing student
-assignments, exams, or other documents containing questions.
-
-SUPPORTED FILE FORMATS:
-- PDF files
-- Image files (PNG, JPG, JPEG, GIF, BMP, WebP)
-- Scanned documents (will be processed with OCR)
-
-UPLOAD PROCESS:
-
-1. Go to the QUESTIONS tab
-2. Click "Upload Questions" button
-3. Select or drag and drop your assignment file
-4. Select a primary topic for the questions from the auto-populated list
-5. Select an AI model for extraction:
-   - OpenAI GPT-4o (recommended for accuracy)
-   - Claude 3.5 Sonnet (good balance)
-   - Google Gemini 1.5 Pro
-   - Llama 3.1 70B (local/private option)
-
-6. Click "Extract Questions"
-
-7. The system will:
-   - Extract text from your document (using OCR if needed)
-   - Identify individual questions
-   - Classify question types (MCQ or SA)
-   - Determine difficulty levels
-   - Assign reasoning levels
-   - Generate possible answers
-
-8. REVIEW EXTRACTED QUESTIONS:
-   - Each extracted question appears in a preview panel
-   - You can edit:
-     * Question text
-     * Question type
-     * Difficulty level
-     * Reasoning level
-     * Answer
-     * Topics (from the auto-populated list)
-   - Remove questions you don't want to save
-
-9. CONFIGURE ASSESSMENT DETAILS (REQUIRED):
-   The upload process will create an assessment automatically. Enter:
-   - Assessment Type: Select Assignment, Quiz, Lab, Midterm, or Final
-   - Assessment Name: e.g., "Assignment 1 - Data Structures"
-   - Semester: e.g., "Fall 2024"
-
-10. Click "Save Questions"
-
-The system will:
-- Add all questions to your question bank
-- Create a new assessment with the extracted questions
-- Link all questions to the newly created assessment
-
-TIPS FOR BETTER EXTRACTION:
-- Use clear, high-resolution scans
-- Ensure questions are well-formatted in the source document
-- Typed documents work better than handwritten ones
-- Review and edit all extracted questions before saving
-- The AI may not be perfect - always verify accuracy
-
-------------------------------------------------------------------------
-4.3 VIEWING AND MANAGING YOUR QUESTION BANK
-------------------------------------------------------------------------
-
-The QUESTIONS tab displays all questions for the selected course.
-
-QUESTION CARDS:
-Each card shows:
-- Question description
-- Number of variants
-- Question type badge (MCQ or SA)
-- Option to view full details
-
-SEARCHING AND FILTERING:
-- Use the search box to find questions by text
-- Sort options:
-  * Newest first
-  * Oldest first
-  * By question type
-
-VIEWING QUESTION DETAILS:
-1. Click on any question card
-2. See all variants of the question
-3. View:
-   - Question text
-   - Difficulty and reasoning levels
-   - Topics (primary and secondary)
-   - Answers
-   - Which assessments use this variant
-
-DELETING QUESTIONS:
-- Click the delete icon on a question card
-- Confirm deletion
-- Note: Questions used in assessments cannot be deleted
-
-------------------------------------------------------------------------
-4.4 CREATING QUESTION VARIANTS
-------------------------------------------------------------------------
-
-Question variants allow you to create multiple versions of the same
-question concept. This is useful for:
-- Preventing cheating (different students see different versions)
-- Adjusting difficulty levels
-- Covering related topics
-
-TO CREATE A VARIANT:
-
-1. Find the original question in your question bank
-2. Click "Create Variant" or click on the question to view details
-3. Click "Add Variant"
-4. Fill in variant details:
-   - Question text (modify the original)
-   - Difficulty level (can be different from original)
-   - Reasoning level
-   - Secondary topics
-   - Answer
-
-5. Click "Save"
-
-All variants of a question are grouped together in the question bank.
-You can use different variants in different assessments or sections.
+3.2 With EduAI (AI-assisted)
+----------------------------
+Use the right-hand “Generate with EduAI” panel inside Add Question:
+1) Click “Add Question”.
+2) On right-hand panel enter a prompt (topic/instructions).
+3) Choose a model:
+   - Internal: campus-hosted; no provider API key; data stays on campus servers.
+   - External: provider-hosted (e.g., Google/Gemini, OpenAI, DeepSeek, Anthropic); requires your personal API key.
+4) If external, enter your provider API key (stored locally/encrypted; never
+   sent to our servers). A warning banner reminds you data leaves campus.
+5) Click Generate. Review/edit the returned question text/description, assign
+   topics, and set draft/reviewed status. Save as in 3.1.
 
 ================================================================================
-5. BUILDING ASSESSMENTS
+4. CREATE VARIANTS OF A QUESTION
 ================================================================================
+Entry points: Question detail view or “Create Variant” actions in the list.
 
-------------------------------------------------------------------------
-5.1 CREATING A NEW ASSESSMENT
-------------------------------------------------------------------------
+4.1 Manually
+------------
+1) Open the question, choose “Create Variant”
+2) Enter Variant Text, Difficulty, optional Answer/Secondary Topics/Assessment.
+3) Draft toggle: leave draft on by default; turn off when reviewed.
+4) Save. The variant is added to the question; question list updates.
 
-Assessments are collections of questions organized into sections.
+4.2 Copy Fields from the Base Variant (quick fill)
+--------------------------------------------------
+1) Open the question, choose “Create Variant”
+2) From the right-hand panel, click “Copy Fields” to prefill text, difficulty, answer, and secondary topics from the base variant.
+3) Edit any fields as needed (and adjust draft status).
+4) Save.
 
-TO CREATE AN ASSESSMENT:
-
-1. Go to the ASSESSMENTS tab
-2. Click "Add Assessment" button
-3. Enter assessment details:
-   - Assessment Type: Quiz, Assignment, Lab, Midterm, or Final
-   - Assessment Name: e.g., "Midterm Exam - Fall 2024"
-   - Semester: e.g., "Fall 2024"
-   - Description: Optional notes about the assessment
-
-4. Configure the assessment blueprint (see section 5.2)
-5. Click "Create Assessment"
-
-The assessment will appear in your assessments list and open automatically
-for you to add sections and questions.
-
-------------------------------------------------------------------------
-5.2 UNDERSTANDING ASSESSMENT BLUEPRINTS
-------------------------------------------------------------------------
-
-Blueprints help you design pedagogically sound assessments by specifying:
-
-REASONING DISTRIBUTION:
-Define what percentage of questions should test:
-- Factual knowledge (recall, recognition)
-- Analytical thinking (analysis, interpretation)
-- Application (problem-solving, applying concepts)
-
-Example: 40% Factual, 35% Analytical, 25% Application
-
-DIFFICULTY BOUNDARIES:
-Set thresholds for difficulty:
-- Easy threshold: Minimum percentage of easy questions
-- Hard threshold: Maximum percentage of hard questions
-
-Example: At least 30% easy questions, no more than 20% hard questions
-
-TOPIC FILTERS:
-- Primary Topics: Questions must cover these topics
-- Secondary Topics: Questions can optionally cover these
-- Excluded Topics: Questions must NOT cover these topics
-
-TARGET QUESTION COUNT:
-- Specify how many questions you want per section
-- The system will help you find the right number of matching questions
-
-Blueprints are templates - you can modify sections individually after
-creating the assessment.
-
-------------------------------------------------------------------------
-5.3 ADDING SECTIONS TO ASSESSMENTS
-------------------------------------------------------------------------
-
-Sections organize your assessment into logical parts.
-
-TO ADD A SECTION:
-
-1. Open an assessment from the ASSESSMENTS tab
-2. Click "Add Section" button
-3. Enter section details:
-   - Section Name: e.g., "Part A: Multiple Choice"
-
-4. Configure section filters:
-   - Question Types: Select MCQ, SA, or both
-   - Primary Topics: Which topics should questions cover?
-   - Secondary Topics: Optional additional topics
-   - Excluded Topics: Topics to avoid
-   - Reasoning Focus: Factual, Analytical, Application, or All
-   - Difficulty Level: Easy, Medium, Hard, or All
-
-5. Click "Search Questions" to find matching questions from your bank
-
-The system will search your question bank and show questions matching
-your criteria.
-
-------------------------------------------------------------------------
-5.4 SELECTING QUESTIONS FOR SECTIONS
-------------------------------------------------------------------------
-
-After searching, you'll see matching questions:
-
-SELECTING QUESTIONS:
-- Click checkboxes to select questions you want to include
-- You can see:
-  * Question text preview
-  * Difficulty level
-  * Reasoning level
-  * Topics
-  * Current usage in other assessments
-
-CREATING NEW QUESTIONS:
-- If you don't find the right questions, click "Create New Question"
-- Questions created here are automatically added to the section
-- They're also saved to your question bank for future use
-
-ADDING QUESTION VARIANTS:
-- If you find a question that's close but not perfect
-- Click "Add Variant" to create a modified version
-- The variant is linked to the original question
-
-SAVING QUESTIONS TO SECTION:
-- After selecting questions, click "Save to Section"
-- Questions appear in the section in the order selected
-- You can reorder them later
-
-------------------------------------------------------------------------
-5.5 ORGANIZING QUESTIONS WITHIN SECTIONS
-------------------------------------------------------------------------
-
-After adding questions to a section:
-
-VIEWING SECTION CONTENTS:
-- Each section card shows all questions
-- Questions are displayed in order
-- Each question shows:
-  * Display number (order in quiz)
-  * Question text preview
-  * Difficulty and reasoning badges
-
-REORDERING QUESTIONS:
-- Questions are displayed in the order you added them
-- To change order, remove and re-add in desired sequence
-- Or edit the section and modify the question list
-
-REMOVING QUESTIONS:
-- Click the remove/delete icon next to a question
-- Question is removed from the section
-- Question remains in your question bank
-
-EDITING SECTIONS:
-- Click "Edit Section" to modify:
-  * Section name
-  * Question filters
-  * Search for additional questions
-- Save changes when done
-
-DELETING SECTIONS:
-- Click "Delete Section" on a section card
-- Confirm deletion
-- Questions remain in your question bank
+4.3 With EduAI (AI-assisted)
+----------------------------
+1) Open the question, choose “Create Variant”
+2) From the right-hand panel, enter an AI prompt (e.g., “Make it harder and add an edge case”).
+2) Pick model (UBC Hosted vs External + API key, same rules as 3.2).
+3) Generate, then review/edit the variant text and difficulty; adjust topics.
+4) Save (draft or reviewed).
 
 ================================================================================
-6. EXPORTING TO CANVAS LMS
+5. UPLOAD AN ASSESSMENT PDF/IMAGE → EXTRACT QUESTIONS
 ================================================================================
+Entry point: Questions tab → “Upload Questions”.
+What it does: OCR + AI extract questions, then auto-create a new assessment and
+an “Uploaded Questions” section.
+Steps:
+1) From the Questions tab, select the "Upload Questions" button.
+2) Fill Assessment details (Type, Name, Semester) — required to save.
+3) Pick AI model (UBC Hosted by default; external allowed with API key).
+4) Upload PDF or image. Progress shows OCR → extraction.
+5) Review extracted drafts:
+   - Edit Summary, Question Text, Topics, Difficulty, Type, optional Answer.
+   - Include/Exclude toggle per question; remove unwanted entries.
+   - If no topics exist, a fallback topic (“Uploaded Questions”) is auto-created.
+6) Click “Create Questions”. All included items become questions with draft
+   variants, and a new assessment + section is created.
+7) After save, you are navigated to the new assessment page.
+Notes:
+- Exports are blocked until draft flags are cleared.
 
-You can export your assessments directly to Canvas as quizzes.
-
-FIRST-TIME SETUP:
-
-1. Open an assessment you want to export
-2. Click "Export to Canvas" button
-3. Choose connection type:
-   - Test Mode: For testing without real Canvas connection
-   - Real Connection: Connect to your actual Canvas instance
-
-4. For Real Connection, enter:
-   - Canvas URL: Your institution's Canvas URL (e.g., canvas.university.edu)
-   - Canvas API Token: Generate this from Canvas Account > Settings >
-     New Access Token
-
-5. Click "Connect and Fetch Courses"
-6. Select the Canvas course where you want to create the quiz
-7. Click "Export to Canvas"
-
-SUBSEQUENT EXPORTS:
-- Your Canvas connection is saved
-- Just select the Canvas course and click "Export to Canvas"
-- The system will create a new quiz in Canvas with:
-  * All questions from all sections
-  * Questions in the correct order
-  * Question types (MCQ/SA) converted to Canvas format
-  * Correct answers configured
-  * Same name as your assessment
-
-WHAT GETS EXPORTED:
-- Assessment name becomes Quiz title
-- All sections are combined into one Canvas quiz
-- Questions maintain their order
-- Multiple choice questions include all options
-- Short answer questions are configured for manual grading
-- Correct answers are set automatically
-
-AFTER EXPORT:
-- You'll see a success message with the Canvas quiz ID
-- Go to Canvas to:
-  * Set the quiz availability dates
-  * Configure point values
-  * Set time limits
-  * Publish the quiz to students
-
-NOTE: Any changes made in Canvas are independent of EduQuery.ai. If you
-update your assessment in EduQuery.ai, you'll need to export again.
 ================================================================================
-END OF USER GUIDE
+6. BUILD ASSESSMENTS
 ================================================================================
+6.1 Create an Assessment Blueprint
+----------------------------------
+Entry: Assessments tab → “Add Assessment”.
+1) Provide Name, Type (Assignment/Lab/Quiz/Midterm/Final), Semester, Description.
+2) Select Primary/Secondary/Excluded topics (seed defaults for sections).
+3) Save Blueprint. It appears in the Assessments list.
+
+6.2 Edit an Assessment Blueprint
+--------------------------------
+Entry: Open an assessment page → click “Edit Blueprint”.
+1) Review/update Name, Type, Semester, Description.
+2) Adjust Primary/Secondary/Excluded topics as needed.
+3) Save Blueprint; changes apply to that assessment’s defaults.
+
+6.3 Create Sections and Select Questions
+----------------------------------------
+On an assessment page:
+1) Click to add a section (Create Section panel).
+2) Set Section Name, desired question types, topic filters, difficulty and reasoning emphasis.
+3) Run search; matching questions/variants are listed based on those filters.
+4) Select variants to attach to the section.
+5) Save the section; it appears in the assessment page.
+
+6.4 Create Questions/Variants Inline During Section Building
+------------------------------------------------------------
+While in the builder, you can:
+- “Create Question” → opens the Add Question dialog (see Section 3).
+- “Create Variant” → opens the Add Variant dialog (see Section 4).
+New items will appear in the search results and can be added to the section.
+
+6.5 Export to Canvas
+--------------------
+Entry: Assessments page → “Export to Canvas”.
+Requirements:
+- All variants must be reviewed (no drafts) or the export is blocked.
+- You must be an instructor in the target Canvas course.
+Flow in the dialog:
+1) If not connected: enter Canvas URL + Canvas API key, then connect (connection
+   is stored for your user).
+2) Once connected, pick a Canvas course from the list (Change Connection lets
+   you reconnect with different credentials).
+3) Click Export. A Canvas quiz is created with the assessment’s questions.
+4) Success message shows questions created and quiz link/ID.
+
+6.6 Export to TXT
+-----------------
+Entry: Assessment page → “Export to TXT”.
+Requirements: At least one question and no draft variants.
+Output: Downloads questions as a .txt file.
+
+================================================================================
+7. AI MODELS AND API KEYS
+================================================================================
+- Model picker subheaders: “Internal” and “External”.
+  - Internal: Campus-hosted models (no provider API key needed; stays inside
+    campus infrastructure).
+  - External: Provider-hosted (e.g., Google/Gemini, OpenAI, DeepSeek,
+    Anthropic). Prompts/data go to that provider.
+- API keys (External only) are stored locally in your browser, encrypted; never
+  sent to the backend. Use “Change” to swap/remove a key.
+- Model pickers live in:
+  - Add Question / Add Variant dialogs (EduAI generation panel).
+  - Upload Questions dialog (extraction model).
+- External selection shows a warning banner about data leaving campus systems.
