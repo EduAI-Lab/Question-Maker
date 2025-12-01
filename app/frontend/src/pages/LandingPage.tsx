@@ -14,6 +14,7 @@ import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
 import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
 import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
+import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
 import { useToast } from '../components/ui/use-toast';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 
@@ -44,6 +45,7 @@ export const LandingPage = () => {
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
   const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
   const [selectedAssessmentForExport, setSelectedAssessmentForExport] = useState<{ id: number; name: string } | null>(null);
+  const [isCanvasImportOpen, setIsCanvasImportOpen] = useState(false);
   const [deleteAssessmentModalOpen, setDeleteAssessmentModalOpen] = useState(false);
   const [assessmentToDelete, setAssessmentToDelete] = useState<{ id: number; name: string } | null>(null);
   const [isDeletingAssessment, setIsDeletingAssessment] = useState(false);
@@ -610,6 +612,7 @@ export const LandingPage = () => {
           }}
           onExportToTxt={handleExportAssessmentToTxt}
           onDeleteAssessment={handleDeleteAssessment}
+          onImportFromCanvas={() => setIsCanvasImportOpen(true)}
         />
         )}
       </div>
@@ -672,6 +675,19 @@ export const LandingPage = () => {
           }}
         />
       )}
+
+      <CanvasImportDialog
+        open={isCanvasImportOpen}
+        onClose={() => setIsCanvasImportOpen(false)}
+        onImportSuccess={async (result) => {
+          // Refresh assessments list
+          await fetchAssessments();
+          // Navigate to the imported assessment
+          navigate(`/assessments/${result.assessmentId}`, {
+            state: { fromTab: 'assessments' }
+          });
+        }}
+      />
       <DeleteConfirmationModal
         open={deleteVariantModalOpen}
         onOpenChange={setDeleteVariantModalOpen}

@@ -13,7 +13,8 @@ import {
     Upload,
     Trash2,
     AlertTriangle,
-    FileText
+    FileText,
+    Download
 } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
@@ -27,6 +28,7 @@ interface AssessmentSectionProps {
     onExportToCanvas?: (assessmentId: number, assessmentName: string) => void;
     onExportToTxt?: (assessmentId: number, assessmentName: string) => void;
     onDeleteAssessment?: (assessmentId: number, assessmentName: string) => void;
+    onImportFromCanvas?: () => void;
 }
 
 type QuestionEntry = {
@@ -146,7 +148,8 @@ export const AssessmentSection = ({
     loadError,
     onExportToCanvas,
     onExportToTxt,
-    onDeleteAssessment
+    onDeleteAssessment,
+    onImportFromCanvas
 }: AssessmentSectionProps) => {
     const navigate = useNavigate();
     const [expandedAssessment, setExpandedAssessment] = useState<number | null>(null);
@@ -196,14 +199,26 @@ export const AssessmentSection = ({
                     <p className="text-sm text-gray-600">{headerDescription}</p>
                     {loadError && <p className="text-sm text-red-600 mt-1">{loadError}</p>}
                 </div>
-                <Button
-                    onClick={handleOpenCreateModal}
-                    className="flex items-center space-x-2"
-                    disabled={!selectedCourseId || isSavingBlueprint}
-                >
-                    <Plus className="h-4 w-4" />
-                    <span>{isSavingBlueprint ? 'Saving...' : 'Add Assessment'}</span>
-                </Button>
+                <div className="flex gap-2">
+                    {onImportFromCanvas && (
+                        <Button
+                            variant="outline"
+                            onClick={onImportFromCanvas}
+                            className="flex items-center space-x-2"
+                        >
+                            <Download className="h-4 w-4" />
+                            <span>Import from Canvas</span>
+                        </Button>
+                    )}
+                    <Button
+                        onClick={handleOpenCreateModal}
+                        className="flex items-center space-x-2"
+                        disabled={!selectedCourseId || isSavingBlueprint}
+                    >
+                        <Plus className="h-4 w-4" />
+                        <span>{isSavingBlueprint ? 'Saving...' : 'Add Assessment'}</span>
+                    </Button>
+                </div>
             </div>
 
             {isLoading ? (
