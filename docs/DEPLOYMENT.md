@@ -322,6 +322,10 @@ Internet → Apache (Reverse Proxy) → Docker Containers
    - Check Apache error logs: `sudo tail -f /var/log/httpd/error_log`
    - Test Apache config: `sudo httpd -t`
    - Restart Apache: `sudo systemctl restart httpd`
+   - **Nginx redirect issue**: If nginx is returning 301 redirects (e.g., `/help` → `/help/`), check `app/frontend/nginx.conf`:
+     - Ensure `absolute_redirect off;` is set to prevent absolute redirect URLs
+     - Use `try_files $uri /index.html;` instead of `try_files $uri $uri/ /index.html;` to prevent automatic trailing slash redirects
+     - Rebuild frontend container: `docker compose build frontend && docker compose up -d frontend`
 
 5. **Container Issues**
    - View container logs: `docker compose logs [service-name]`
