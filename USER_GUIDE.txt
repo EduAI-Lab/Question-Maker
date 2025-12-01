@@ -43,6 +43,7 @@ Flow: Top nav profile icon (👤) → “Link courses from EduAI”.
 3) Click “Add selected courses”. Courses + topics are created locally.
 4) (Optional) Use the “Logout” button in this dialog to end the session.
 Tip: Add courses before creating questions or assessments.
+Image placeholder: Link courses dialog and topics import.
 
 ================================================================================
 3. CREATE QUESTIONS
@@ -76,6 +77,7 @@ Use the right-hand “Generate with EduAI” panel inside Add Question:
    sent to our servers). A warning banner reminds you data leaves campus.
 5) Click Generate. Review/edit the returned question text/description, assign
    topics, and set draft/reviewed status. Save as in 3.1.
+Image placeholder: Add Question dialog (EduAI panel and model picker).
 
 ================================================================================
 4. CREATE VARIANTS OF A QUESTION
@@ -88,6 +90,7 @@ Entry points: Question detail view or “Create Variant” actions in the list.
 2) Enter Variant Text, Difficulty, optional Answer/Secondary Topics/Assessment.
 3) Draft toggle: leave draft on by default; turn off when reviewed.
 4) Save. The variant is added to the question; question list updates.
+Image placeholder: Create Variant form (manual).
 
 4.2 Copy Fields from the Base Variant (quick fill)
 --------------------------------------------------
@@ -95,6 +98,7 @@ Entry points: Question detail view or “Create Variant” actions in the list.
 2) From the right-hand panel, click “Copy Fields” to prefill text, difficulty, answer, and secondary topics from the base variant.
 3) Edit any fields as needed (and adjust draft status).
 4) Save.
+Image placeholder: Copy Fields panel and prefilled variant.
 
 4.3 With EduAI (AI-assisted)
 ----------------------------
@@ -103,6 +107,7 @@ Entry points: Question detail view or “Create Variant” actions in the list.
 2) Pick model (Internal vs External + API key, same rules as 3.2).
 3) Generate, then review/edit the variant text and difficulty; adjust topics.
 4) Save (draft or reviewed).
+Image placeholder: EduAI variant generation panel.
 
 ================================================================================
 5. UPLOAD AN ASSESSMENT PDF/IMAGE → EXTRACT QUESTIONS
@@ -124,6 +129,7 @@ Steps:
 7) After save, you are navigated to the new assessment page.
 Notes:
 - Exports are blocked until draft flags are cleared.
+Image placeholder: Upload dialog (assessment details, model picker, review list).
 
 ================================================================================
 6. BUILD ASSESSMENTS
@@ -134,6 +140,7 @@ Entry: Assessments tab → “Add Assessment”.
 1) Provide Name, Type (Assignment/Lab/Quiz/Midterm/Final), Semester, Description.
 2) Select Primary/Secondary/Excluded topics (seed defaults for sections).
 3) Save Blueprint. It appears in the Assessments list.
+Image placeholder: Add Assessment blueprint modal.
 
 6.2 Edit an Assessment Blueprint
 --------------------------------
@@ -141,6 +148,7 @@ Entry: Open an assessment page → click “Edit Blueprint”.
 1) Review/update Name, Type, Semester, Description.
 2) Adjust Primary/Secondary/Excluded topics as needed.
 3) Save Blueprint; changes apply to that assessment’s defaults.
+Image placeholder: Edit Blueprint modal.
 
 6.3 Create Sections and Select Questions
 ----------------------------------------
@@ -150,6 +158,7 @@ On an assessment page:
 3) Run search; matching questions/variants are listed based on those filters.
 4) Select variants to attach to the section.
 5) Save the section; it appears in the assessment page.
+Image placeholder: Create Section panel with filters and search results.
 
 6.4 Create Questions/Variants Inline During Section Building
 ------------------------------------------------------------
@@ -157,6 +166,7 @@ While in the builder, you can:
 - “Create Question” → opens the Add Question dialog (see Section 3).
 - “Create Variant” → opens the Add Variant dialog (see Section 4).
 New items will appear in the search results and can be added to the section.
+Image placeholder: Inline create buttons inside builder.
 
 6.5 Export to Canvas
 --------------------
@@ -171,12 +181,14 @@ Flow in the dialog:
    you reconnect with different credentials).
 3) Click Export. A Canvas quiz is created with the assessment’s questions.
 4) Success message shows questions created and quiz link/ID.
+Image placeholder: Canvas export dialog (connection and course selection).
 
 6.6 Export to TXT
 -----------------
 Entry: Assessment page → “Export to TXT”.
 Requirements: At least one question and no draft variants.
 Output: Downloads questions as a .txt file.
+Image placeholder: Export to TXT action.
 
 ================================================================================
 7. AI MODELS AND API KEYS
@@ -192,3 +204,4 @@ Output: Downloads questions as a .txt file.
   - Add Question / Add Variant dialogs (EduAI generation panel).
   - Upload Questions dialog (extraction model).
 - External selection shows a warning banner about data leaving campus systems.
+Image placeholder: Model picker showing Internal/External groups and warning.
