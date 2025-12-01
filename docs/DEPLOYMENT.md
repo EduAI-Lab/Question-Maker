@@ -241,13 +241,16 @@ sudo nano /etc/httpd/conf.d/question-maker.conf
     ProxyPass http://localhost:8000
     ProxyPassReverse http://localhost:8000
     ProxyPreserveHost On
+    Require all granted
 </LocationMatch>
 
-# Handle all other requests - send to frontend
+# Handle all other requests - send to frontend (includes /help, /login, /landing, etc.)
+# This regex matches everything EXCEPT /api/ routes
 <LocationMatch "^(?!\/api\/).*">
     ProxyPass http://localhost:3005
     ProxyPassReverse http://localhost:3005
     ProxyPreserveHost On
+    Require all granted
 </LocationMatch>
 ```
 
@@ -312,7 +315,15 @@ Internet → Apache (Reverse Proxy) → Docker Containers
    - Ensure frontend uses relative URLs (`/api` not `http://localhost:8000`)
    - Check Apache is properly routing `/api/*` to backend
 
-4. **Container Issues**
+4. **403 Forbidden Errors on Routes (e.g., /help)**
+   - Check Apache configuration at `/etc/httpd/conf.d/question-maker.conf`
+   - Ensure `Require all granted` is present in LocationMatch blocks
+   - Verify the regex pattern `^(?!\/api\/).*` matches your route
+   - Check Apache error logs: `sudo tail -f /var/log/httpd/error_log`
+   - Test Apache config: `sudo httpd -t`
+   - Restart Apache: `sudo systemctl restart httpd`
+
+5. **Container Issues**
    - View container logs: `docker compose logs [service-name]`
    - Restart containers: `docker compose restart`
    - Rebuild if needed: `docker compose build`
