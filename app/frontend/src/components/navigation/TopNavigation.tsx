@@ -2,7 +2,7 @@ import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Course } from '../../types/question';
-import { User } from 'lucide-react';
+import { User, HelpCircle } from 'lucide-react';
 
 interface TopNavigationProps {
     selectedCourse: Course | null;
@@ -78,6 +78,15 @@ export const TopNavigation = ({
 
                 {/* Right: User Profile */}
                 <div className="flex items-center space-x-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full"
+                        onClick={() => window.open('/help', '_blank', 'noopener')}
+                        aria-label="Open help"
+                    >
+                        <HelpCircle className="h-5 w-5" />
+                    </Button>
                     <div className="relative">
                         <Button
                             variant="ghost"
