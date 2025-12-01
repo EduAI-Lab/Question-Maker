@@ -433,13 +433,56 @@ export const getCanvasQuizQuestions = async (userId, canvasCourseId, quizId) => 
 };
 
 /**
+ * Strip HTML tags from text while preserving line breaks
+ */
+const stripHtmlTags = (html) => {
+  if (!html || typeof html !== 'string') return '';
+  
+  let text = html;
+  
+  // Replace block-level elements with line breaks
+  text = text.replace(/<\/p>/gi, '\n');
+  text = text.replace(/<\/div>/gi, '\n');
+  text = text.replace(/<\/li>/gi, '\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<\/h[1-6]>/gi, '\n');
+  
+  // Remove all remaining HTML tags
+  text = text.replace(/<[^>]*>/g, '');
+  
+  // Decode HTML entities
+  text = text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&[#\w]+;/g, '');
+  
+  // Normalize whitespace: collapse multiple spaces, preserve single newlines
+  text = text
+    .replace(/[ \t]+/g, ' ') // Collapse spaces and tabs
+    .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
+    .replace(/[ \t]*\n[ \t]*/g, '\n') // Remove spaces around newlines
+    .trim();
+  
+  return text;
+};
+
+/**
  * Convert Canvas question to variant format
  * This is the reverse of convertVariantToCanvasQuestion
+ * Throws error if question type is not supported
  */
 const convertCanvasQuestionToVariant = (canvasQuestion) => {
   const questionType = canvasQuestion.question_type;
-  const questionText = canvasQuestion.question_text || '';
+  const questionTextRaw = canvasQuestion.question_text || '';
   const questionName = canvasQuestion.question_name || '';
+  
+  // Strip HTML tags from question text
+  const questionText = stripHtmlTags(questionTextRaw);
   
   let localType = 'SA'; // Default to short answer
   let processedQuestionText = questionText;
@@ -470,7 +513,9 @@ const convertCanvasQuestionToVariant = (canvasQuestion) => {
         const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
         answers.forEach((ans, index) => {
           const letter = letters[index];
-          options.push(`${letter}) ${ans.answer_text}`);
+          // Strip HTML from answer text
+          const answerText = stripHtmlTags(ans.answer_text || '');
+          options.push(`${letter}) ${answerText}`);
           if (ans.answer_weight === 100 || ans.answer_weight > 0) {
             correctLetter = letter;
           }
@@ -498,15 +543,18 @@ const convertCanvasQuestionToVariant = (canvasQuestion) => {
     // Essay questions - extract answer if available
     const answers = canvasQuestion.answers || [];
     if (answers.length > 0 && answers[0].answer_text) {
-      answer = answers[0].answer_text;
+      answer = stripHtmlTags(answers[0].answer_text);
     }
   } else if (questionType === 'short_answer_question' || questionType === 'fill_in_multiple_blanks_question') {
     localType = 'SA';
     // Short answer - extract answer
     const answers = canvasQuestion.answers || [];
     if (answers.length > 0 && answers[0].answer_text) {
-      answer = answers[0].answer_text;
+      answer = stripHtmlTags(answers[0].answer_text);
     }
+  } else {
+    // Unsupported question type
+    throw new Error(`Unsupported question type: ${questionType}`);
   }
 
   // Extract description from question name (remove position number)
@@ -579,51 +627,72 @@ export const importQuizFromCanvas = async (userId, canvasCourseId, quizId, local
       position: 0
     });
 
-    // Convert and import questions
+    // Convert and import questions with graceful error handling
     const importedQuestions = [];
+    const skippedQuestions = [];
     const primaryTopicId = options.primaryTopicId || null;
+
+    if (!primaryTopicId) {
+      throw new Error('Primary topic ID is required for importing questions. Please select a topic.');
+    }
 
     for (let i = 0; i < canvasQuestions.length; i++) {
       const canvasQuestion = canvasQuestions[i];
-      const converted = convertCanvasQuestionToVariant(canvasQuestion);
+      
+      try {
+        // Try to convert the question - this will throw if unsupported
+        const converted = convertCanvasQuestionToVariant(canvasQuestion);
 
-      // Create question metadata
-      // If no primary topic provided, we'll need to handle this - for now, require it or use a default
-      if (!primaryTopicId) {
-        throw new Error('Primary topic ID is required for importing questions. Please select a topic.');
+        // Create question metadata
+        const questionMetadata = await Question_Metadata.create({
+          courseId: localCourseId,
+          primaryTopicId: primaryTopicId,
+          type: converted.type,
+          description: converted.description,
+          questionOrder: {}
+        });
+
+        // Create variant
+        const variant = await Variants.create({
+          questionMetadataId: questionMetadata.id,
+          questionText: converted.questionText,
+          difficulty: 'medium', // Default difficulty
+          answer: converted.answer,
+          assessmentId: assessment.id,
+          secondaryTopicsId: [],
+          isAiGenerated: false,
+          isDraft: true // Mark as draft for review
+        });
+
+        // Link variant to section
+        await SectionVariants.create({
+          sectionId: section.id,
+          variantId: variant.id,
+          displayOrder: converted.position || i
+        });
+
+        importedQuestions.push({
+          questionMetadataId: questionMetadata.id,
+          variantId: variant.id
+        });
+      } catch (error) {
+        // If conversion or creation fails, skip this question but continue
+        const questionName = canvasQuestion.question_name || `Question ${i + 1}`;
+        const questionType = canvasQuestion.question_type || 'unknown';
+        skippedQuestions.push({
+          position: canvasQuestion.position || i + 1,
+          name: questionName,
+          type: questionType,
+          reason: error.message || 'Unknown error'
+        });
+        // Continue to next question
+        continue;
       }
+    }
 
-      const questionMetadata = await Question_Metadata.create({
-        courseId: localCourseId,
-        primaryTopicId: primaryTopicId,
-        type: converted.type,
-        description: converted.description,
-        questionOrder: {}
-      });
-
-      // Create variant
-      const variant = await Variants.create({
-        questionMetadataId: questionMetadata.id,
-        questionText: converted.questionText,
-        difficulty: 'medium', // Default difficulty
-        answer: converted.answer,
-        assessmentId: assessment.id,
-        secondaryTopicsId: [],
-        isAiGenerated: false,
-        isDraft: true // Mark as draft for review
-      });
-
-      // Link variant to section
-      await SectionVariants.create({
-        sectionId: section.id,
-        variantId: variant.id,
-        displayOrder: converted.position || i
-      });
-
-      importedQuestions.push({
-        questionMetadataId: questionMetadata.id,
-        variantId: variant.id
-      });
+    // If no questions were imported at all, throw an error
+    if (importedQuestions.length === 0) {
+      throw new Error('No questions could be imported. All question types may be unsupported.');
     }
 
     // Save course mapping if it doesn't exist
@@ -647,6 +716,8 @@ export const importQuizFromCanvas = async (userId, canvasCourseId, quizId, local
       assessmentId: assessment.id,
       assessmentName: assessment.name,
       questionsImported: importedQuestions.length,
+      questionsSkipped: skippedQuestions.length,
+      skippedQuestions: skippedQuestions,
       sectionId: section.id
     };
   } catch (error) {

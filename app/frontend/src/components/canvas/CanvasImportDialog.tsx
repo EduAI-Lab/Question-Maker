@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { useToast } from '../ui/use-toast';
-import canvasService, { CanvasCourse, CanvasIntegration, CanvasQuiz } from '../../services/canvasService';
+import canvasService, { CanvasCourse, CanvasIntegration, CanvasQuiz, CanvasSkippedQuestion } from '../../services/canvasService';
 import { courseService } from '../../services/courseService';
 import { Course } from '../../types/question';
 import { Topic } from '../../types/topic';
@@ -270,10 +270,29 @@ export const CanvasImportDialog = ({
         }
       );
       
+      // Build success message
+      let description = `Imported ${result.questionsImported} question${result.questionsImported !== 1 ? 's' : ''} from Canvas.`;
+      if (result.questionsSkipped && result.questionsSkipped > 0) {
+        description += ` ${result.questionsSkipped} question${result.questionsSkipped !== 1 ? 's were' : ' was'} skipped due to unsupported question types.`;
+      }
+      
       toast({
         title: 'Import successful!',
-        description: `Imported ${result.questionsImported} questions from Canvas.`,
+        description: description,
       });
+
+      // If there are skipped questions, show details in console and optionally in a longer toast
+      if (result.skippedQuestions && result.skippedQuestions.length > 0) {
+        console.warn('Skipped questions during import:', result.skippedQuestions);
+        // Show additional toast with details if there are many skipped questions
+        if (result.skippedQuestions.length > 3) {
+          toast({
+            title: 'Some questions were skipped',
+            description: `${result.skippedQuestions.length} questions with unsupported types were not imported. Check the browser console for details.`,
+            variant: 'default',
+          });
+        }
+      }
 
       if (onImportSuccess) {
         onImportSuccess({

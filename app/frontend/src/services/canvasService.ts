@@ -40,10 +40,19 @@ export interface CanvasQuestion {
   }>;
 }
 
+export interface CanvasSkippedQuestion {
+  position: number;
+  name: string;
+  type: string;
+  reason: string;
+}
+
 export interface CanvasImportResult {
   assessmentId: number;
   assessmentName: string;
   questionsImported: number;
+  questionsSkipped?: number;
+  skippedQuestions?: CanvasSkippedQuestion[];
   sectionId: number;
 }
 
