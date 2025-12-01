@@ -19,6 +19,43 @@ export interface CanvasExportResult {
   canvasUrl: string;
 }
 
+export interface CanvasQuiz {
+  id: number;
+  title: string;
+  quiz_type: string;
+  published: boolean;
+  description?: string;
+}
+
+export interface CanvasQuestion {
+  id: number;
+  question_name: string;
+  question_text: string;
+  question_type: string;
+  position: number;
+  answers: Array<{
+    id: number;
+    answer_text: string;
+    answer_weight: number;
+  }>;
+}
+
+export interface CanvasSkippedQuestion {
+  position: number;
+  name: string;
+  type: string;
+  reason: string;
+}
+
+export interface CanvasImportResult {
+  assessmentId: number;
+  assessmentName: string;
+  questionsImported: number;
+  questionsSkipped?: number;
+  skippedQuestions?: CanvasSkippedQuestion[];
+  sectionId: number;
+}
+
 export const canvasService = {
   /**
    * Get Canvas integration status
@@ -80,6 +117,43 @@ export const canvasService = {
     } catch (error) {
       return null;
     }
+  },
+
+  /**
+   * Get quizzes from a Canvas course
+   */
+  async getQuizzes(canvasCourseId: number): Promise<CanvasQuiz[]> {
+    const response = await api.get(`/api/canvas/courses/${canvasCourseId}/quizzes`);
+    return response.data.data || [];
+  },
+
+  /**
+   * Get questions from a Canvas quiz
+   */
+  async getQuizQuestions(canvasCourseId: number, quizId: number): Promise<CanvasQuestion[]> {
+    const response = await api.get(`/api/canvas/courses/${canvasCourseId}/quizzes/${quizId}/questions`);
+    return response.data.data || [];
+  },
+
+  /**
+   * Import a Canvas quiz as an assessment
+   */
+  async importQuiz(
+    canvasCourseId: number,
+    quizId: number,
+    localCourseId: number,
+    options: {
+      assessmentType?: string;
+      assessmentName?: string;
+      semester?: string;
+      primaryTopicId: number;
+    }
+  ): Promise<CanvasImportResult> {
+    const response = await api.post(`/api/canvas/import/${canvasCourseId}/quizzes/${quizId}`, {
+      localCourseId,
+      ...options
+    });
+    return response.data.data;
   }
 };
 

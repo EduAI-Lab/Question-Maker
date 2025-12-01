@@ -4,7 +4,10 @@ import {
   saveCanvasIntegration,
   getCanvasCourses,
   exportAssessmentToCanvas,
-  getCanvasCourseMapping
+  getCanvasCourseMapping,
+  getCanvasQuizzes,
+  getCanvasQuizQuestions,
+  importQuizFromCanvas
 } from '../services/canvasService.js';
 import { authenticateToken } from '../middleware/auth.js';
 
@@ -182,6 +185,91 @@ router.get('/mapping/:courseId', authenticateToken, async (req, res, next) => {
     res.json({
       success: true,
       data: mapping
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   GET /api/canvas/courses/:canvasCourseId/quizzes
+ * @desc    Get quizzes from a Canvas course
+ * @access  Private
+ */
+router.get('/courses/:canvasCourseId/quizzes', authenticateToken, async (req, res, next) => {
+  try {
+    const { canvasCourseId } = req.params;
+    const quizzes = await getCanvasQuizzes(req.user.id, canvasCourseId);
+
+    res.json({
+      success: true,
+      data: quizzes
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   GET /api/canvas/courses/:canvasCourseId/quizzes/:quizId/questions
+ * @desc    Get questions from a Canvas quiz
+ * @access  Private
+ */
+router.get('/courses/:canvasCourseId/quizzes/:quizId/questions', authenticateToken, async (req, res, next) => {
+  try {
+    const { canvasCourseId, quizId } = req.params;
+    const questions = await getCanvasQuizQuestions(req.user.id, canvasCourseId, quizId);
+
+    res.json({
+      success: true,
+      data: questions
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @route   POST /api/canvas/import/:canvasCourseId/quizzes/:quizId
+ * @desc    Import a Canvas quiz as an assessment
+ * @access  Private
+ */
+router.post('/import/:canvasCourseId/quizzes/:quizId', authenticateToken, async (req, res, next) => {
+  try {
+    const { canvasCourseId, quizId } = req.params;
+    const { localCourseId, assessmentType, assessmentName, semester, primaryTopicId } = req.body;
+
+    if (!localCourseId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Local course ID is required'
+      });
+    }
+
+    if (!primaryTopicId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Primary topic ID is required for importing questions'
+      });
+    }
+
+    const result = await importQuizFromCanvas(
+      req.user.id,
+      canvasCourseId,
+      quizId,
+      localCourseId,
+      {
+        assessmentType,
+        assessmentName,
+        semester,
+        primaryTopicId
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Quiz imported from Canvas successfully',
+      data: result
     });
   } catch (error) {
     next(error);

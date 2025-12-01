@@ -114,6 +114,18 @@ export const QuestionDetailView = ({
         onSelectVariant(target);
         setViewMode('detail');
     };
+
+    const questionTextDisplay = (variant.questionText || 'Untitled question').trim();
+    const questionTextClass = useMemo(() => {
+        if (questionTextDisplay.length > 320) {
+            return 'text-base leading-relaxed';
+        }
+        if (questionTextDisplay.length > 200) {
+            return 'text-lg leading-relaxed';
+        }
+        return 'text-2xl leading-8';
+    }, [questionTextDisplay.length]);
+
     //mock for AI generated questions
     const handleToggleAiTag = async () => {
         try {
@@ -230,8 +242,8 @@ export const QuestionDetailView = ({
                             </Button>
                         </div>
                     ) : (
-                        <div className="text-2xl font-semibold leading-8 text-gray-900">
-                            {variant.questionText || 'Untitled question'}
+                        <div className={`text-gray-900 font-semibold ${questionTextClass} max-h-40 overflow-y-auto`}>
+                            {questionTextDisplay}
                         </div>
                     )}
                 </div>

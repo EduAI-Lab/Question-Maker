@@ -35,9 +35,10 @@ Internet → Apache (Reverse Proxy) → Docker Containers
    - Outputs static files to `/app/dist`
 
 2. **Production Stage**: nginx:alpine
-   - Copies built files from builder stage
-   - Serves static files
+   - Copies built files from `/app/dist` to `/usr/share/nginx/html`
+   - Serves static files via Nginx
    - Handles React Router with `try_files`
+   - Includes API proxy configuration (fallback, not used in production)
 
 ### 3. Backend Container
 **Base Image**: node:18-alpine
@@ -79,10 +80,13 @@ Host Port → Container Port → Service
 
 ### Internal Communication
 ```
-Frontend → Backend: http://backend:8000/api/*
-Apache → Frontend: http://localhost:3005/*
-Apache → Backend: http://localhost:8000/api/*
+Browser → Apache → Frontend: http://localhost:3005/*
+Browser → Apache → Backend: http://localhost:8000/api/*
+Frontend Container → Backend Container: http://backend:8000 (via Docker network, fallback only)
+Backend Container → Database Container: postgres:5432 (via Docker network)
 ```
+
+**Note**: In production, API requests from the browser go through Apache proxy. The frontend container's Nginx also has API proxying configured, but it's not used since Apache handles routing.
 
 ## Data Flow
 
@@ -98,19 +102,20 @@ Apache Reverse Proxy
 
 ### 2. API Request Flow
 ```
-Frontend Container
-    ↓ HTTP Request (internal)
+User Browser
+    ↓ HTTPS Request (POST /api/auth/login)
+Apache Reverse Proxy
+    ↓ HTTP Request (routes /api/* to backend)
 Backend Container
     ↓ SQL Query
 PostgreSQL Container
-    ↓ Response
+    ↓ User Data
 Backend Container
-    ↓ JSON Response
-Frontend Container
-    ↓ HTML/JS Response
-Apache
+    ↓ JSON Response (JWT Token)
+Apache Reverse Proxy
     ↓ HTTPS Response
 User Browser
+    ↓ Stores token in localStorage
 ```
 
 ### 3. Static Asset Flow
@@ -336,7 +341,6 @@ graph TB
     Apache -->|"/* → Frontend"| Frontend
     
     %% Internal Communication
-    Frontend -->|"API Calls<br/>http://backend:8000"| Backend
     Backend -->|"SQL Queries<br/>postgres:5432"| Database
     
     %% Data Flow Labels
@@ -373,7 +377,7 @@ sequenceDiagram
     F->>A: HTML/JS Response
     A->>U: HTTPS Response
     
-    %% API Call
+    %% API Call (from browser JavaScript)
     U->>A: HTTPS Request (POST /api/auth/login)
     A->>B: HTTP Request (POST /api/auth/login)
     B->>D: SQL Query (SELECT user)
@@ -381,8 +385,9 @@ sequenceDiagram
     B->>A: JSON Response (JWT Token)
     A->>U: HTTPS Response
     
-    %% Subsequent Requests
+    %% Subsequent API Requests
     U->>A: HTTPS Request (GET /api/questions)
+    Note over U: Includes Bearer token<br/>from localStorage
     A->>B: HTTP Request (GET /api/questions)
     B->>D: SQL Query (SELECT questions)
     D->>B: Questions Data
