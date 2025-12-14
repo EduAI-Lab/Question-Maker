@@ -11,6 +11,7 @@ set -e  # Exit on any error
 PROJECT_DIR="/srv/www/questionmaker.ok.ubc.ca"
 BRANCH="main"
 LOG_FILE="/var/log/question-maker/deploy.log"
+FALLBACK_LOG_FILE="$PROJECT_DIR/deploy.log"
 
 # Colors for output
 RED='\033[0;31m'
@@ -19,27 +20,60 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Function to get the active log file (handles permission issues)
+get_log_file() {
+    # Check if we can write to the primary log location
+    if [ -w "$LOG_FILE" ] 2>/dev/null || ([ -d "$(dirname "$LOG_FILE")" ] && [ -w "$(dirname "$LOG_FILE")" ] 2>/dev/null); then
+        echo "$LOG_FILE"
+    # Fall back to project directory
+    elif [ -w "$FALLBACK_LOG_FILE" ] 2>/dev/null || ([ -d "$(dirname "$FALLBACK_LOG_FILE")" ] && [ -w "$(dirname "$FALLBACK_LOG_FILE")" ] 2>/dev/null); then
+        echo "$FALLBACK_LOG_FILE"
+    else
+        echo "/dev/null"  # Discard if no writable location
+    fi
+}
+
+# Function to log output (handles permission issues gracefully)
+log_output() {
+    ACTIVE_LOG=$(get_log_file)
+    if [ "$ACTIVE_LOG" != "/dev/null" ]; then
+        echo -e "$1" | tee -a "$ACTIVE_LOG"
+    else
+        echo -e "$1"
+    fi
+}
+
 # Function to print colored output
 print_status() {
-    echo -e "${GREEN}[INFO]${NC} $1" | tee -a "$LOG_FILE"
+    log_output "${GREEN}[INFO]${NC} $1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1" | tee -a "$LOG_FILE"
+    log_output "${YELLOW}[WARNING]${NC} $1"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE"
+    log_output "${RED}[ERROR]${NC} $1"
 }
 
 print_header() {
-    echo -e "${BLUE}========================================${NC}" | tee -a "$LOG_FILE"
-    echo -e "${BLUE}$1${NC}" | tee -a "$LOG_FILE"
-    echo -e "${BLUE}========================================${NC}" | tee -a "$LOG_FILE"
+    log_output "${BLUE}========================================${NC}"
+    log_output "${BLUE}$1${NC}"
+    log_output "${BLUE}========================================${NC}"
 }
 
-# Create log directory if it doesn't exist
-mkdir -p "$(dirname "$LOG_FILE")"
+# Create log directory if it doesn't exist (try with sudo if needed)
+if [ ! -d "$(dirname "$LOG_FILE")" ]; then
+    if mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null; then
+        : # Success
+    elif sudo mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null; then
+        sudo chown "$USER:$USER" "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    else
+        # Fall back to project directory for logs
+        LOG_FILE="$FALLBACK_LOG_FILE"
+        mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
+    fi
+fi
 
 # Log start time
 print_header "Starting deployment - $(date)"
@@ -104,16 +138,17 @@ git pull origin "$BRANCH"
 
 # Rebuild and restart Docker containers
 print_status "Rebuilding Docker images..."
-docker compose build --no-cache 2>&1 | tee -a "$LOG_FILE" || {
+ACTIVE_LOG=$(get_log_file)
+docker compose build --no-cache 2>&1 | tee -a "$ACTIVE_LOG" || {
     print_error "Docker build failed. Check logs above."
     exit 1
 }
 
 print_status "Stopping existing containers..."
-docker compose down 2>&1 | tee -a "$LOG_FILE" || print_warning "Some containers may not have been running"
+docker compose down 2>&1 | tee -a "$ACTIVE_LOG" || print_warning "Some containers may not have been running"
 
 print_status "Starting containers with updated images..."
-docker compose up -d 2>&1 | tee -a "$LOG_FILE" || {
+docker compose up -d 2>&1 | tee -a "$ACTIVE_LOG" || {
     print_error "Failed to start containers. Check logs above."
     exit 1
 }
@@ -123,7 +158,7 @@ sleep 5
 
 # Check container status
 print_status "Container Status:"
-docker compose ps | tee -a "$LOG_FILE"
+docker compose ps | tee -a "$ACTIVE_LOG"
 
 # Check container health
 print_status "Checking container health..."
@@ -131,7 +166,7 @@ HEALTH_CHECK_FAILED=0
 
 if ! docker compose ps | grep -q "Up (healthy)"; then
     print_warning "Some containers may not be healthy. Checking logs..."
-    docker compose logs --tail=20 | tee -a "$LOG_FILE"
+    docker compose logs --tail=20 | tee -a "$ACTIVE_LOG"
     HEALTH_CHECK_FAILED=1
 fi
 
@@ -139,12 +174,13 @@ fi
 print_status "Restarting Apache..."
 sudo systemctl restart httpd 2>/dev/null || sudo systemctl restart apache2 2>/dev/null || print_warning "Apache restart failed or not needed"
 
+ACTIVE_LOG=$(get_log_file)
 if [ $HEALTH_CHECK_FAILED -eq 0 ]; then
     print_header "Deployment completed successfully - $(date)"
-    print_status "Deployment log saved to: $LOG_FILE"
+    print_status "Deployment log saved to: $ACTIVE_LOG"
     exit 0
 else
     print_error "Deployment completed but health checks failed. Please review logs."
-    print_status "Deployment log saved to: $LOG_FILE"
+    print_status "Deployment log saved to: $ACTIVE_LOG"
     exit 1
 fi

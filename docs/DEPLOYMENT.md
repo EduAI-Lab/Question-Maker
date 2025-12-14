@@ -1,5 +1,49 @@
 # Question Maker Deployment Guide
 
+## Quick Start: Push to Production
+
+**Before you start:** Make sure you've committed and pushed your changes to the `main` branch from your local machine:
+```bash
+git add .
+git commit -m "Your commit message"
+git push origin main
+```
+
+**Then on the server, follow these 3 steps:**
+
+1. **SSH to the server:**
+   ```bash
+   ssh [yourcwl]@questionmaker.ok.ubc.ca
+
+   <!-- Example -->
+   ssh ssaada08@questionmaker.ok.ubc.ca
+   ```
+   *Note: Connect to UBC VPN first if not on campus*
+
+2. **Navigate to the repository:**
+   ```bash
+   cd /srv/www/questionmaker.ok.ubc.ca
+   ```
+
+3. **After pulling, you can then run:**
+   ```bash
+   git pull origin main
+   docker compose build --no-cache
+   docker compose down
+   docker compose up -d
+   ```
+
+The script will automatically:
+- Check for updates from the `main` branch
+- Pull the latest changes
+- Rebuild Docker containers
+- Restart services
+- Verify deployment health
+
+**View deployment logs:** `tail -f /var/log/question-maker/deploy.log`
+
+---
+
 This guide provides step-by-step instructions for deploying the Question Maker application using Docker on UBC servers.
 
 ## Prerequisites
@@ -197,13 +241,16 @@ sudo nano /etc/httpd/conf.d/question-maker.conf
     ProxyPass http://localhost:8000
     ProxyPassReverse http://localhost:8000
     ProxyPreserveHost On
+    Require all granted
 </LocationMatch>
 
-# Handle all other requests - send to frontend
+# Handle all other requests - send to frontend (includes /help, /login, /landing, etc.)
+# This regex matches everything EXCEPT /api/ routes
 <LocationMatch "^(?!\/api\/).*">
     ProxyPass http://localhost:3005
     ProxyPassReverse http://localhost:3005
     ProxyPreserveHost On
+    Require all granted
 </LocationMatch>
 ```
 
@@ -268,7 +315,19 @@ Internet → Apache (Reverse Proxy) → Docker Containers
    - Ensure frontend uses relative URLs (`/api` not `http://localhost:8000`)
    - Check Apache is properly routing `/api/*` to backend
 
-4. **Container Issues**
+4. **403 Forbidden Errors on Routes (e.g., /help)**
+   - Check Apache configuration at `/etc/httpd/conf.d/question-maker.conf`
+   - Ensure `Require all granted` is present in LocationMatch blocks
+   - Verify the regex pattern `^(?!\/api\/).*` matches your route
+   - Check Apache error logs: `sudo tail -f /var/log/httpd/error_log`
+   - Test Apache config: `sudo httpd -t`
+   - Restart Apache: `sudo systemctl restart httpd`
+   - **Nginx redirect issue**: If nginx is returning 301 redirects (e.g., `/help` → `/help/`), check `app/frontend/nginx.conf`:
+     - Ensure `absolute_redirect off;` is set to prevent absolute redirect URLs
+     - Use `try_files $uri /index.html;` instead of `try_files $uri $uri/ /index.html;` to prevent automatic trailing slash redirects
+     - Rebuild frontend container: `docker compose build frontend && docker compose up -d frontend`
+
+5. **Container Issues**
    - View container logs: `docker compose logs [service-name]`
    - Restart containers: `docker compose restart`
    - Rebuild if needed: `docker compose build`
