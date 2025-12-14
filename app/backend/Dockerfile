@@ -4,8 +4,8 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Install curl for health checks (more reliable than node http)
-RUN apk add --no-cache curl
+# Install curl for health checks and dumb-init for proper signal handling
+RUN apk add --no-cache curl dumb-init
 
 # Copy package files
 COPY package*.json ./
@@ -38,6 +38,9 @@ ENV NODE_OPTIONS="--max-old-space-size=384"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:8000/healthz || exit 1
 
+# Use dumb-init to properly forward signals to Node.js
+# This prevents hanging shutdowns and zombie processes when running as PID 1
+ENTRYPOINT ["dumb-init", "--"]
+
 # Start the application
-# Use exec form to ensure proper signal handling
 CMD ["node", "src/index.js"]

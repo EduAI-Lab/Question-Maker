@@ -32,9 +32,9 @@ COPY nginx.conf /etc/nginx/nginx.conf
 EXPOSE 80
 
 # Health check with better timeout and retry logic
-# curl is more reliable and handles errors better than wget
+# Uses static healthz.html file to avoid nginx processing overhead
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
+  CMD curl -f http://localhost/healthz.html || exit 1
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
