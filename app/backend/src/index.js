@@ -13,7 +13,7 @@ import assessmentRoutes from './routes/assessments.js';
 import variantRoutes from './routes/variants.js';
 import eduaiRoutes from './routes/eduai.js';
 import canvasRoutes from './routes/canvas.js';
-import { connectDatabase } from './config/database.js';
+import { connectDatabase, sequelize } from './config/database.js';
 import { config } from './config/settings.js';
 // Import models to ensure associations are set up
 import './schema/index.js';
@@ -70,15 +70,89 @@ app.use('/api/canvas', canvasRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
+// Store server reference for graceful shutdown
+let server = null;
+
+// Graceful shutdown handler
+const gracefulShutdown = async (signal) => {
+  console.log(`\n${signal} received. Starting graceful shutdown...`);
+  
+  if (server) {
+    server.close(async () => {
+      console.log('HTTP server closed.');
+      
+      // Close database connections
+      try {
+        if (sequelize) {
+          await sequelize.close();
+          console.log('Database connections closed.');
+        }
+      } catch (error) {
+        console.error('Error closing database:', error);
+      }
+      
+      console.log('Graceful shutdown complete.');
+      process.exit(0);
+    });
+    
+    // Force close after 10 seconds
+    setTimeout(() => {
+      console.error('Forced shutdown after timeout');
+      process.exit(1);
+    }, 10000);
+  } else {
+    process.exit(0);
+  }
+};
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Don't exit immediately, let the process manager handle it
+  // Log the error and continue if possible
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Don't exit immediately, log and continue
+});
+
+// Handle termination signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 // Start server
 const startServer = async () => {
   try {
     // Connect to database
     await connectDatabase();
     
-    app.listen(PORT, '0.0.0.0', () => {
+    server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📚 EduQuery.ai API ready for requests`);
+    });
+    
+    // Handle server errors
+    server.on('error', (error) => {
+      if (error.syscall !== 'listen') {
+        throw error;
+      }
+      
+      const bind = typeof PORT === 'string' ? 'Pipe ' + PORT : 'Port ' + PORT;
+      
+      switch (error.code) {
+        case 'EACCES':
+          console.error(`${bind} requires elevated privileges`);
+          process.exit(1);
+          break;
+        case 'EADDRINUSE':
+          console.error(`${bind} is already in use`);
+          process.exit(1);
+          break;
+        default:
+          throw error;
+      }
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
