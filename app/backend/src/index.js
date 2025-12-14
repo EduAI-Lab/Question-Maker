@@ -48,6 +48,11 @@ app.use(compression());
 // Logging
 app.use(morgan('combined'));
 
+// Liveness health check endpoint (dumb endpoint - no DB, Redis, Judge0, or heavy processing)
+app.get('/healthz', (req, res) => {
+  res.status(200).send('ok');
+});
+
 // Health check
 app.get('/', (req, res) => {
   res.json({ 

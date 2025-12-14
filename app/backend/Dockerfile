@@ -32,7 +32,7 @@ EXPOSE 8000
 # Health check with better error handling
 # Uses curl which is more reliable and has proper timeout handling
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:8000/ || exit 1
+  CMD curl -f http://localhost:8000/healthz || exit 1
 
 # Start the application
 # Use exec form to ensure proper signal handling
