@@ -29,6 +29,10 @@ USER nodejs
 # Expose port
 EXPOSE 8000
 
+# Set Node.js memory limit to prevent OOM kills
+# 384MB leaves headroom for native modules, buffers, and OS overhead within 512MB container limit
+ENV NODE_OPTIONS="--max-old-space-size=384"
+
 # Health check with better error handling
 # Uses curl which is more reliable and has proper timeout handling
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
