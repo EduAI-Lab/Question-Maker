@@ -130,9 +130,8 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Start server
 const startServer = async () => {
   try {
-    // Connect to database
-    await connectDatabase();
-    
+    // Start HTTP server first - don't block on database connection
+    // This allows healthcheck to pass even if DB is temporarily unavailable
     server = app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📚 EduQuery.ai API ready for requests`);
@@ -158,6 +157,18 @@ const startServer = async () => {
         default:
           throw error;
       }
+    });
+
+    // Connect to database in background (non-blocking)
+    // Allow server to start even if DB connection fails initially
+    // The app will retry automatically and handle transient failures
+    connectDatabase({ 
+      retryOnFailure: true, 
+      maxRetries: 10,
+      allowFailure: true // Don't crash if DB is unavailable at startup
+    }).catch((error) => {
+      // Error already logged in connectDatabase, just continue
+      console.warn('⚠️  Server started without database connection. Will retry in background.');
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
