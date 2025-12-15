@@ -10,7 +10,7 @@ import {
 } from '../ui/dialog';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Loader2, LogOut } from 'lucide-react';
+import { Loader2, LogOut, Plus } from 'lucide-react';
 import { Class } from '../../types/class';
 import { eduaiService, EduAICourseOption, EduAITopicOption } from '../../services/eduaiService';
 import { courseService } from '../../services/courseService';
@@ -132,6 +132,58 @@ export const ProfileCoursesDialog = ({
         });
     };
 
+    const handleCreateTestCourse = async () => {
+        setIsSaving(true);
+        setError(null);
+        try {
+            // Generate a unique test course code
+            const testCourseCode = `TEST-${Date.now().toString().slice(-4)}`;
+            const testCourseName = 'Test Course';
+
+            // Check if a test course with similar code already exists
+            const normalizedTestCode = normalizeCourseCode(testCourseCode);
+            if (existingCourseCodeSet.has(normalizedTestCode)) {
+                toast({
+                    title: 'Test course already exists',
+                    description: 'You already have a test course. You can use it to create questions and assessments.',
+                    variant: 'default'
+                });
+                setIsSaving(false);
+                return;
+            }
+
+            const createdCourse = await courseService.createCourse({
+                name: testCourseName,
+                subject: testCourseName,
+                courseCode: testCourseCode
+            });
+
+            // Create a default topic so users can immediately start creating questions
+            try {
+                await courseService.createTopic(createdCourse.id, 'General');
+            } catch (topicError) {
+                console.warn('Failed to create default topic for test course', topicError);
+                // Continue even if topic creation fails - users can add topics manually
+            }
+
+            if (onCoursesAdded) {
+                await onCoursesAdded();
+            }
+
+            toast({
+                title: 'Test course created',
+                description: 'You can now use this course to create questions and assessments without connecting to EduAI.'
+            });
+
+            onClose();
+        } catch (err) {
+            console.error('Failed to create test course', err);
+            setError('Unable to create test course. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleSave = async () => {
         const targetCourseIds = selectedCourseIds.filter((id) => {
             const option = courseOptions.find((item) => item.id === id);
@@ -210,9 +262,9 @@ export const ProfileCoursesDialog = ({
         <Dialog open={open} onOpenChange={handleDialogChange}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Link courses from EduAI</DialogTitle>
+                    <DialogTitle>Add Courses</DialogTitle>
                     <DialogDescription>
-                        Select the courses you teach. We will import their topic lists into Question Maker.
+                        Link courses from EduAI or create a test course to get started without connecting to EduAI.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -223,10 +275,52 @@ export const ProfileCoursesDialog = ({
                 )}
 
                 <div className="mt-4 space-y-4">
+                    {/* Test Course Option - Always visible */}
+                    <div className="rounded-md border-2 border-dashed border-blue-300 bg-blue-50/50 p-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-sm font-semibold text-foreground">Test Course</span>
+                                    <Badge variant="outline" className="text-xs">No EduAI required</Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Create a test course to start making questions and assessments without connecting to EduAI.
+                                </p>
+                            </div>
+                            <Button
+                                onClick={handleCreateTestCourse}
+                                disabled={isSaving || isLoading}
+                                variant="default"
+                                className="ml-4"
+                            >
+                                {isSaving ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Creating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Create Test Course
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* EduAI Courses Section */}
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <div className="h-px flex-1 bg-border"></div>
+                            <span className="text-xs text-muted-foreground font-medium">OR LINK FROM EDUAI</span>
+                            <div className="h-px flex-1 bg-border"></div>
+                        </div>
+                    </div>
+
                     {isLoading ? (
                         <div className="flex items-center justify-center py-12 text-muted-foreground">
                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Loading courses...
+                            Loading courses from EduAI...
                         </div>
                     ) : (
                         <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
@@ -286,9 +380,11 @@ export const ProfileCoursesDialog = ({
                                 );
                             })}
 
-                            {courseOptions.length === 0 && (
+                            {courseOptions.length === 0 && !isLoading && (
                                 <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
-                                    No courses available from EduAI right now.
+                                    {error 
+                                        ? 'Unable to load courses from EduAI. You can still create a test course above.'
+                                        : 'No courses available from EduAI right now. You can create a test course above to get started.'}
                                 </div>
                             )}
                         </div>
