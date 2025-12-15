@@ -136,13 +136,24 @@ export const ProfileCoursesDialog = ({
         setIsSaving(true);
         setError(null);
         try {
-            // Generate a unique test course code
-            const testCourseCode = `TEST-${Date.now().toString().slice(-4)}`;
+            // Generate a unique test course code (only after confirming no test course exists)
+            const testCourseCode = 'TEST';
             const testCourseName = 'Test Course';
+            const normalizedTestCourseName = normalizeCourseCode(testCourseName);
 
-            // Check if a test course with similar code already exists
-            const normalizedTestCode = normalizeCourseCode(testCourseCode);
-            if (existingCourseCodeSet.has(normalizedTestCode)) {
+            // Check if a test course already exists by checking:
+            // 1. Any course with a code starting with "test-"
+            // 2. Any course with the name "TEST- - Test Course"
+            const hasTestCourse = existingCourses.some((course) => {
+                const courseCode = normalizeCourseCode(course.courseCode || course.code || '');
+                const courseName = normalizeCourseCode(course.name || '');
+                return (
+                    courseCode.startsWith('test-') ||
+                    courseName === normalizedTestCourseName
+                );
+            });
+
+            if (hasTestCourse) {
                 toast({
                     title: 'Test course already exists',
                     description: 'You already have a test course. You can use it to create questions and assessments.',

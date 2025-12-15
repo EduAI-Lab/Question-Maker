@@ -234,3 +234,4 @@ This provides better logging, error handling, and dependency management.
 **Last Updated**: December 2024  
 **Script**: `daily-deploy.sh`  
 **Log Location**: `/var/log/question-maker/daily-deploy.log`
+
