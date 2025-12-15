@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger.js';
+
 export const notFound = (req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
   error.status = 404;
@@ -8,8 +10,18 @@ export const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  // Log error
-  console.error(err);
+  // Log error with structured logging
+  const logLevel = error.status >= 500 ? 'error' : 'warn';
+  logger[logLevel]({
+    err: error,
+    req: {
+      method: req.method,
+      url: req.url,
+      path: req.path,
+      query: req.query,
+    },
+    status: error.status || 500,
+  }, error.message || 'Request error');
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {

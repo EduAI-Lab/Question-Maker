@@ -19,6 +19,9 @@ RUN npx vite build
 # Production stage
 FROM nginx:alpine
 
+# Install curl for health checks (more reliable than wget)
+RUN apk add --no-cache curl
+
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
@@ -28,9 +31,10 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Expose port
 EXPOSE 80
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
+# Health check with better timeout and retry logic
+# Uses static healthz.html file to avoid nginx processing overhead
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost/healthz.html || exit 1
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
