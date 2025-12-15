@@ -51,7 +51,10 @@ export const config = {
   
   // Rate Limiting
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX) || 1000 
+  rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX) || 1000,
+  
+  // Logging
+  logLevel: process.env.LOG_LEVEL || 'info'
 };
 
 export default config;
