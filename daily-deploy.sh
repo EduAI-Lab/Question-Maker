@@ -184,18 +184,32 @@ fi
 # Changes detected - proceed with deployment
 print_status "Changes detected! Updating from ${LOCAL_COMMIT:0:7} to ${REMOTE_COMMIT:0:7}"
 
-# Check if there are any local changes
-if ! git diff-index --quiet HEAD --; then
-    print_warning "Local changes detected. Stashing them..."
-    git stash save "Auto-stash before pull - $(date)"
+# For automated deployment, always favor remote changes
+# Discard any local modifications to ensure clean deployment
+ACTIVE_LOG=$(get_log_file)
+if ! git diff-index --quiet HEAD -- || ! git diff --quiet || ! git diff --cached --quiet; then
+    print_warning "Local changes detected. Discarding them to match remote (automated deployment favors remote)..."
+    # Reset to match remote exactly (favors remote in all cases)
+    git reset --hard "origin/$BRANCH" 2>&1 | tee -a "$ACTIVE_LOG" || {
+        print_warning "Reset to remote failed, trying clean reset..."
+        git clean -fd 2>&1 | tee -a "$ACTIVE_LOG" || true
+        git reset --hard HEAD 2>&1 | tee -a "$ACTIVE_LOG" || true
+        # Now try to pull with merge strategy favoring remote
+        git pull origin "$BRANCH" --no-edit -X theirs 2>&1 | tee -a "$ACTIVE_LOG" || {
+            print_error "Failed to sync with remote. Manual intervention required."
+            print_error "Run: cd $PROJECT_DIR && git reset --hard origin/$BRANCH"
+            exit 1
+        }
+    }
+    print_status "Local changes discarded. Repository now matches remote."
+else
+    # No local changes, safe to pull normally
+    print_status "Pulling latest changes from origin/$BRANCH..."
+    git pull origin "$BRANCH" 2>&1 | tee -a "$ACTIVE_LOG" || {
+        print_error "Failed to pull changes. Check git credentials and network."
+        exit 1
+    }
 fi
-
-# Pull latest changes
-print_status "Pulling latest changes from origin/$BRANCH..."
-git pull origin "$BRANCH" || {
-    print_error "Failed to pull changes. Check git credentials and network."
-    exit 1
-}
 
 # Rebuild and restart Docker containers
 print_status "Rebuilding Docker images (no cache)..."
