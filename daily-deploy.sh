@@ -130,15 +130,23 @@ if [ -z "$REPO_URL" ]; then
     exit 1
 fi
 
-# Convert SSH URL to HTTPS if needed, or use HTTPS URL with token
+# Extract repository path from URL (handles both SSH and HTTPS, with or without token)
+# Remove authentication if present, convert SSH to HTTPS format, extract path
 if [[ "$REPO_URL" == git@* ]]; then
-    # Convert git@github.com:user/repo.git to https://github.com/user/repo.git
-    REPO_URL=$(echo "$REPO_URL" | sed 's/git@github.com:/https:\/\/github.com\//' | sed 's/\.git$//')
+    # SSH format: git@github.com:user/repo.git -> github.com/user/repo
+    REPO_PATH=$(echo "$REPO_URL" | sed 's/git@github.com://' | sed 's/\.git$//' | sed 's/\.git\/$//')
+elif [[ "$REPO_URL" == https://* ]]; then
+    # HTTPS format: https://user:token@github.com/user/repo.git or https://github.com/user/repo.git
+    # Remove https:// and any authentication, then extract path
+    REPO_PATH=$(echo "$REPO_URL" | sed 's|^https://||' | sed 's|^[^@]*@||' | sed 's/\.git$//' | sed 's/\.git\/$//' | sed 's/\/$//')
+else
+    print_error "Unknown repository URL format: $REPO_URL"
+    exit 1
 fi
 
 # Configure git to use token for this repository
 print_status "Configuring git authentication..."
-GIT_URL_WITH_TOKEN="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@${REPO_URL#https://}"
+GIT_URL_WITH_TOKEN="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@${REPO_PATH}"
 git remote set-url origin "$GIT_URL_WITH_TOKEN" 2>/dev/null || {
     print_warning "Could not update git remote URL, continuing with existing config"
 }
