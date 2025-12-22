@@ -1,12 +1,14 @@
+/**
+ * Auth router handling registration, login, and profile endpoints for the Question Maker backend.
+ * Validates incoming payloads, delegates to authService, and applies authentication middleware where required.
+ */
 import express from 'express';
 import { registerUser, loginUser, getUserById } from '../services/authService.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// @route   POST /api/auth/register
-// @desc    Register a new user
-// @access  Public
+/** POST /api/auth/register – creates a user after validating email/password requirements. */
 router.post('/register', async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -37,9 +39,7 @@ router.post('/register', async (req, res, next) => {
   }
 });
 
-// @route   POST /api/auth/login
-// @desc    Login user
-// @access  Public
+/** POST /api/auth/login – verifies credentials and returns JWT/user payload on success. */
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -63,9 +63,7 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// @route   GET /api/auth/me
-// @desc    Get current user
-// @access  Private
+/** GET /api/auth/me – fetches the authenticated user profile using the JWT on the request. */
 router.get('/me', authenticateToken, async (req, res, next) => {
   try {
     const user = await getUserById(req.user.id);
@@ -80,4 +78,3 @@ router.get('/me', authenticateToken, async (req, res, next) => {
 });
 
 export default router;
-

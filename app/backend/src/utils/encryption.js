@@ -1,10 +1,9 @@
+/**
+ * Utility helpers for encrypting/decrypting sensitive strings (e.g., Canvas API keys).
+ * Uses AES-256-GCM with PBKDF2-derived keys so we get authenticated encryption per value.
+ */
 import crypto from 'crypto';
 import { config } from '../config/settings.js';
-
-/**
- * Encryption utility for two-way encryption/decryption
- * Uses AES-256-GCM for authenticated encryption
- */
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16; // 16 bytes for AES
@@ -12,21 +11,12 @@ const SALT_LENGTH = 64; // 64 bytes for salt
 const TAG_LENGTH = 16; // 16 bytes for GCM tag
 const KEY_LENGTH = 32; // 32 bytes for AES-256
 
-/**
- * Derive a key from the encryption key using PBKDF2
- * @param {string} encryptionKey - The master encryption key
- * @param {Buffer} salt - Salt for key derivation
- * @returns {Buffer} Derived key
- */
+/** Derives a strong key from the configured encryption key + salt via PBKDF2. */
 function deriveKey(encryptionKey, salt) {
   return crypto.pbkdf2Sync(encryptionKey, salt, 100000, KEY_LENGTH, 'sha512');
 }
 
-/**
- * Encrypt a plaintext string
- * @param {string} plaintext - The text to encrypt
- * @returns {string} Encrypted string in format: salt:iv:tag:encryptedData (all base64)
- */
+/** Encrypts a plaintext value into the `salt:iv:tag:data` base64 format. */
 export function encrypt(plaintext) {
   if (!plaintext) {
     return plaintext;
@@ -59,11 +49,7 @@ export function encrypt(plaintext) {
   return `${salt.toString('base64')}:${iv.toString('base64')}:${tag.toString('base64')}:${encrypted}`;
 }
 
-/**
- * Decrypt an encrypted string
- * @param {string} encryptedData - The encrypted string in format: salt:iv:tag:encryptedData
- * @returns {string} Decrypted plaintext
- */
+/** Decrypts values produced by `encrypt`, tolerating legacy plaintext inputs. */
 export function decrypt(encryptedData) {
   if (!encryptedData) {
     return encryptedData;
@@ -114,4 +100,3 @@ export function decrypt(encryptedData) {
     return encryptedData;
   }
 }
-

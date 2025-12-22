@@ -1,10 +1,9 @@
+/**
+ * Thin client around the EduAI API that powers chat, question generation, and catalog lookups.
+ * Exposes a singleton so routes/services share configuration and connection state.
+ */
 import axios from "axios";
 import { config } from "../config/settings.js";
-
-/**
- * EduAI Service - Integration with external EduAI RAG API
- * Provides course-aware AI assistance for question generation
- */
 
 class EduAIService {
   constructor() {
@@ -25,23 +24,12 @@ class EduAIService {
     }
   }
 
-  /**
-   * Check if EduAI service is properly configured
-   */
+  /** Returns true when the base URL/API key are available and the service can make requests. */
   isConfigured() {
     return !!this.apiKey;
   }
 
-  /**
-   * Send a chat request to EduAI API with course context
-   * @param {Object} params - Chat parameters
-   * @param {Array} params.messages - Chat message history
-   * @param {string} params.model - AI model identifier (e.g., 'google:gemini-2.5-flash', 'ollama:gpt-oss:120b')
-   * @param {Object} params.apiKeys - Provider-specific API keys
-   * @param {string} params.courseCode - Target course identifier
-   * @param {boolean} params.streaming - Enable response streaming
-   * @returns {Promise<Object>} Chat response
-   */
+  /** Sends a chat payload to EduAI, handling logging, timeouts, and API error translation. */
   async chat(params) {
     if (!this.isConfigured()) {
       throw new Error(
@@ -110,18 +98,7 @@ class EduAIService {
     }
   }
 
-  /**
-   * Generate questions using EduAI with course context
-   * @param {Object} params - Question generation parameters
-   * @param {string} params.prompt - Question generation prompt
-   * @param {string} params.courseCode - Course code for context
-   * @param {string} params.model - AI model to use
-   * @param {Object} params.apiKeys - Provider API keys
-   * @param {number} params.numQuestions - Number of questions to generate
-   * @param {Object} params.difficultyDistribution - Difficulty distribution
-   * @param {Object} params.reasoningDistribution - Reasoning level distribution
-   * @returns {Promise<Array>} Generated questions
-   */
+  /** Generates normalized questions via EduAI, enforcing prompt requirements and parsing JSON responses. */
   async generateQuestions(params) {
     const {
       prompt,
@@ -280,10 +257,7 @@ Please ensure the questions are appropriate for the course level and cover the k
     }
   }
 
-  /**
-   * Retrieve all courses from EduAI
-   * @returns {Promise<Array>} List of courses with their metadata
-   */
+  /** Lists EduAI-managed courses for onboarding flows. */
   async listCourses() {
     if (!this.isConfigured()) {
       throw new Error(
@@ -327,11 +301,7 @@ Please ensure the questions are appropriate for the course level and cover the k
     }
   }
 
-  /**
-   * Retrieve topics for a given course from EduAI
-   * @param {string} courseId - EduAI course identifier (e.g. COSC211)
-   * @returns {Promise<Object>} Raw response containing course topics
-   */
+  /** Fetches topic metadata for an EduAI course identifier. */
   async getCourseTopics(courseId) {
     if (!this.isConfigured()) {
       throw new Error(
@@ -379,10 +349,7 @@ Please ensure the questions are appropriate for the course level and cover the k
     }
   }
 
-  /**
-   * Retrieve available AI models from EduAI
-   * @returns {Promise<Array>} List of AI models
-   */
+  /** Retrieves the list of AI models supported by EduAI for display in pickers. */
   async listAIModels() {
     if (!this.isConfigured()) {
       throw new Error(
@@ -426,10 +393,7 @@ Please ensure the questions are appropriate for the course level and cover the k
     }
   }
 
-  /**
-   * Test API key validity by making a simple chat request
-   * @returns {Promise<Object>} API key test result
-   */
+  /** Issues a lightweight chat call to validate whether the configured EduAI API key works. */
   async testApiKey() {
     if (!this.isConfigured()) {
       return {

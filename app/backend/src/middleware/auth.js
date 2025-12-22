@@ -1,7 +1,15 @@
+/**
+ * Express middleware utilities for authenticating requests via JWT and issuing tokens.
+ * Ensures downstream routes have `req.user` populated and provides a helper for generating signed tokens.
+ */
 import jwt from 'jsonwebtoken';
 import { User } from '../schema/User.js';
 import { config } from '../config/settings.js';
 
+/**
+ * Validates the Bearer token, loads the corresponding user, and attaches it to the request.
+ * Rejects missing/expired/invalid tokens with appropriate 401 responses before hitting protected routes.
+ */
 export const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
@@ -48,6 +56,7 @@ export const authenticateToken = async (req, res, next) => {
   }
 };
 
+/** Generates a signed JWT for the given user ID using the configured secret and expiry. */
 export const generateToken = (userId) => {
   return jwt.sign(
     { userId },
@@ -55,4 +64,3 @@ export const generateToken = (userId) => {
     { expiresIn: config.jwtExpiresIn }
   );
 };
-
