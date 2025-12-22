@@ -286,14 +286,6 @@ export const ProfileCoursesDialog = ({
                             </DialogDescription>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => startTour('main')}
-                            >
-                                Tour this dialog
-                            </Button>
                             <EduAIStatusBadge
                                 status={eduaiStatus.status}
                                 message={eduaiStatus.message}
