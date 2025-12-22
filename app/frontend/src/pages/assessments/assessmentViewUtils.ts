@@ -1,3 +1,7 @@
+/**
+ * Utility helpers for the assessment builder: topic normalization, filter construction, and draft helpers.
+ * Keeps shared logic for section creation and question matching in one place.
+ */
 import {
   Assessment,
   AssessmentSection,

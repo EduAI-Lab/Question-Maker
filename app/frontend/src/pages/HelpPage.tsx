@@ -1,3 +1,7 @@
+/**
+ * Help page rendering the in-app user guide for instructors.
+ * Provides navigation anchors so users can browse workflows without leaving the app.
+ */
 export const HelpPage = () => {
     return (
         <div className="min-h-screen bg-background text-foreground">

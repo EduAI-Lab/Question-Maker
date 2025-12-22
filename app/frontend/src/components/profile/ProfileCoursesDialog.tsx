@@ -1,3 +1,7 @@
+/**
+ * Dialog for linking EduAI courses into the local library, fetching topics, and handling logout.
+ * Lets users select courses from EduAI, skip ones already added, and persist them via courseService.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {

@@ -1,3 +1,7 @@
+/**
+ * Modal for creating or editing an assessment blueprint with topic/difficulty settings.
+ * Loads course topics and returns collected params to parent callbacks.
+ */
 import * as React from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';

@@ -1,3 +1,7 @@
+/**
+ * ThemeProvider component that syncs app theme to localStorage and system preferences.
+ * Exposes `useTheme` so components can toggle between light/dark/system.
+ */
 import { createContext, useContext, useEffect, useState } from "react"
 
 type Theme = "dark" | "light" | "system"

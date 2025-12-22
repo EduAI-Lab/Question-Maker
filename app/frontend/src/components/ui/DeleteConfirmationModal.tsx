@@ -1,3 +1,6 @@
+/**
+ * Reusable confirmation dialog for delete flows with optional destructive styling.
+ */
 import * as React from 'react';
 import {
   Dialog,
@@ -78,4 +81,3 @@ export const DeleteConfirmationModal = ({
     </Dialog>
   );
 };
-

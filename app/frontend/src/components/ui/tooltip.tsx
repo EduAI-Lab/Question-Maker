@@ -1,3 +1,6 @@
+/**
+ * Lightweight tooltip component for displaying content on hover/focus.
+ */
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
@@ -57,4 +60,3 @@ export const Tooltip = ({ children, content, side = 'top', className, multiline 
     </div>
   );
 };
-

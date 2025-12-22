@@ -1,3 +1,7 @@
+/**
+ * Sidebar section listing assessments with counts, exports, and generation controls.
+ * Supports creating new assessments, exporting to Canvas/TXT, and importing from Canvas.
+ */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';

@@ -1,3 +1,6 @@
+/**
+ * Hosts the toast provider/viewport and renders active toasts from the store.
+ */
 import {
   Toast,
   ToastClose,

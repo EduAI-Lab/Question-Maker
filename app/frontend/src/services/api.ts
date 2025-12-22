@@ -1,3 +1,7 @@
+/**
+ * Axios client configured with base URL, auth token injection, and 401 handling redirect.
+ * Shared by all service modules to standardize headers and error behavior.
+ */
 import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || '/api';
@@ -34,4 +38,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-

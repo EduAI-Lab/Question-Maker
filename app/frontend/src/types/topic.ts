@@ -1,3 +1,6 @@
+/**
+ * Topic type used to tag questions and assessments within a course.
+ */
 export interface Topic {
   id: number;
   name: string;

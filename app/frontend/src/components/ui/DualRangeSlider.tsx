@@ -1,3 +1,7 @@
+/**
+ * Dual-handle range slider component used for adjusting percentage boundaries.
+ * Includes historical notes on reasoning/difficulty calculations retained for reference.
+ */
 import React, { useState, useRef, useEffect } from 'react';
 
 /**

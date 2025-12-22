@@ -1,3 +1,6 @@
+/**
+ * Auth-related types used by frontend services and context.
+ */
 export interface User {
   id: number;
   email: string;
@@ -22,4 +25,3 @@ export interface RegisterCredentials {
   email: string;
   password: string;
 }
-
