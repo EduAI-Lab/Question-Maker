@@ -27,6 +27,8 @@ import { useToast } from '../ui/use-toast';
 import eduaiService, { EduAIModelOption, EduAICourseOption } from '../../services/eduaiService';
 import { Course } from '../../types/question';
 import { apiKeyStorage } from '../../services/apiKeyStorage';
+import { useEduAIStatus } from '../../hooks/useEduAIStatus';
+import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 
 interface AddQuestionDialogProps {
     open: boolean;
@@ -101,6 +103,7 @@ export const AddQuestionDialog = ({
     const [isAiGenerated, setIsAiGenerated] = useState(false);
     const [markAsReviewed, setMarkAsReviewed] = useState(false); // false = draft (default), true = reviewed
     const { toast } = useToast();
+    const eduaiStatus = useEduAIStatus();
     const selectedGenerationModel = useMemo(
         () => availableModels.find((model) => model.id === form.generationModel),
         [availableModels, form.generationModel]
@@ -951,15 +954,23 @@ export const AddQuestionDialog = ({
 
                                 {/* Option 2: Generate with EduAI */}
                                 <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3">
-                                    <div className="flex items-start gap-2">
-                                        <div className="flex-1">
-                                            <h5 className="text-sm font-semibold">Generate with EduAI</h5>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                {mode === 'variant'
-                                                    ? 'Let EduAI create a variant based on a prompt'
-                                                    : 'Let EduAI generate a question from a prompt'}
-                                            </p>
+                                    <div className="space-y-2">
+                                        <div className="flex items-start gap-2">
+                                            <div className="flex-1">
+                                                <h5 className="text-sm font-semibold">Generate with EduAI</h5>
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    {mode === 'variant'
+                                                        ? 'Let EduAI create a variant based on a prompt'
+                                                        : 'Let EduAI generate a question from a prompt'}
+                                                </p>
+                                            </div>
                                         </div>
+                                        <EduAIStatusBadge
+                                            status={eduaiStatus.status}
+                                            message={eduaiStatus.message}
+                                            onRefresh={eduaiStatus.refresh}
+                                            className="z-50"
+                                        />
                                     </div>
 
                                     {courseWarningMessage && (

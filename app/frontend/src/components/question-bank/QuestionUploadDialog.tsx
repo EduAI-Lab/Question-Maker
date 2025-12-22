@@ -23,6 +23,8 @@ import { Progress } from '../ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Tooltip } from '../ui/tooltip';
 import { useToast } from '../ui/use-toast';
+import { useEduAIStatus } from '../../hooks/useEduAIStatus';
+import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 
 import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '../../types/question';
 import { Topic } from '../../types/topic';
@@ -108,6 +110,7 @@ export const QuestionUploadDialog = ({
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
     const [providerApiKey, setProviderApiKey] = useState('');
+    const eduaiStatus = useEduAIStatus();
     const selectedModel = useMemo(
         () => availableModels.find((model) => model.id === aiModel),
         [aiModel, availableModels]
@@ -651,7 +654,15 @@ export const QuestionUploadDialog = ({
 
                     <Card>
                         <CardHeader className="space-y-1">
-                            <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
+                                <EduAIStatusBadge
+                                    status={eduaiStatus.status}
+                                    message={eduaiStatus.message}
+                                    onRefresh={eduaiStatus.refresh}
+                                    className="z-50"
+                                />
+                            </div>
                             <p className="text-xs text-muted-foreground">
                                 Questions will be saved to <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
                                 {' '}Topics are assigned automatically after extraction—you can adjust them in the review step.
