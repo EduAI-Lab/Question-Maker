@@ -214,6 +214,7 @@ export const AssessmentSection = ({
                         onClick={handleOpenCreateModal}
                         className="flex items-center space-x-2"
                         disabled={!selectedCourseId || isSavingBlueprint}
+                        data-tour-id="add-assessment-btn"
                     >
                         <Plus className="h-4 w-4" />
                         <span>{isSavingBlueprint ? 'Saving...' : 'Add Assessment'}</span>
@@ -226,7 +227,7 @@ export const AssessmentSection = ({
                     Loading assessments...
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-4" data-tour-id="assessment-list">
                     {assessments.map((assessment) => {
                         const assessmentQuestions = buildQuestionEntries(assessment);
                         const totalQuestionCount = countTotalQuestions(assessment);
@@ -291,6 +292,7 @@ export const AssessmentSection = ({
                                                                 variant="outline"
                                                                 size="sm"
                                                                 disabled
+                                                                data-tour-id="export-canvas-btn"
                                                                 className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
                                                             >
                                                                 <Upload className="h-4 w-4" />
@@ -303,6 +305,7 @@ export const AssessmentSection = ({
                                                         variant="outline"
                                                         size="sm"
                                                         onClick={() => onExportToCanvas(assessment.id, assessment.name)}
+                                                        data-tour-id="export-canvas-btn"
                                                         className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
                                                     >
                                                         <Upload className="h-4 w-4" />
@@ -327,6 +330,7 @@ export const AssessmentSection = ({
                                                                 variant="outline"
                                                                 size="sm"
                                                                 disabled
+                                                                data-tour-id="export-txt-btn"
                                                                 className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
                                                             >
                                                                 <FileText className="h-4 w-4" />
@@ -339,6 +343,7 @@ export const AssessmentSection = ({
                                                         variant="outline"
                                                         size="sm"
                                                         onClick={() => onExportToTxt(assessment.id, assessment.name)}
+                                                        data-tour-id="export-txt-btn"
                                                         className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
                                                     >
                                                         <FileText className="h-4 w-4" />

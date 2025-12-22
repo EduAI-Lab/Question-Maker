@@ -17,6 +17,7 @@ import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
 import { useToast } from '../components/ui/use-toast';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
+import { useGuidedTour } from '../contexts/GuidedTourContext';
 
 export const LandingPage = () => {
   const LAST_SELECTED_COURSE_KEY = 'landing:last-selected-course';
@@ -53,6 +54,7 @@ export const LandingPage = () => {
   const [variantToDelete, setVariantToDelete] = useState<QuestionVariantEntry | null>(null);
   const [isDeletingVariant, setIsDeletingVariant] = useState(false);
   const { toast } = useToast();
+  const { startTour } = useGuidedTour();
 
   const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
     if (!courseId) {
@@ -200,7 +202,7 @@ export const LandingPage = () => {
   const emptyStateMessage = selectedCourse
     ? questionsError || 'No questions found for this course yet. Try adding or uploading questions.'
     : courses.length === 0
-      ? 'No courses available. Click the profile icon (👤) in the top-right corner to add your first course.'
+      ? 'No courses available. Start the guided tour to add courses from EduAI.'
       : 'Select a course to view its questions.';
 
   const filteredAssessments = useMemo(() => {
@@ -324,6 +326,7 @@ export const LandingPage = () => {
   const handleAddQuestion = () => {
     setPresetVariant(null);
     setIsAddQuestionOpen(true);
+    setAutoStartAddQuestionTour(false);
   };
 
   const handleQuestionCreated = (question: Question) => {
@@ -350,6 +353,7 @@ export const LandingPage = () => {
       void loadTopicsForCourse(selectedCourse.id);
     }
     setIsUploadOpen(true);
+    setAutoStartUploadTour(false);
   };
 
   const handleDeleteAssessment = (assessmentId: number, assessmentName: string) => {
@@ -580,7 +584,7 @@ export const LandingPage = () => {
             emptyMessage={emptyStateMessage}
             disableAdd={!selectedCourse}
             disableUpload={!selectedCourse}
-            onOpenProfile={() => setIsProfileDialogOpen(true)}
+            onOpenProfile={() => startTour('main')}
           />
         ) : (
         <AssessmentSection

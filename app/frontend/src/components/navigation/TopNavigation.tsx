@@ -5,6 +5,7 @@ import { Course } from '../../types/question';
 import { User, HelpCircle } from 'lucide-react';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
+import { useGuidedTour } from '../../contexts/GuidedTourContext';
 
 interface TopNavigationProps {
     selectedCourse: Course | null;
@@ -26,6 +27,7 @@ export const TopNavigation = ({
     onProfileClick
 }: TopNavigationProps) => {
     const eduaiStatus = useEduAIStatus();
+    const { startTour } = useGuidedTour();
 
     return (
         <div className="bg-white border-b border-gray-200 px-6 py-4">
@@ -49,7 +51,7 @@ export const TopNavigation = ({
               }}
               disabled={isLoadingCourses || courses.length === 0}
             >
-              <SelectTrigger className="w-80 min-w-80">
+              <SelectTrigger className="w-80 min-w-80" data-tour-id="course-select">
                 <SelectValue
                   placeholder={isLoadingCourses ? 'Loading courses...' : 'Select Course'}
                   className="text-base font-bold"
@@ -73,27 +75,37 @@ export const TopNavigation = ({
 
                     {/* Tabs */}
                     <Tabs value={activeTab} onValueChange={(value) => onTabChange(value as 'questions' | 'assessments')}>
-                        <TabsList className="grid w-full grid-cols-2">
+                        <TabsList className="grid w-full grid-cols-2" data-tour-id="top-nav-tabs">
                             <TabsTrigger value="questions">Questions</TabsTrigger>
-                            <TabsTrigger value="assessments">Assessments</TabsTrigger>
+                            <TabsTrigger value="assessments" data-tour-id="assessment-tab">Assessments</TabsTrigger>
                         </TabsList>
                     </Tabs>
                 </div>
 
                 {/* Right: User Profile */}
                 <div className="flex items-center space-x-2">
-                    <EduAIStatusBadge
-                        status={eduaiStatus.status}
-                        message={eduaiStatus.message}
-                        onRefresh={eduaiStatus.refresh}
-                        className="z-50"
-                    />
+                    <div data-tour-id="eduai-status">
+                        <EduAIStatusBadge
+                            status={eduaiStatus.status}
+                            message={eduaiStatus.message}
+                            onRefresh={eduaiStatus.refresh}
+                            className="z-50"
+                        />
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => startTour('main')}
+                    >
+                        Guided tour
+                    </Button>
                     <Button
                         variant="ghost"
                         size="icon"
                         className="rounded-full"
                         onClick={() => window.open('/help', '_blank', 'noopener')}
                         aria-label="Open help"
+                        data-tour-id="help-button"
                     >
                         <HelpCircle className="h-5 w-5" />
                     </Button>
@@ -103,6 +115,7 @@ export const TopNavigation = ({
                             size="icon"
                             className="rounded-full"
                             onClick={onProfileClick}
+                            data-tour-id="profile-courses-button"
                             aria-label="Open profile"
                         >
                             <User className="h-6 w-6" />

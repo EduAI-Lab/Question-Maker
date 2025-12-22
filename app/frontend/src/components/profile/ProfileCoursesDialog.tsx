@@ -18,6 +18,7 @@ import { useToast } from '../ui/use-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
+import { useGuidedTour } from '../../contexts/GuidedTourContext';
 
 interface ProfileCoursesDialogProps {
     open: boolean;
@@ -45,6 +46,7 @@ export const ProfileCoursesDialog = ({
     const { logout } = useAuth();
     const navigate = useNavigate();
     const eduaiStatus = useEduAIStatus();
+    const { startTour } = useGuidedTour();
 
     const existingCourseCodeSet = useMemo(() => {
         const codes = new Set<string>();
@@ -283,12 +285,22 @@ export const ProfileCoursesDialog = ({
                                 Link courses from EduAI or create a test course to get started without connecting to EduAI.
                             </DialogDescription>
                         </div>
-                        <EduAIStatusBadge
-                            status={eduaiStatus.status}
-                            message={eduaiStatus.message}
-                            onRefresh={eduaiStatus.refresh}
-                            className="z-50"
-                        />
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startTour('main')}
+                            >
+                                Tour this dialog
+                            </Button>
+                            <EduAIStatusBadge
+                                status={eduaiStatus.status}
+                                message={eduaiStatus.message}
+                                onRefresh={eduaiStatus.refresh}
+                                className="z-50"
+                            />
+                        </div>
                     </div>
                 </DialogHeader>
 
@@ -347,7 +359,7 @@ export const ProfileCoursesDialog = ({
                             Loading courses from EduAI...
                         </div>
                     ) : (
-                        <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+                        <div className="max-h-80 space-y-3 overflow-y-auto pr-1" data-tour-id="profile-course-list">
                             {courseOptions.map((option) => {
                                 const normalized = normalizeCourseCode(option.code);
                                 const isAdded = normalized ? existingCourseCodeSet.has(normalized) : false;
@@ -382,7 +394,7 @@ export const ProfileCoursesDialog = ({
                                                         {option.term} {option.year}
                                                     </Badge>
                                                 )}
-                                                {isAdded && <Badge variant="outline">Already added</Badge>}
+                                                {isAdded && <Badge variant="outline" data-tour-id="profile-added-badge">Already added</Badge>}
                                                 {isSelected && !isAdded && !isSaving && (
                                                     <Badge variant="secondary">Selected</Badge>
                                                 )}
@@ -428,7 +440,7 @@ export const ProfileCoursesDialog = ({
                         <Button variant="ghost" onClick={onClose} disabled={isSaving}>
                             Cancel
                         </Button>
-                        <Button onClick={handleSave} disabled={isSaving || isLoading}>
+                        <Button onClick={handleSave} disabled={isSaving || isLoading} data-tour-id="profile-add-button">
                             {isSaving ? 'Linking…' : 'Add selected courses'}
                         </Button>
                     </div>

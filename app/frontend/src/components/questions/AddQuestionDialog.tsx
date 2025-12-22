@@ -724,7 +724,7 @@ export const AddQuestionDialog = ({
 
                                 {/* New Question Mode: Show question metadata fields */}
                                 {mode === 'new' && (
-                                    <div className="space-y-4">
+                                    <div className="space-y-4" data-tour-id="aq-metadata">
                                         <h4 className="text-sm font-semibold">Question Metadata</h4>
 
                                         <div className="space-y-2">
@@ -767,7 +767,7 @@ export const AddQuestionDialog = ({
                                 )}
 
                                 {/* Variant Details (shown for both modes) */}
-                                <div className="space-y-4">
+                                <div className="space-y-4" data-tour-id="aq-variant">
                                     <h4 className="text-sm font-semibold">Variant Details</h4>
 
                                     {/* Question Type - only for new mode */}
@@ -953,7 +953,7 @@ export const AddQuestionDialog = ({
                                 )}
 
                                 {/* Option 2: Generate with EduAI */}
-                                <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3">
+                                <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3" data-tour-id="aq-eduai-panel">
                                     <div className="space-y-2">
                                         <div className="flex items-start gap-2">
                                             <div className="flex-1">
@@ -1004,7 +1004,7 @@ export const AddQuestionDialog = ({
                                             />
                                         </div>
 
-                                        <div className="space-y-1.5">
+                                        <div className="space-y-1.5" data-tour-id="aq-model-picker">
                                             <Label htmlFor="ai-model" className="text-xs font-medium">Model</Label>
                                             <Select
                                                 value={form.generationModel}
@@ -1146,7 +1146,7 @@ export const AddQuestionDialog = ({
                 </div>
 
                 <DialogFooter className="pt-4 flex-col sm:flex-row gap-3">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2" data-tour-id="aq-draft-toggle">
                         <input
                             type="checkbox"
                             id="mark-as-reviewed"
@@ -1173,6 +1173,7 @@ export const AddQuestionDialog = ({
                                 isSubmitting ||
                                 (mode === 'variant' && !form.baseSelection)
                             }
+                            data-tour-id="aq-save"
                         >
                             {isSubmitting
                                 ? 'Saving...'

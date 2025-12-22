@@ -184,6 +184,8 @@ export const QuestionUploadDialog = ({
         }
     }, [open, topics]);
 
+    // No auto-start; keep a single tour entry point.
+
     useEffect(() => {
         if (!open) return;
 
@@ -595,17 +597,19 @@ export const QuestionUploadDialog = ({
         <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
             <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Upload Questions</DialogTitle>
-                    <DialogDescription>
-                        Upload a PDF or image containing questions for{' '}
-                        <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
-                        {' '}
-                        We&apos;ll extract them with OCR and AI so you can review before saving.
-                    </DialogDescription>
+                    <div>
+                        <DialogTitle>Upload Questions</DialogTitle>
+                        <DialogDescription>
+                            Upload a PDF or image containing questions for{' '}
+                            <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
+                            {' '}
+                            We&apos;ll extract them with OCR and AI so you can review before saving.
+                        </DialogDescription>
+                    </div>
                 </DialogHeader>
 
                 <div className="space-y-6 py-2">
-                    <Card>
+                    <Card data-tour-id="upload-assessment-meta">
                         <CardHeader className="space-y-1">
                             <CardTitle className="text-base font-semibold">Assessment details</CardTitle>
                             <p className="text-xs text-muted-foreground">
@@ -669,7 +673,7 @@ export const QuestionUploadDialog = ({
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="space-y-2">
+                            <div className="space-y-2" data-tour-id="upload-model">
                                 <Label htmlFor="ai-model">AI model</Label>
                                 <Select value={aiModel} onValueChange={setAiModel}>
                                     <SelectTrigger id="ai-model">
@@ -763,6 +767,7 @@ export const QuestionUploadDialog = ({
                             {(!lastFileName && draftQuestions.length === 0) && (
                                 <label
                                     htmlFor="question-upload"
+                                    data-tour-id="upload-file"
                                     className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center transition hover:border-primary hover:bg-muted/50 cursor-pointer"
                                 >
                                     <UploadCloud className="h-10 w-10 text-muted-foreground" />
@@ -812,7 +817,7 @@ export const QuestionUploadDialog = ({
                     </Card>
 
                     {draftQuestions.length > 0 && (
-                        <Card>
+                        <Card data-tour-id="upload-review">
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle className="text-base font-semibold">
                                     Review extracted questions ({draftQuestions.length})
@@ -987,14 +992,14 @@ export const QuestionUploadDialog = ({
                         {disabledReason ? (
                             <Tooltip content={disabledReason} multiline>
                                 <span className="inline-block">
-                                    <Button onClick={() => void handleSave()} disabled={!canSave}>
+                                    <Button onClick={() => void handleSave()} disabled={!canSave} data-tour-id="upload-create">
                                         {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Create Questions
                                     </Button>
                                 </span>
                             </Tooltip>
                         ) : (
-                            <Button onClick={() => void handleSave()} disabled={!canSave}>
+                            <Button onClick={() => void handleSave()} disabled={!canSave} data-tour-id="upload-create">
                                 {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Create Questions
                             </Button>

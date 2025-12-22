@@ -34,6 +34,7 @@ export const QuestionBankHeader = ({
             onClick={onUploadQuestions}
             className="flex items-center space-x-2"
             disabled={disableUpload}
+            data-tour-id="upload-questions-btn"
           >
             <Upload className="h-4 w-4" />
             <span>Upload Questions</span>
@@ -42,6 +43,7 @@ export const QuestionBankHeader = ({
             onClick={onAddQuestion}
             className="flex items-center space-x-2"
             disabled={disableAdd}
+            data-tour-id="add-question-btn"
           >
             <Plus className="h-4 w-4" />
             <span>Add Question</span>
