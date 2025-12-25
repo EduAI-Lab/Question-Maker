@@ -51,8 +51,15 @@ export const refreshEduAIStatus = async () => {
     return inflight;
 };
 
-// Kick off an initial check once at module load.
-refreshEduAIStatus();
+// Kick off an initial check once at module load, but only if user is authenticated
+// This prevents 401 errors and infinite redirect loops on the login page
+const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+if (token) {
+  refreshEduAIStatus();
+} else {
+  // Set initial state to error if not authenticated
+  setState({ status: 'error', message: 'EduAI status unavailable - please log in' });
+}
 
 export const useEduAIStatus = () => {
     const subscribe = (callback: () => void) => {
