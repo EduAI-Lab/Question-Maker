@@ -14,6 +14,8 @@ import api from '../services/api';
 import eduaiService from '../services/eduaiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../components/ui/use-toast';
+import { EduAIStatusBadge } from '../components/eduai/EduAIStatusBadge';
+import { useEduAIStatus } from '../hooks/useEduAIStatus';
 
 interface ResultState {
   status: 'idle' | 'success' | 'error';
@@ -26,6 +28,7 @@ const defaultResult: ResultState = { status: 'idle' };
 export const ApiTestPage = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
+  const eduaiStatus = useEduAIStatus();
 
   const [courseForm, setCourseForm] = useState({
     name: '',
@@ -156,11 +159,18 @@ export const ApiTestPage = () => {
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-6">
-        <header>
-          <h1 className="text-3xl font-bold">API Test Bench</h1>
-          <p className="text-muted-foreground">
-            Use the forms below to call the new backend routes directly.
-          </p>
+        <header className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">API Test Bench</h1>
+            <p className="text-muted-foreground">
+              Use the forms below to call the new backend routes directly.
+            </p>
+          </div>
+          <EduAIStatusBadge
+            status={eduaiStatus.status}
+            message={eduaiStatus.message}
+            onRefresh={eduaiStatus.refresh}
+          />
         </header>
 
         <section className="grid gap-6 md:grid-cols-2">

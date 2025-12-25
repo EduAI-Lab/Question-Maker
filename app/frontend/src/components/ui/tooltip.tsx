@@ -31,7 +31,7 @@ export const Tooltip = ({ children, content, side = 'top', className, multiline 
 
   return (
     <div
-      className="relative inline-block"
+      className={cn("relative inline-block", className)}
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
     >

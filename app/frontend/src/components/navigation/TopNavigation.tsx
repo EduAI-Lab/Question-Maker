@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Course } from '../../types/question';
 import { User, HelpCircle } from 'lucide-react';
+import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
+import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 
 interface TopNavigationProps {
     selectedCourse: Course | null;
@@ -27,6 +29,8 @@ export const TopNavigation = ({
     isLoadingCourses = false,
     onProfileClick
 }: TopNavigationProps) => {
+    const eduaiStatus = useEduAIStatus();
+
     return (
         <div className="bg-white border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
@@ -82,6 +86,12 @@ export const TopNavigation = ({
 
                 {/* Right: User Profile */}
                 <div className="flex items-center space-x-2">
+                    <EduAIStatusBadge
+                        status={eduaiStatus.status}
+                        message={eduaiStatus.message}
+                        onRefresh={eduaiStatus.refresh}
+                        className="z-50"
+                    />
                     <Button
                         variant="ghost"
                         size="icon"
