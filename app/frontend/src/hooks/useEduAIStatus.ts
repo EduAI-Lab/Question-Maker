@@ -28,17 +28,17 @@ const fetchStatus = async () => {
         const result = (await Promise.race([
             eduaiService.testApiKey(),
             new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('EduAI status check timed out')), 5000)
+                setTimeout(() => reject(new Error('EduAI status check timed out')), 10000)
             ),
         ])) as any;
 
         if (result?.success) {
             setState({ status: 'ok', message: 'EduAI is online' });
         } else {
-            setState({ status: 'error', message: 'EduAI is unavailable' });
+            setState({ status: 'error', message: 'EduAI is unavailable. AI features will be disabled.' });
         }
     } catch {
-        setState({ status: 'error', message: 'EduAI is unavailable' });
+        setState({ status: 'error', message: 'EduAI is unavailable. AI features will be disabled.' });
     }
 };
 
