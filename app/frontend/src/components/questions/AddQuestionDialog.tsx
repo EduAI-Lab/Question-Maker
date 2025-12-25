@@ -565,12 +565,18 @@ export const AddQuestionDialog = ({
                     )
                     : [];
 
+                const resolvedAnswer =
+                    typeof generated.answer === 'string' && generated.answer.trim().length > 0
+                        ? generated.answer.trim()
+                        : '';
+
                 if (mode === 'variant') {
                     return {
                         ...prev,
                         variantText: generated.content ?? prev.variantText,
                         variantDifficulty: inferredDifficulty,
                         variantReasoningLevel: inferredReasoningLevel,
+                        variantAnswer: resolvedAnswer || prev.variantAnswer,
                         generationPrompt: prev.generationPrompt,
                         variantSecondaryTopics:
                             resolvedSecondaryTopics.length > 0 ? resolvedSecondaryTopics : prev.variantSecondaryTopics
@@ -594,7 +600,7 @@ export const AddQuestionDialog = ({
                     questionDescription: resolvedDescription,
                     generationPrompt: prev.generationPrompt,
                     variantReferenceId: '',
-                    variantAnswer: '',
+                    variantAnswer: resolvedAnswer,
                     primaryTopicId: resolvedPrimaryTopicId,
                     variantSecondaryTopics:
                         resolvedSecondaryTopics.length > 0 ? resolvedSecondaryTopics : prev.variantSecondaryTopics
