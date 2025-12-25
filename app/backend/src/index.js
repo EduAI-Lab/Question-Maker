@@ -1,3 +1,7 @@
+/**
+ * Application entrypoint: configures Express middleware, routes, logging, and graceful shutdowns.
+ * Starts the HTTP server immediately and initializes the database connection in the background.
+ */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -131,6 +135,7 @@ app.use(errorHandler);
 let server = null;
 
 // Graceful shutdown handler
+/** Handles SIGTERM/SIGINT by closing the HTTP server and database before exiting. */
 const gracefulShutdown = async (signal) => {
   logger.info({ signal }, 'Starting graceful shutdown...');
   
@@ -180,6 +185,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start server
+/** Boots the Express app, wires server error handlers, and kicks off DB connection attempts. */
 const startServer = async () => {
   try {
     // Start HTTP server first - don't block on database connection

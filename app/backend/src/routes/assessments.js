@@ -1,3 +1,7 @@
+/**
+ * Router that handles assessment CRUD, section management, and variant linkage for authenticated users.
+ * Orchestrates calls to assessmentService and assessmentSectionService while enforcing ownership checks.
+ */
 import express from 'express';
 import { 
   createAssessment, 
@@ -24,9 +28,7 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// @route   POST /api/assessments
-// @desc    Create a new assessment
-// @access  Private
+/** POST /api/assessments – creates an assessment for the authenticated instructor, validating required fields. */
 router.post('/', authenticateToken, async (req, res, next) => {
   try {
     const { type, name, semester, description, courseId, blueprintConfig } = req.body;
@@ -57,9 +59,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/assessments
-// @desc    Get all assessments for the current user
-// @access  Private
+/** GET /api/assessments – lists assessments for the user with optional pagination/course filters. */
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
     const { limit, offset, courseId } = req.query;
@@ -79,9 +79,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/assessments/:id
-// @desc    Get a specific assessment
-// @access  Private
+/** GET /api/assessments/:id – fetches a single assessment if it belongs to the requester. */
 router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
     const assessment = await getAssessmentById(req.params.id, req.user.id);
@@ -95,9 +93,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   PUT /api/assessments/:id
-// @desc    Update an assessment
-// @access  Private
+/** PUT /api/assessments/:id – updates assessment metadata/blueprint after ownership verification. */
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { type, name, semester, description, courseId, blueprintConfig } = req.body;
@@ -121,9 +117,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   DELETE /api/assessments/:id
-// @desc    Delete an assessment
-// @access  Private
+/** DELETE /api/assessments/:id – deletes the specified assessment if owned by the user. */
 router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     await deleteAssessment(req.params.id, req.user.id);
@@ -137,9 +131,7 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   POST /api/assessments/:id/questions
-// @desc    Add a question to an assessment
-// @access  Private
+/** POST /api/assessments/:id/questions – links a question to an assessment with a specific order slot. */
 router.post('/:id/questions', authenticateToken, async (req, res, next) => {
   try {
     const { questionId, orderNumber } = req.body;
@@ -168,9 +160,7 @@ router.post('/:id/questions', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   DELETE /api/assessments/:id/questions/:questionId
-// @desc    Remove a question from an assessment
-// @access  Private
+/** DELETE /api/assessments/:id/questions/:questionId – unlinks a question from the assessment. */
 router.delete('/:id/questions/:questionId', authenticateToken, async (req, res, next) => {
   try {
     const question = await removeQuestionFromAssessment(
@@ -189,9 +179,7 @@ router.delete('/:id/questions/:questionId', authenticateToken, async (req, res, 
   }
 });
 
-// @route   GET /api/assessments/:id/questions
-// @desc    Get all questions in an assessment
-// @access  Private
+/** GET /api/assessments/:id/questions – returns all questions associated with the assessment. */
 router.get('/:id/questions', authenticateToken, async (req, res, next) => {
   try {
     const questions = await getQuestionsInAssessment(req.params.id, req.user.id);
@@ -206,6 +194,7 @@ router.get('/:id/questions', authenticateToken, async (req, res, next) => {
 });
 
 // Section routes
+/** GET /api/assessments/:id/sections – lists all sections tied to the assessment for the user. */
 router.get('/:id/sections', authenticateToken, async (req, res, next) => {
   try {
     const sections = await getSectionsForAssessment(req.params.id, req.user.id);
@@ -215,6 +204,7 @@ router.get('/:id/sections', authenticateToken, async (req, res, next) => {
   }
 });
 
+/** POST /api/assessments/:id/sections – creates a new section definition under the assessment. */
 router.post('/:id/sections', authenticateToken, async (req, res, next) => {
   try {
     const section = await createAssessmentSection(req.params.id, req.user.id, req.body);
@@ -228,6 +218,7 @@ router.post('/:id/sections', authenticateToken, async (req, res, next) => {
   }
 });
 
+/** PUT /api/assessments/:assessmentId/sections/:sectionId – updates section metadata or filters. */
 router.put('/:assessmentId/sections/:sectionId', authenticateToken, async (req, res, next) => {
   try {
     const section = await updateAssessmentSection(req.params.sectionId, req.user.id, req.body);
@@ -241,6 +232,7 @@ router.put('/:assessmentId/sections/:sectionId', authenticateToken, async (req, 
   }
 });
 
+/** DELETE /api/assessments/:assessmentId/sections/:sectionId – removes the section and its links. */
 router.delete('/:assessmentId/sections/:sectionId', authenticateToken, async (req, res, next) => {
   try {
     await deleteAssessmentSection(req.params.sectionId, req.user.id);
@@ -253,6 +245,7 @@ router.delete('/:assessmentId/sections/:sectionId', authenticateToken, async (re
   }
 });
 
+/** POST /api/assessments/:assessmentId/sections/:sectionId/variants – attaches a question variant to the section. */
 router.post('/:assessmentId/sections/:sectionId/variants', authenticateToken, async (req, res, next) => {
   try {
     const { variantId, displayOrder, metadata } = req.body;
@@ -281,6 +274,7 @@ router.post('/:assessmentId/sections/:sectionId/variants', authenticateToken, as
   }
 });
 
+/** PUT /api/assessments/:assessmentId/sections/:sectionId/variants/:variantId/order – updates the display order of a variant link. */
 router.put('/:assessmentId/sections/:sectionId/variants/:variantId/order', authenticateToken, async (req, res, next) => {
   try {
     const { displayOrder } = req.body;
@@ -309,6 +303,7 @@ router.put('/:assessmentId/sections/:sectionId/variants/:variantId/order', authe
   }
 });
 
+/** DELETE /api/assessments/:assessmentId/sections/:sectionId/variants/:variantId – removes a variant from the section. */
 router.delete('/:assessmentId/sections/:sectionId/variants/:variantId', authenticateToken, async (req, res, next) => {
   try {
     await removeVariantFromSection(
@@ -326,7 +321,7 @@ router.delete('/:assessmentId/sections/:sectionId/variants/:variantId', authenti
   }
 });
 
-// Check if question is in any assessment sections
+/** GET /api/assessments/questions/:questionId/check-in-assessments – determines whether a question appears in any sections. */
 router.get('/questions/:questionId/check-in-assessments', authenticateToken, async (req, res, next) => {
   try {
     const result = await checkQuestionInAssessments(
@@ -343,7 +338,7 @@ router.get('/questions/:questionId/check-in-assessments', authenticateToken, asy
   }
 });
 
-// Remove question from all sections across all assessments
+/** DELETE /api/assessments/questions/:questionId/remove-from-all-sections – bulk removes a question from every section it appears in. */
 router.delete('/questions/:questionId/remove-from-all-sections', authenticateToken, async (req, res, next) => {
   try {
     const result = await removeQuestionFromAllSections(

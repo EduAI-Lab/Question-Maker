@@ -1,3 +1,7 @@
+/**
+ * Standalone auth hook for components that don't use the AuthContext wrapper.
+ * Manages token-backed user state and exposes login/register/logout helpers.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { User } from '../types/auth';
 import { authService } from '../services/authService';
@@ -95,4 +99,3 @@ export const useAuth = () => {
     logout
   };
 };
-

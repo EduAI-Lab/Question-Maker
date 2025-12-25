@@ -1,3 +1,7 @@
+/**
+ * Panel that lists matching questions for a section search, supporting selection and variant actions.
+ * Sorts selected questions to the top and shows review toggles for each variant.
+ */
 import { useMemo } from 'react';
 import { Question } from '../../types/question';
 import { Topic } from '../../types/topic';

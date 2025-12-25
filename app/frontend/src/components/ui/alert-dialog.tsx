@@ -1,3 +1,6 @@
+/**
+ * Shadcn alert dialog primitives re-exported for consistent modal usage.
+ */
 import * as React from "react"
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
 import { cn } from "@/lib/utils"

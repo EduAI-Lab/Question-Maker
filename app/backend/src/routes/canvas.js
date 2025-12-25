@@ -1,3 +1,7 @@
+/**
+ * Canvas router exposing endpoints for connecting accounts, exporting assessments, and importing quizzes.
+ * Wraps canvasService calls with authentication and payload validation for Canvas integration workflows.
+ */
 import express from 'express';
 import {
   getCanvasIntegration,
@@ -13,11 +17,7 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-/**
- * @route   GET /api/canvas/integration
- * @desc    Get user's Canvas integration status
- * @access  Private
- */
+/** GET /api/canvas/integration – returns whether the user has Canvas configured (without exposing the API key). */
 router.get('/integration', authenticateToken, async (req, res, next) => {
   try {
     const integration = await getCanvasIntegration(req.user.id);
@@ -44,11 +44,7 @@ router.get('/integration', authenticateToken, async (req, res, next) => {
   }
 });
 
-/**
- * @route   POST /api/canvas/connect
- * @desc    Connect or update Canvas integration
- * @access  Private
- */
+/** POST /api/canvas/connect – stores Canvas credentials/test-mode flag after validating payload. */
 router.post('/connect', authenticateToken, async (req, res, next) => {
   try {
     const { canvasUrl, apiKey, isTestMode } = req.body;
@@ -99,11 +95,7 @@ router.post('/connect', authenticateToken, async (req, res, next) => {
   }
 });
 
-/**
- * @route   DELETE /api/canvas/disconnect
- * @desc    Disconnect Canvas integration
- * @access  Private
- */
+/** DELETE /api/canvas/disconnect – removes the saved Canvas integration for the user. */
 router.delete('/disconnect', authenticateToken, async (req, res, next) => {
   try {
     const integration = await getCanvasIntegration(req.user.id);
@@ -121,11 +113,7 @@ router.delete('/disconnect', authenticateToken, async (req, res, next) => {
   }
 });
 
-/**
- * @route   GET /api/canvas/courses
- * @desc    Get user's Canvas courses
- * @access  Private
- */
+/** GET /api/canvas/courses – lists Canvas courses available via the integration helper. */
 router.get('/courses', authenticateToken, async (req, res, next) => {
   try {
     const courses = await getCanvasCourses(req.user.id);
@@ -139,11 +127,7 @@ router.get('/courses', authenticateToken, async (req, res, next) => {
   }
 });
 
-/**
- * @route   POST /api/canvas/export/:assessmentId
- * @desc    Export assessment to Canvas
- * @access  Private
- */
+/** POST /api/canvas/export/:assessmentId – exports an assessment's questions to the specified Canvas course. */
 router.post('/export/:assessmentId', authenticateToken, async (req, res, next) => {
   try {
     const { assessmentId } = req.params;
@@ -172,11 +156,7 @@ router.post('/export/:assessmentId', authenticateToken, async (req, res, next) =
   }
 });
 
-/**
- * @route   GET /api/canvas/mapping/:courseId
- * @desc    Get Canvas course mapping for a local course
- * @access  Private
- */
+/** GET /api/canvas/mapping/:courseId – returns stored mapping between a local course and Canvas course. */
 router.get('/mapping/:courseId', authenticateToken, async (req, res, next) => {
   try {
     const { courseId } = req.params;
@@ -191,11 +171,7 @@ router.get('/mapping/:courseId', authenticateToken, async (req, res, next) => {
   }
 });
 
-/**
- * @route   GET /api/canvas/courses/:canvasCourseId/quizzes
- * @desc    Get quizzes from a Canvas course
- * @access  Private
- */
+/** GET /api/canvas/courses/:canvasCourseId/quizzes – fetches quizzes from a Canvas course via the API. */
 router.get('/courses/:canvasCourseId/quizzes', authenticateToken, async (req, res, next) => {
   try {
     const { canvasCourseId } = req.params;
@@ -210,11 +186,7 @@ router.get('/courses/:canvasCourseId/quizzes', authenticateToken, async (req, re
   }
 });
 
-/**
- * @route   GET /api/canvas/courses/:canvasCourseId/quizzes/:quizId/questions
- * @desc    Get questions from a Canvas quiz
- * @access  Private
- */
+/** GET /api/canvas/courses/:canvasCourseId/quizzes/:quizId/questions – lists Canvas quiz questions for review/import. */
 router.get('/courses/:canvasCourseId/quizzes/:quizId/questions', authenticateToken, async (req, res, next) => {
   try {
     const { canvasCourseId, quizId } = req.params;
@@ -229,11 +201,7 @@ router.get('/courses/:canvasCourseId/quizzes/:quizId/questions', authenticateTok
   }
 });
 
-/**
- * @route   POST /api/canvas/import/:canvasCourseId/quizzes/:quizId
- * @desc    Import a Canvas quiz as an assessment
- * @access  Private
- */
+/** POST /api/canvas/import/:canvasCourseId/quizzes/:quizId – imports a Canvas quiz into a local assessment and course. */
 router.post('/import/:canvasCourseId/quizzes/:quizId', authenticateToken, async (req, res, next) => {
   try {
     const { canvasCourseId, quizId } = req.params;
@@ -277,4 +245,3 @@ router.post('/import/:canvasCourseId/quizzes/:quizId', authenticateToken, async 
 });
 
 export default router;
-

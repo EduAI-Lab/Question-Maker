@@ -1,5 +1,10 @@
+/**
+ * Assessment section service for manipulating sections, section-variant links, and validation helpers.
+ * Ensures sections belong to the requesting user and keeps variant/assessment relationships consistent.
+ */
 import { Assessments, AssessmentSections, SectionVariants, Variants, Question_Metadata, Course } from '../schema/index.js';
 
+/** Loads an assessment scoped to a user or throws if it is missing. */
 const findAssessmentForUser = async (assessmentId, userId) => {
   const assessment = await Assessments.findOne({
     where: { id: assessmentId },
@@ -21,6 +26,7 @@ const findAssessmentForUser = async (assessmentId, userId) => {
   return assessment;
 };
 
+/** Fetches a section while verifying the parent assessment belongs to the user. */
 const findSectionForUser = async (sectionId, userId) => {
   const section = await AssessmentSections.findOne({
     where: { id: sectionId },
@@ -47,6 +53,7 @@ const findSectionForUser = async (sectionId, userId) => {
   return section;
 };
 
+/** Returns all sections (with nested variants) for an assessment the user owns. */
 export const getSectionsForAssessment = async (assessmentId, userId) => {
   await findAssessmentForUser(assessmentId, userId);
 
@@ -86,6 +93,7 @@ export const getSectionsForAssessment = async (assessmentId, userId) => {
   return sections;
 };
 
+/** Creates a new section for an assessment, defaulting to the next position slot. */
 export const createAssessmentSection = async (assessmentId, userId, payload) => {
   const assessment = await findAssessmentForUser(assessmentId, userId);
 
@@ -105,6 +113,7 @@ export const createAssessmentSection = async (assessmentId, userId, payload) => 
   return section;
 };
 
+/** Updates section metadata/filters/position after verifying ownership. */
 export const updateAssessmentSection = async (sectionId, userId, updates) => {
   const section = await findSectionForUser(sectionId, userId);
 
@@ -121,6 +130,7 @@ export const updateAssessmentSection = async (sectionId, userId, updates) => {
   return section;
 };
 
+/** Deletes a section and clears variant assessment links if they are no longer referenced. */
 export const deleteAssessmentSection = async (sectionId, userId) => {
   const section = await findSectionForUser(sectionId, userId);
   const assessmentId = section.assessment.id;
@@ -162,6 +172,7 @@ export const deleteAssessmentSection = async (sectionId, userId) => {
   return true;
 };
 
+/** Ensures a variant belongs to the requesting user before linking. */
 const verifyVariantOwnership = async (variantId, userId) => {
   const variant = await Variants.findOne({
     where: { id: variantId },
@@ -188,6 +199,7 @@ const verifyVariantOwnership = async (variantId, userId) => {
   return variant;
 };
 
+/** Adds a variant to a section, ensuring assessment linkage/order metadata stays in sync. */
 export const addVariantToSection = async (sectionId, userId, variantId, options = {}) => {
   const section = await findSectionForUser(sectionId, userId);
   const variant = await verifyVariantOwnership(variantId, userId);
@@ -210,6 +222,7 @@ export const addVariantToSection = async (sectionId, userId, variantId, options 
   return link;
 };
 
+/** Removes a variant from a section and clears assessment references if no other links remain. */
 export const removeVariantFromSection = async (sectionId, userId, variantId) => {
   const section = await findSectionForUser(sectionId, userId);
 
@@ -246,6 +259,7 @@ export const removeVariantFromSection = async (sectionId, userId, variantId) => 
   return true;
 };
 
+/** Updates the display order for a variant inside a section. */
 export const updateVariantOrderInSection = async (sectionId, userId, variantId, displayOrder) => {
   await findSectionForUser(sectionId, userId);
 
@@ -263,12 +277,7 @@ export const updateVariantOrderInSection = async (sectionId, userId, variantId, 
   return link;
 };
 
-/**
- * Check if a question is linked to any assessment sections
- * @param {number} questionId - The question metadata ID
- * @param {number} userId - The user ID for authorization
- * @returns {Promise<{isInAssessments: boolean, assessmentIds: number[]}>} - Whether question is in assessments and which assessment IDs
- */
+/** Reports whether a question’s variants are linked to any sections and which assessments would be impacted. */
 export const checkQuestionInAssessments = async (questionId, userId) => {
   // Verify user owns the question
   const question = await Question_Metadata.findOne({
@@ -335,13 +344,7 @@ export const checkQuestionInAssessments = async (questionId, userId) => {
   };
 };
 
-/**
- * Remove all section variant links for a question across all assessments
- * This is used when marking a question as draft to remove it from all assessments
- * @param {number} questionId - The question metadata ID
- * @param {number} userId - The user ID for authorization
- * @returns {Promise<{removedLinks: number, affectedAssessments: number[]}>} - Number of links removed and affected assessment IDs
- */
+/** Removes every section link for a question’s variants and clears their order metadata. */
 export const removeQuestionFromAllSections = async (questionId, userId) => {
   // Verify user owns the question
   const question = await Question_Metadata.findOne({

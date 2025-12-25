@@ -1,3 +1,6 @@
+/**
+ * Shadcn scroll area wrapper with styled scrollbars.
+ */
 import * as React from "react"
 
 const ScrollArea = React.forwardRef<

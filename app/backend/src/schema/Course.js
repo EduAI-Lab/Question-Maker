@@ -1,3 +1,7 @@
+/**
+ * Sequelize model for instructor-owned courses which group topics, questions, and assessments.
+ * Links back to the owning `User` and provides a namespace for EduAI integrations.
+ */
 import { DataTypes } from "sequelize";
 import { sequelize } from "../config/database.js";
 

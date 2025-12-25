@@ -1,3 +1,7 @@
+/**
+ * Canvas API client for integration status, course listings, exports, and imports.
+ * Mirrors backend routes and shapes data for frontend consumption.
+ */
 import api from './api';
 
 export interface CanvasIntegration {
@@ -57,9 +61,7 @@ export interface CanvasImportResult {
 }
 
 export const canvasService = {
-  /**
-   * Get Canvas integration status
-   */
+  /** Fetches the current user's Canvas integration status (or null). */
   async getIntegration(): Promise<CanvasIntegration | null> {
     try {
       const response = await api.get('/api/canvas/integration');
@@ -70,9 +72,7 @@ export const canvasService = {
     }
   },
 
-  /**
-   * Connect Canvas account
-   */
+  /** Connects a Canvas account or test mode and returns the saved integration. */
   async connectCanvas(canvasUrl: string, apiKey: string, isTestMode: boolean = false): Promise<CanvasIntegration> {
     const response = await api.post('/api/canvas/connect', {
       canvasUrl,
@@ -82,24 +82,18 @@ export const canvasService = {
     return response.data.data;
   },
 
-  /**
-   * Disconnect Canvas account
-   */
+  /** Disconnects the user's Canvas integration. */
   async disconnectCanvas(): Promise<void> {
     await api.delete('/api/canvas/disconnect');
   },
 
-  /**
-   * Get user's Canvas courses
-   */
+  /** Lists Canvas courses for the connected user. */
   async getCourses(): Promise<CanvasCourse[]> {
     const response = await api.get('/api/canvas/courses');
     return response.data.data || [];
   },
 
-  /**
-   * Export assessment to Canvas
-   */
+  /** Exports an assessment to a Canvas course, returning quiz details. */
   async exportAssessment(assessmentId: number, canvasCourseId: number): Promise<CanvasExportResult> {
     const response = await api.post(`/api/canvas/export/${assessmentId}`, {
       canvasCourseId
@@ -107,9 +101,7 @@ export const canvasService = {
     return response.data.data;
   },
 
-  /**
-   * Get Canvas course mapping for a local course
-   */
+  /** Retrieves the stored mapping for a local course to its Canvas course ID. */
   async getCourseMapping(courseId: number) {
     try {
       const response = await api.get(`/api/canvas/mapping/${courseId}`);
@@ -158,4 +150,3 @@ export const canvasService = {
 };
 
 export default canvasService;
-

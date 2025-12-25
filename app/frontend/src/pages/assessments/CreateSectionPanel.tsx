@@ -1,3 +1,7 @@
+/**
+ * Panel for creating/updating assessment sections, including filters for question search.
+ * Manages topic selections, question type choices, and kicks off search callbacks.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import {
     AssessmentBlueprintConfig,

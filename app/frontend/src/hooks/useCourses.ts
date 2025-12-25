@@ -1,3 +1,7 @@
+/**
+ * Hook for fetching and mutating the authenticated user's courses with loading/error tracking.
+ * Exposes CRUD helpers that keep local state in sync with courseService responses.
+ */
 import { useState, useEffect, useCallback } from 'react';
 import { Course, CourseCreate } from '../types/question';
 import { courseService } from '../services/courseService';

@@ -1,3 +1,7 @@
+/**
+ * Question API client handling CRUD, AI generation/extraction, variant ops, and ordering.
+ * Provides typed responses to keep UI code lean and focused on rendering.
+ */
 import api from './api';
 import {
   Question,
@@ -10,6 +14,7 @@ import {
   ExtractedQuestion
 } from '../types/question';
 
+/** Normalizes backend variant payload into frontend QuestionVariant shape. */
 const mapVariant = (variant: any): QuestionVariant => ({
   id: variant.id,
   questionText: variant.questionText,
@@ -40,6 +45,7 @@ const mapVariant = (variant: any): QuestionVariant => ({
     : undefined
 });
 
+/** Normalizes backend question payload into frontend Question shape. */
 const mapQuestion = (item: any): Question => ({
   id: item.id,
   description: item.description ?? null,
@@ -60,6 +66,7 @@ const mapQuestion = (item: any): Question => ({
 });
 
 export const questionService = {
+  /** Fetches questions with optional filters and maps them to frontend shape. */
   async getQuestions(options: {
     courseId?: number;
     search?: string;
@@ -76,25 +83,30 @@ export const questionService = {
     return (response.data.data || []).map(mapQuestion);
   },
 
+  /** Retrieves a single question by ID. */
   async getQuestion(id: number): Promise<Question> {
     const response = await api.get(`/api/questions/${id}`);
     return mapQuestion(response.data.data);
   },
 
+  /** Creates a question and returns the normalized result. */
   async createQuestion(question: QuestionCreate): Promise<Question> {
     const response = await api.post('/api/questions', question);
     return mapQuestion(response.data.data);
   },
 
+  /** Updates question metadata. */
   async updateQuestion(id: number, question: Partial<QuestionCreate>): Promise<Question> {
     const response = await api.put(`/api/questions/${id}`, question);
     return mapQuestion(response.data.data);
   },
 
+  /** Deletes a question. */
   async deleteQuestion(id: number): Promise<void> {
     await api.delete(`/api/questions/${id}`);
   },
 
+  /** Creates a variant for a question and returns normalized data. */
   async createVariant(questionId: number, payload: {
     questionText: string;
     difficulty?: QuestionDifficulty;
@@ -109,6 +121,7 @@ export const questionService = {
     return mapVariant(response.data.data);
   },
 
+  /** Updates a variant by ID. */
   async updateVariant(variantId: number, payload: {
     questionText?: string;
     difficulty?: QuestionDifficulty;
@@ -123,30 +136,36 @@ export const questionService = {
     return mapVariant(response.data.data);
   },
 
+  /** Deletes a variant by ID. */
   async deleteVariant(variantId: number): Promise<void> {
     await api.delete(`/api/questions/variants/${variantId}`);
   },
 
+  /** Calls legacy AI generate endpoint to produce draft question metadata. */
   async generateQuestions(params: QuestionGenerationParams): Promise<QuestionMetadata[]> {
     const response = await api.post('/api/questions/generate', params);
     return response.data.data;
   },
 
+  /** Approves generated questions and saves them to the question bank. */
   async approveQuestions(questions: QuestionMetadata[], courseId?: number): Promise<Question[]> {
     const response = await api.post('/api/questions/approve', { questions, courseId });
     return (response.data.data || []).map(mapQuestion);
   },
 
+  /** Returns aggregate question/variant stats for the current user. */
   async getQuestionStats(): Promise<QuestionStats> {
     const response = await api.get('/api/questions/stats');
     return response.data.data;
   },
 
+  /** Extracts questions from OCR text via backend AI service. */
   async extractQuestionsFromText(payload: { text: string; courseId: number; model?: string; apiKeys?: Record<string, any> }): Promise<ExtractedQuestion[]> {
     const response = await api.post('/api/questions/extract', payload);
     return response.data.data || [];
   },
 
+  /** Saves extracted questions (and optional assessment) and returns normalized questions. */
   async saveExtractedQuestions(payload: {
     courseId: number;
     primaryTopicId?: number;

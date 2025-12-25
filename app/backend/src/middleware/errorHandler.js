@@ -1,11 +1,20 @@
+/**
+ * Express error-handling middleware that converts thrown errors into structured JSON responses.
+ * Provides a 404 generator for unknown routes and a centralized formatter/logger for unexpected failures.
+ */
 import { logger } from '../utils/logger.js';
 
+/** Creates a 404 error for unmatched routes so the main handler can respond consistently. */
 export const notFound = (req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
   error.status = 404;
   next(error);
 };
 
+/**
+ * Logs the error with context and responds with sanitized JSON, mapping common token/validation issues to user-friendly messages.
+ * Includes stack traces only in development to avoid leaking internals in production.
+ */
 export const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
@@ -58,4 +67,3 @@ export const errorHandler = (err, req, res, next) => {
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 };
-

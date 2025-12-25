@@ -1,3 +1,6 @@
+/**
+ * Shadcn tabs components for switching between grouped content.
+ */
 import * as React from "react"
 
 interface TabsProps extends React.HTMLAttributes<HTMLDivElement> {

@@ -1,3 +1,7 @@
+/**
+ * Question bank list with search/sort controls, add/upload actions, and variant cards.
+ * Filters variants client-side and exposes callbacks for viewing/creating variants.
+ */
 import { useState, useMemo } from 'react';
 import { QuestionVariantEntry } from '../../types/question';
 import { QuestionCard } from './QuestionCard';

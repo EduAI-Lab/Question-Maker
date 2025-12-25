@@ -1,3 +1,7 @@
+/**
+ * Header for the question bank list with add/upload actions and course context.
+ * Shows counts and disables actions when appropriate.
+ */
 import { Button } from '../ui/button';
 import { Plus, Upload } from 'lucide-react';
 

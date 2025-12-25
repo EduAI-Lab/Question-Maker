@@ -1,3 +1,7 @@
+/**
+ * Sequelize model that maps a local course to a Canvas course for export tracking.
+ * Provides quick lookup for which Canvas course was used per user/course combination.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 
@@ -58,4 +62,3 @@ export const CanvasCourseMapping = sequelize.define('CanvasCourseMapping', {
     }
   ]
 });
-

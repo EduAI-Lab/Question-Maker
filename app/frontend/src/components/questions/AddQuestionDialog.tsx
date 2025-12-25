@@ -1,3 +1,7 @@
+/**
+ * Dialog for creating questions (manual or AI-assisted) and managing initial variants.
+ * Handles course/topic selection, validation, assessment linkage, and optional AI generation hooks.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import {
     Dialog,

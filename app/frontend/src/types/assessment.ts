@@ -1,3 +1,6 @@
+/**
+ * Assessment type re-exports and helper interfaces to avoid circular imports from question.ts.
+ */
 // Import types from question.ts to avoid circular dependencies
 import { 
   Assessment, 

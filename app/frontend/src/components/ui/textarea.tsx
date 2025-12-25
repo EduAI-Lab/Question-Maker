@@ -1,3 +1,6 @@
+/**
+ * Shadcn textarea component with consistent styling.
+ */
 import * as React from "react"
 
 export interface TextareaProps
