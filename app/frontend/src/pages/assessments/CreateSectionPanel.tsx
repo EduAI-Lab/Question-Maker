@@ -311,7 +311,8 @@ export const CreateSectionPanel = ({
                 primaryTopicIds,
                 secondaryTopicIds,
                 excludedTopicIds,
-                difficulty: selectedDifficulty.length > 0 ? selectedDifficulty : null
+                difficulty: selectedDifficulty.length > 0 ? selectedDifficulty : null,
+                reasoningLevel: selectedReasoning.length > 0 ? selectedReasoning as Array<'factual' | 'analytical' | 'application'> : null
             },
             payload,
             editingSection?.id
