@@ -129,7 +129,6 @@ Requirements:
     "description": "Brief summary (<= 15 words) that does not simply repeat the question text",
     "difficulty": "easy/medium/hard",
     "reasoning_level": "factual/analytical/application",
-    "bloom_level": "remember/understand/apply/analyze/evaluate/create",
     "type": "MCQ/SA/LA",
     "primary_topic_id": number | null,
     "secondary_topic_ids": number[]
@@ -186,19 +185,10 @@ Please ensure the questions are appropriate for the course level and cover the k
           q.content &&
           q.difficulty &&
           q.reasoning_level &&
-          q.bloom_level &&
           ["easy", "medium", "hard"].includes(q.difficulty) &&
           ["factual", "analytical", "application"].includes(
             q.reasoning_level
-          ) &&
-          [
-            "remember",
-            "understand",
-            "apply",
-            "analyze",
-            "evaluate",
-            "create",
-          ].includes(q.bloom_level)
+          )
       );
 
       if (validQuestions.length === 0) {
@@ -237,7 +227,6 @@ Please ensure the questions are appropriate for the course level and cover the k
           description,
           difficulty: question.difficulty,
           reasoning_level: question.reasoning_level,
-          bloom_level: question.bloom_level,
           type:
             typeof question.type === "string" &&
             question.type.toUpperCase().trim() === "SA"
