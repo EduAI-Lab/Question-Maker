@@ -1,15 +1,13 @@
+/**
+ * Authentication service for registering users, verifying credentials, and issuing JWTs.
+ * Encapsulates password hashing, duplicate checks, and helper lookups for the auth routes.
+ */
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../schema/index.js';
 import { config } from '../config/settings.js';
 
-/**
- * Register a new user
- * @param {Object} userData - User registration data
- * @param {string} userData.email - User email
- * @param {string} userData.password - User password
- * @returns {Promise<Object>} Created user data (without password)
- */
+/** Creates a user with hashed credentials and returns a JWT/user payload. */
 async function registerUser(userData) {
   const { email, password } = userData;
 
@@ -46,13 +44,7 @@ async function registerUser(userData) {
   };
 }
 
-/**
- * Login user
- * @param {Object} credentials - User login credentials
- * @param {string} credentials.email - User email
- * @param {string} credentials.password - User password
- * @returns {Promise<Object>} User data and JWT token
- */
+/** Verifies credentials for an existing user and returns a JWT/user payload. */
 async function loginUser(credentials) {
   const { email, password } = credentials;
 
@@ -85,20 +77,12 @@ async function loginUser(credentials) {
   };
 }
 
-/**
- * Verify JWT token
- * @param {string} token - JWT token
- * @returns {Promise<Object>} Decoded token payload
- */
+/** Validates a JWT and returns the decoded payload or throws on failure. */
 function verifyToken(token) {
   return jwt.verify(token, config.jwtSecret);
 }
 
-/**
- * Get user by ID
- * @param {number} userId - User ID
- * @returns {Promise<Object>} User data (without password)
- */
+/** Fetches a user by primary key and returns a safe subset of fields. */
 async function getUserById(userId) {
   const user = await User.findByPk(userId);
   if (!user) {

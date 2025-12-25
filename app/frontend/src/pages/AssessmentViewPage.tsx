@@ -1,3 +1,7 @@
+/**
+ * Assessment detail page for viewing sections, matching questions, and managing variants.
+ * Loads the assessment, fetches related questions, and coordinates section/variant modals.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Layers3, Plus, Upload, AlertTriangle, FileText } from 'lucide-react';

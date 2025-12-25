@@ -1,3 +1,7 @@
+/**
+ * Auth context provider that manages user session state, token storage, and auth actions.
+ * Exposes hooks for login/register/logout and guards consumers until initialization completes.
+ */
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { User } from '../types/auth';
 import { authService } from '../services/authService';
@@ -13,6 +17,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Hook to read auth context; throws if used outside AuthProvider. */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -25,6 +30,7 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+/** Provides auth state/actions to the React tree and initializes from stored tokens. */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);

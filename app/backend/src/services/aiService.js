@@ -1,3 +1,7 @@
+/**
+ * Legacy AI helper service for Groq/OpenAI/DeepSeek question generation and EduAI extraction utilities.
+ * Provides text normalization helpers and topic assignment logic used by OCR uploads.
+ */
 import axios from "axios";
 import { config } from "../config/settings.js";
 import { Question_Metadata, Topics, Course } from "../schema/index.js";
@@ -9,6 +13,7 @@ const AI_PROVIDERS = {
   DEEPSEEK: "deepseek",
 };
 
+/** Calls the Groq chat API with a structured prompt and returns the raw content string. */
 const callGroqAPI = async (prompt, params) => {
   try {
     const response = await axios.post(
@@ -61,6 +66,7 @@ const callGroqAPI = async (prompt, params) => {
 };
 
 // Legacy: OpenAI generator kept for reference; newer flows use EduAI instead.
+/** Calls OpenAI chat completions to generate legacy questions for the question bank. */
 const callOpenAIAPI = async (prompt, params) => {
   try {
     const response = await axios.post(
@@ -107,6 +113,7 @@ const callOpenAIAPI = async (prompt, params) => {
   }
 };
 
+/** Invokes DeepSeek’s chat endpoint to generate question payloads similar to Groq/OpenAI. */
 const callDeepSeekAPI = async (prompt, params) => {
   try {
     const response = await axios.post(
@@ -152,6 +159,7 @@ const callDeepSeekAPI = async (prompt, params) => {
   }
 };
 
+/** Normalizes OCR text by trimming whitespace, collapsing blank lines, and removing tabs. */
 const normalizeExtractText = (text) => {
   if (!text) return "";
   return (
@@ -167,6 +175,7 @@ const normalizeExtractText = (text) => {
   );
 };
 
+/** Splits long extraction text into chunkSize-safe segments so API prompts stay bounded. */
 const chunkText = (text, chunkSize = 6000) => {
   if (!text) return [];
   const chunks = [];
@@ -176,6 +185,7 @@ const chunkText = (text, chunkSize = 6000) => {
   return chunks;
 };
 
+/** Derives a short summary/label from question text, capping at ~12 words. */
 const summarizeQuestion = (text) => {
   if (!text) return "Question";
   const sanitized = text.replace(/\s+/g, " ").trim();
@@ -187,12 +197,14 @@ const summarizeQuestion = (text) => {
   return `${words.slice(0, 12).join(" ")}…`;
 };
 
+/** Estimates how many questions to request for a chunk based on its length. */
 const calculateQuestionTarget = (chunk) => {
   if (!chunk) return 3;
   const estimated = Math.round(chunk.length / 900);
   return Math.max(3, Math.min(12, estimated));
 };
 
+/** Splits a total count into easy/medium/hard buckets with guardrails. */
 const buildDifficultyCounts = (total) => {
   let easy = Math.max(1, Math.floor(total * 0.4));
   let medium = Math.max(1, Math.floor(total * 0.4));
@@ -222,6 +234,7 @@ const buildDifficultyCounts = (total) => {
   };
 };
 
+/** Cleans and normalizes EduAI question objects into the format expected by uploads. */
 const sanitizeEduAIQuestion = (question) => {
   const content =
     typeof question?.content === "string" ? question.content.trim() : "";
@@ -272,6 +285,7 @@ const sanitizeEduAIQuestion = (question) => {
   };
 };
 
+/** Uses EduAI to extract questions from OCR’d text, chunking input and deduplicating outputs. */
 const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:120b", apiKeys = {}) => {
   if (!eduaiService.isConfigured()) {
     throw new Error(
@@ -361,6 +375,7 @@ ${chunk}
 };
 
 // Legacy: OpenAI extractor retained for reference; current upload flow uses EduAI.
+/** Legacy helper that asks OpenAI to extract structured questions from a chunk of text. */
 const callOpenAIForExtraction = async (textChunk) => {
   if (!config.openaiApiKey) {
     throw new Error(
@@ -417,6 +432,7 @@ ${textChunk}
   return content;
 };
 
+/** Validates and normalizes a raw extracted question entry before persistence. */
 const sanitizeExtractedQuestion = (raw) => {
   if (!raw || typeof raw !== "object") {
     return null;
@@ -462,6 +478,7 @@ const sanitizeExtractedQuestion = (raw) => {
 };
 
 // Legacy: OpenAI topic assignment retained for reference; current pipeline uses EduAI metadata.
+/** Legacy helper that calls OpenAI to assign topic IDs to extracted questions. */
 const callOpenAIForTopicAssignment = async (questions, topics) => {
   if (!config.openaiApiKey) {
     throw new Error(
@@ -521,6 +538,7 @@ Use only IDs from the provided topics. Keep the array order identical to the inp
   return response.data?.choices?.[0]?.message?.content ?? "[]";
 };
 
+/** Normalizes the topic assignment payload, ensuring IDs exist and removing duplicates. */
 const sanitizeTopicAssignment = (raw, validTopicIds) => {
   if (!raw || typeof raw !== "object") {
     return null;
@@ -568,6 +586,7 @@ const sanitizeTopicAssignment = (raw, validTopicIds) => {
   };
 };
 
+/** Enriches extracted questions with topic IDs using OpenAI when local topics are available. */
 const enrichQuestionsWithTopics = async (questions, courseId) => {
   if (!courseId) {
     return questions;
@@ -629,6 +648,7 @@ const enrichQuestionsWithTopics = async (questions, courseId) => {
   }
 };
 
+/** Public API to normalize raw upload text and run EduAI extraction for a course. */
 export const extractQuestionsFromText = async (rawText, courseId, model, apiKeys) => {
   const normalized = normalizeExtractText(rawText);
   if (!normalized) {
@@ -643,6 +663,7 @@ export const extractQuestionsFromText = async (rawText, courseId, model, apiKeys
   return extracted;
 };
 
+/** Invokes the selected AI provider to generate structured questions, parsing/validating results. */
 export const generateQuestions = async (prompt, provider, params) => {
   try {
     let response;

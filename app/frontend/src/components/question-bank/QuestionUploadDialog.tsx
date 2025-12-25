@@ -1,3 +1,7 @@
+/**
+ * Dialog for uploading PDF/image files, running OCR, and extracting questions via EduAI.
+ * Manages draft review, topic selection, optional assessment creation, and save flows.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tesseract from 'tesseract.js';

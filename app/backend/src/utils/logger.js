@@ -1,3 +1,7 @@
+/**
+ * Centralized Pino logger configuration shared across the backend.
+ * Handles redaction, pretty-printing in development, and JSON output in production.
+ */
 import pino from 'pino';
 
 /**

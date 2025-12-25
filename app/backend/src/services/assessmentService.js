@@ -1,6 +1,11 @@
+/**
+ * Assessment service encapsulating CRUD operations plus question/section associations.
+ * Ensures user ownership via course joins and keeps question ordering metadata consistent.
+ */
 import { Assessments, Question_Metadata, Variants, AssessmentSections, SectionVariants, Course, sequelize } from '../schema/index.js';
 import { Op } from 'sequelize';
 
+/** Creates an assessment blueprint for the given user/course after validating inputs. */
 export const createAssessment = async (userId, assessmentData) => {
   try {
     const { type, name, semester, courseId, description, blueprintConfig } = assessmentData;
@@ -37,6 +42,7 @@ export const createAssessment = async (userId, assessmentData) => {
   }
 };
 
+/** Lists assessments owned by a user with optional filters and eager-loaded relations. */
 export const getAssessmentsByUser = async (userId, options = {}) => {
   try {
     const { limit = 50, offset = 0, courseId } = options;
@@ -119,6 +125,7 @@ export const getAssessmentsByUser = async (userId, options = {}) => {
   }
 };
 
+/** Fetches a single assessment with its sections/variants if the user owns it. */
 export const getAssessmentById = async (assessmentId, userId) => {
   try {
     const assessment = await Assessments.findOne({
@@ -197,6 +204,7 @@ export const getAssessmentById = async (assessmentId, userId) => {
   }
 };
 
+/** Updates assessment metadata/blueprint while enforcing ownership and valid course references. */
 export const updateAssessment = async (assessmentId, updateData, userId) => {
   try {
     const assessment = await Assessments.findOne({
@@ -260,6 +268,7 @@ export const updateAssessment = async (assessmentId, updateData, userId) => {
   }
 };
 
+/** Deletes an assessment and detaches any variants tied to it to keep data consistent. */
 export const deleteAssessment = async (assessmentId, userId) => {
   try {
     const assessment = await Assessments.findOne({
@@ -308,6 +317,7 @@ export const deleteAssessment = async (assessmentId, userId) => {
   }
 };
 
+/** Adds a question to an assessment by updating its per-assessment `questionOrder`. */
 export const addQuestionToAssessment = async (assessmentId, questionId, orderNumber, userId) => {
   try {
     // Verify user owns the question
@@ -354,6 +364,7 @@ export const addQuestionToAssessment = async (assessmentId, questionId, orderNum
   }
 };
 
+/** Removes a question from an assessment's ordering payload after verifying ownership. */
 export const removeQuestionFromAssessment = async (assessmentId, questionId, userId) => {
   try {
     // Verify user owns the question
@@ -401,6 +412,7 @@ export const removeQuestionFromAssessment = async (assessmentId, questionId, use
   }
 };
 
+/** Returns questions scheduled for a given assessment ordered by their stored display order. */
 export const getQuestionsInAssessment = async (assessmentId, userId) => {
   try {
     // Verify assessment exists and belongs to user

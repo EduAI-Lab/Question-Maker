@@ -1,3 +1,7 @@
+/**
+ * Root app component: wires theme/auth providers, router, and top-level pages.
+ * Defines navigation for login, landing, assessments, help, and an optional API test route.
+ */
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from './components/ui/toaster';
 import { ThemeProvider } from './components/theme-provider';

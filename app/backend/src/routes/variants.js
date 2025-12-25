@@ -1,3 +1,7 @@
+/**
+ * Router for managing question variants (create/read/update/delete) tied to a question owner.
+ * Shares questionService helpers and enforces authentication for every action.
+ */
 import express from 'express';
 import {
   createVariant,
@@ -9,9 +13,7 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// @route   POST /api/questions/:id/variants
-// @desc    Create a new variant for a question
-// @access  Private
+/** POST /api/questions/:id/variants – creates a variant under the given question after validation. */
 router.post('/:id/variants', authenticateToken, async (req, res, next) => {
   try {
     const { questionText, difficulty, assessmentId, secondaryTopicsId, answer, referenceId, isAiGenerated, isDraft } = req.body;
@@ -48,9 +50,7 @@ router.post('/:id/variants', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/questions/:id/variants
-// @desc    Get all variants for a question
-// @access  Private
+/** GET /api/questions/:id/variants – returns all variants for a question owned by the user. */
 router.get('/:id/variants', authenticateToken, async (req, res, next) => {
   try {
     const variants = await getVariantsByQuestion(req.params.id, req.user.id);
@@ -64,9 +64,7 @@ router.get('/:id/variants', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   PUT /api/questions/variants/:variantId
-// @desc    Update a variant
-// @access  Private
+/** PUT /api/questions/variants/:variantId – updates variant content, difficulty, and metadata. */
 router.put('/variants/:variantId', authenticateToken, async (req, res, next) => {
   try {
     const { questionText, difficulty, assessmentId, secondaryTopicsId, answer, referenceId, isAiGenerated, isDraft } = req.body;
@@ -96,9 +94,7 @@ router.put('/variants/:variantId', authenticateToken, async (req, res, next) => 
   }
 });
 
-// @route   DELETE /api/questions/variants/:variantId
-// @desc    Delete a variant
-// @access  Private
+/** DELETE /api/questions/variants/:variantId – removes a variant owned by the authenticated user. */
 router.delete('/variants/:variantId', authenticateToken, async (req, res, next) => {
   try {
     await deleteVariant(req.params.variantId, req.user.id);

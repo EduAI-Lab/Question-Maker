@@ -1,3 +1,7 @@
+/**
+ * Lightweight multi-select dropdown for topics with outside-click handling.
+ * Allows toggling selections while honoring disabled IDs.
+ */
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Topic } from '../../types/topic';

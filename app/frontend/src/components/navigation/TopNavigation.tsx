@@ -1,3 +1,7 @@
+/**
+ * Top navigation bar providing course selection, tab switching, and profile/help entrypoints.
+ * Accepts course data and callbacks to propagate tab/course changes to parent layouts.
+ */
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';

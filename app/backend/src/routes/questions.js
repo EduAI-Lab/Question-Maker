@@ -1,3 +1,7 @@
+/**
+ * Router for question management endpoints including CRUD, statistics, AI generation, and extraction workflows.
+ * All routes are authenticated and delegate to questionService/aiService helpers for business logic.
+ */
 import express from 'express';
 import {
   createQuestion,
@@ -16,9 +20,7 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// @route   POST /api/questions
-// @desc    Create a new question
-// @access  Private
+/** POST /api/questions – validates payload and creates a new question for the user. */
 router.post('/', authenticateToken, async (req, res, next) => {
   try {
     const rawDescription = req.body.description ?? req.body.content;
@@ -80,9 +82,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/questions
-// @desc    Get all questions for the current user
-// @access  Private
+/** GET /api/questions – paginated list of questions scoped to the authenticated user. */
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
     const { courseId, classId, search, limit, offset } = req.query;
@@ -105,9 +105,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/questions/stats
-// @desc    Get question statistics for the current user
-// @access  Private
+/** GET /api/questions/stats – returns aggregate stats (counts, types) for the user’s question bank. */
 router.get('/stats', authenticateToken, async (req, res, next) => {
   try {
     const stats = await getQuestionStats(req.user.id);
@@ -121,9 +119,7 @@ router.get('/stats', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/questions/:id
-// @desc    Get a specific question
-// @access  Private
+/** GET /api/questions/:id – fetches a single question after verifying ownership. */
 router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
     const question = await getQuestionById(req.params.id, req.user.id);
@@ -137,9 +133,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   PUT /api/questions/:id
-// @desc    Update a question
-// @access  Private
+/** PUT /api/questions/:id – updates question metadata/type/order flags, enforcing validation rules. */
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { description, content, courseId, classId, type, primaryTopicId, questionOrder, isAiGenerated, isDraft } = req.body; //mock for AI generated questions
@@ -221,9 +215,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   DELETE /api/questions/:id
-// @desc    Delete a question
-// @access  Private
+/** DELETE /api/questions/:id – removes a question owned by the authenticated user. */
 router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     await deleteQuestion(req.params.id, req.user.id);
@@ -237,9 +229,7 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   POST /api/questions/generate
-// @desc    Generate questions using AI
-// @access  Private
+/** POST /api/questions/generate – triggers legacy AI providers to generate draft questions. */
 router.post('/generate', authenticateToken, async (req, res, next) => {
   try {
     const { prompt, provider = AI_PROVIDERS.GROQ, numQuestions = 15, difficultyDistribution } = req.body;
@@ -272,9 +262,7 @@ router.post('/generate', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   POST /api/questions/extract
-// @desc    Extract questions from OCR/parsed text
-// @access  Private
+/** POST /api/questions/extract – sends OCR text to the AI extraction service and returns proposed questions. */
 router.post('/extract', authenticateToken, async (req, res, next) => {
   try {
     const { text, courseId, model, apiKeys } = req.body;
@@ -312,9 +300,7 @@ router.post('/extract', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   POST /api/questions/extract/save
-// @desc    Persist extracted questions
-// @access  Private
+/** POST /api/questions/extract/save – persists selected extracted questions (optionally tying them to an assessment). */
 router.post('/extract/save', authenticateToken, async (req, res, next) => {
   try {
     const { courseId, primaryTopicId, topicName, questions, assessment } = req.body;
@@ -353,9 +339,7 @@ router.post('/extract/save', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   POST /api/questions/approve
-// @desc    Approve and save generated questions
-// @access  Private
+/** POST /api/questions/approve – bulk saves approved generated questions into the question bank. */
 router.post('/approve', authenticateToken, async (req, res, next) => {
   try {
     const { questions, courseId, classId } = req.body;
@@ -401,9 +385,7 @@ router.post('/approve', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   PUT /api/questions/:id/order
-// @desc    Update question order in an assessment
-// @access  Private
+/** PUT /api/questions/:id/order – updates an assessment-specific order value for the question. */
 router.put('/:id/order', authenticateToken, async (req, res, next) => {
   try {
     const { assessmentId, orderNumber } = req.body;
@@ -432,9 +414,7 @@ router.put('/:id/order', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   DELETE /api/questions/:id/order/:assessmentId
-// @desc    Remove question from assessment order
-// @access  Private
+/** DELETE /api/questions/:id/order/:assessmentId – removes a question from an assessment’s ordering. */
 router.delete('/:id/order/:assessmentId', authenticateToken, async (req, res, next) => {
   try {
     const question = await removeQuestionFromAssessment(

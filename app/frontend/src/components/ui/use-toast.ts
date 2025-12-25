@@ -1,3 +1,7 @@
+/**
+ * Hook for managing toast notifications backed by a headless store.
+ * Provides convenience methods to push/dismiss toasts and access the current queue.
+ */
 import * as React from "react"
 
 import type {

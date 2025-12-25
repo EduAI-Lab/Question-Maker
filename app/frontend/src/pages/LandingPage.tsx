@@ -1,3 +1,7 @@
+/**
+ * Main product landing page showing questions and assessments with creation/import/export flows.
+ * Handles course/topic loading, tab state, and orchestrates dialogs for questions, variants, Canvas, and uploads.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TopNavigation } from '../components/navigation/TopNavigation';

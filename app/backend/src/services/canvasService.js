@@ -1,3 +1,7 @@
+/**
+ * Canvas integration service that manages token storage, course mappings, exports, and imports.
+ * Supports both real Canvas API calls and a mock test mode for development/demo flows.
+ */
 import axios from 'axios';
 import { CanvasIntegration, CanvasCourseMapping, Question_Metadata, Variants, AssessmentSections, SectionVariants, Course } from '../schema/index.js';
 import { getAssessmentById, createAssessment } from './assessmentService.js';
@@ -17,9 +21,7 @@ const MOCK_CANVAS_COURSES = [
   { id: 4, name: 'Computer Programming II', course_code: 'COSC 121' }
 ];
 
-/**
- * Get or create Canvas integration for a user
- */
+/** Retrieves the Canvas integration settings (if any) for the specified user. */
 export const getCanvasIntegration = async (userId) => {
   try {
     let integration = await CanvasIntegration.findOne({
@@ -32,9 +34,7 @@ export const getCanvasIntegration = async (userId) => {
   }
 };
 
-/**
- * Create or update Canvas integration
- */
+/** Creates or updates the Canvas integration credentials/test-mode flag for a user. */
 export const saveCanvasIntegration = async (userId, { canvasUrl, apiKey, isTestMode = false }) => {
   try {
     const [integration, created] = await CanvasIntegration.findOrCreate({
@@ -61,9 +61,7 @@ export const saveCanvasIntegration = async (userId, { canvasUrl, apiKey, isTestM
   }
 };
 
-/**
- * Make Canvas API request (with test mode support)
- */
+/** Executes a Canvas API request, returning mock data when test mode is enabled. */
 const makeCanvasRequest = async (integration, method, endpoint, data = null) => {
   if (integration.isTestMode) {
     // Simulate API delay
@@ -138,9 +136,7 @@ const makeCanvasRequest = async (integration, method, endpoint, data = null) => 
   }
 };
 
-/**
- * Get user's Canvas courses
- */
+/** Lists Canvas courses available to the instructor, or mock courses in test mode. */
 export const getCanvasCourses = async (userId) => {
   try {
     const integration = await getCanvasIntegration(userId);
@@ -162,9 +158,7 @@ export const getCanvasCourses = async (userId) => {
   }
 };
 
-/**
- * Create a Canvas quiz from an assessment
- */
+/** Exports an assessment’s sections/variants to Canvas as a quiz and stores the mapping. */
 export const exportAssessmentToCanvas = async (userId, assessmentId, canvasCourseId) => {
   try {
     const integration = await getCanvasIntegration(userId);
@@ -274,9 +268,7 @@ export const exportAssessmentToCanvas = async (userId, assessmentId, canvasCours
   }
 };
 
-/**
- * Convert a variant to Canvas question format
- */
+/** Converts a local variant into a Canvas quiz question payload (MCQ/SA/LA supported). */
 const convertVariantToCanvasQuestion = (variant, questionMetadata, position, sectionName) => {
   const questionText = variant.questionText || '';
   const answerText = variant.answer || '';
@@ -318,11 +310,7 @@ const convertVariantToCanvasQuestion = (variant, questionMetadata, position, sec
   }
 };
 
-/**
- * Parse MCQ options from question text and determine correct answer
- * Format: "Question text\nA) Option A\nB) Option B\nC) Option C\nD) Option D"
- * Answer format: "B) Option B" or just "B"
- */
+/** Parses MCQ options from the variant text and flags the correct answer letter if present. */
 const parseMCQOptions = (questionText, answerText) => {
   const lines = questionText.split('\n');
   const options = [];
@@ -366,9 +354,7 @@ const parseMCQOptions = (questionText, answerText) => {
   return options;
 };
 
-/**
- * Get Canvas course mapping for a local course
- */
+/** Returns the stored Canvas course mapping for a given user/local-course pair. */
 export const getCanvasCourseMapping = async (userId, localCourseId) => {
   try {
     const mapping = await CanvasCourseMapping.findOne({
@@ -384,9 +370,7 @@ export const getCanvasCourseMapping = async (userId, localCourseId) => {
   }
 };
 
-/**
- * Get quizzes from a Canvas course
- */
+/** Lists quizzes from a Canvas course, filtering to assignment-style quizzes. */
 export const getCanvasQuizzes = async (userId, canvasCourseId) => {
   try {
     const integration = await getCanvasIntegration(userId);
@@ -409,9 +393,7 @@ export const getCanvasQuizzes = async (userId, canvasCourseId) => {
   }
 };
 
-/**
- * Get questions from a Canvas quiz
- */
+/** Fetches the question list for a Canvas quiz. */
 export const getCanvasQuizQuestions = async (userId, canvasCourseId, quizId) => {
   try {
     const integration = await getCanvasIntegration(userId);
@@ -432,9 +414,7 @@ export const getCanvasQuizQuestions = async (userId, canvasCourseId, quizId) => 
   }
 };
 
-/**
- * Strip HTML tags from text while preserving line breaks
- */
+/** Removes Canvas HTML markup from question text while preserving logical line breaks. */
 const stripHtmlTags = (html) => {
   if (!html || typeof html !== 'string') return '';
   
@@ -471,11 +451,7 @@ const stripHtmlTags = (html) => {
   return text;
 };
 
-/**
- * Convert Canvas question to variant format
- * This is the reverse of convertVariantToCanvasQuestion
- * Throws error if question type is not supported
- */
+/** Converts a Canvas question into local variant metadata, throwing for unsupported types. */
 const convertCanvasQuestionToVariant = (canvasQuestion) => {
   const questionType = canvasQuestion.question_type;
   const questionTextRaw = canvasQuestion.question_text || '';
@@ -570,9 +546,7 @@ const convertCanvasQuestionToVariant = (canvasQuestion) => {
   };
 };
 
-/**
- * Import a Canvas quiz as an assessment
- */
+/** Imports a Canvas quiz into a local assessment, creating sections/questions/variants. */
 export const importQuizFromCanvas = async (userId, canvasCourseId, quizId, localCourseId, options = {}) => {
   try {
     const integration = await getCanvasIntegration(userId);

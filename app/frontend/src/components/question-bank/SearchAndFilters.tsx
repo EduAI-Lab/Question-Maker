@@ -1,3 +1,7 @@
+/**
+ * Search and sort controls for the question bank panel.
+ * Provides a text filter and sort dropdown that feed parent callbacks.
+ */
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';

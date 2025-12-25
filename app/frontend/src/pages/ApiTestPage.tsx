@@ -1,3 +1,7 @@
+/**
+ * Developer-only API test page for exercising backend endpoints from the UI.
+ * Includes forms to create/fetch courses, topics, questions, and assessments for debugging.
+ */
 import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';

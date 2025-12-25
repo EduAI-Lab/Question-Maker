@@ -1,3 +1,6 @@
+/**
+ * Shadcn separator for dividing sections in layouts.
+ */
 import * as React from "react"
 
 const Separator = React.forwardRef<
