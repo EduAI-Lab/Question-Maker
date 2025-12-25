@@ -1,3 +1,7 @@
+/**
+ * Sequelize model storing per-user Canvas integration details with encrypted API keys and test-mode flag.
+ * Automatically encrypts/decrypts the API key and ensures a unique integration per user.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
@@ -115,4 +119,3 @@ export const CanvasIntegration = sequelize.define('CanvasIntegration', {
     }
   }
 });
-

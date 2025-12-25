@@ -1,6 +1,11 @@
+/**
+ * Question service providing CRUD for metadata/variants plus assessment ordering helpers.
+ * Validates ownership via course relationships and keeps variant-topic links normalized.
+ */
 import { Question_Metadata, Variants, Topics, Assessments, AssessmentSections, SectionVariants } from '../schema/index.js';
 import { Course } from '../schema/Course.js';
 
+/** Normalizes any acceptable topic input (array/string/number) into an array of integers. */
 const normalizeSecondaryTopics = (value) => {
   if (Array.isArray(value)) {
     return value
@@ -26,6 +31,7 @@ const normalizeSecondaryTopics = (value) => {
   return [];
 };
 
+/** Builds a short question description from available text fields so metadata looks tidy. */
 const generateMetadataDescription = (questionText, summary, instructions) => {
   const candidate = [summary, instructions, questionText].find(
     (value) => typeof value === 'string' && value.trim().length > 0
@@ -47,6 +53,7 @@ const generateMetadataDescription = (questionText, summary, instructions) => {
   return `${words.slice(0, 12).join(' ')}…`;
 };
 
+/** Creates question metadata after validating ownership, type, and topic IDs. */
 export const createQuestion = async (userId, questionData) => {
   try {
     const {
@@ -97,6 +104,7 @@ export const createQuestion = async (userId, questionData) => {
   }
 };
 
+/** Returns questions (with course + variant associations) scoped to the requesting user. */
 export const getQuestionsByUser = async (userId, options = {}) => {
   try {
     const { courseId, search, limit = 50, offset = 0 } = options;
@@ -152,6 +160,7 @@ export const getQuestionsByUser = async (userId, options = {}) => {
   }
 };
 
+/** Fetches a single question with variants once the user-course relationship is confirmed. */
 export const getQuestionById = async (questionId, userId) => {
   try {
     const question = await Question_Metadata.findOne({
@@ -188,6 +197,7 @@ export const getQuestionById = async (questionId, userId) => {
   }
 };
 
+/** Updates metadata fields while ensuring provided IDs and types remain valid. */
 export const updateQuestion = async (questionId, userId, updateData) => {
   try {
     const question = await Question_Metadata.findOne({
@@ -264,6 +274,7 @@ export const updateQuestion = async (questionId, userId, updateData) => {
   }
 };
 
+/** Deletes a question (and cascades variants) after verifying the user owns the course. */
 export const deleteQuestion = async (questionId, userId) => {
   try {
     const question = await Question_Metadata.findOne({
@@ -288,6 +299,7 @@ export const deleteQuestion = async (questionId, userId) => {
   }
 };
 
+/** Bulk-creates multiple questions for approvals, short-circuiting on validation issues. */
 export const createMultipleQuestions = async (userId, questionsData) => {
   try {
     const createdQuestions = [];
@@ -316,6 +328,7 @@ export const createMultipleQuestions = async (userId, questionsData) => {
   }
 };
 
+/** Persists extracted questions/variants and optionally creates assessments/sections for them. */
 export const saveExtractedQuestions = async (userId, payload) => {
   const { courseId, primaryTopicId, topicName, questions, assessment, isAiGenerated = false } = payload;
 
@@ -538,6 +551,7 @@ export const saveExtractedQuestions = async (userId, payload) => {
   }
 };
 
+/** Aggregates counts of questions/variants/drafts for dashboard stats. */
 export const getQuestionStats = async (userId) => {
   try {
     // Count questions for this user through course relationship
@@ -575,6 +589,7 @@ export const getQuestionStats = async (userId) => {
   }
 };
 
+/** Updates the per-assessment ordering map stored on a question metadata row. */
 export const updateQuestionOrder = async (questionId, assessmentId, orderNumber, userId) => {
   try {
     const question = await Question_Metadata.findOne({
@@ -607,6 +622,7 @@ export const updateQuestionOrder = async (questionId, assessmentId, orderNumber,
   }
 };
 
+/** Removes a question from a specific assessment’s order map and detaches variants if needed. */
 export const removeQuestionFromAssessment = async (questionId, assessmentId, userId) => {
   try {
     const question = await Question_Metadata.findOne({
@@ -640,6 +656,7 @@ export const removeQuestionFromAssessment = async (questionId, assessmentId, use
 };
 
 // Variant Management Functions
+/** Creates a variant for a question while validating course ownership and metadata. */
 export const createVariant = async (questionId, variantData, userId) => {
   try {
     // Verify user owns the question
@@ -678,6 +695,7 @@ export const createVariant = async (questionId, variantData, userId) => {
   }
 };
 
+/** Updates a variant’s content/difficulty/associations, normalizing secondary topics. */
 export const updateVariant = async (variantId, variantData, userId) => {
   try {
     const variant = await Variants.findOne({
@@ -721,6 +739,7 @@ export const updateVariant = async (variantId, variantData, userId) => {
   }
 };
 
+/** Deletes a variant and cleans up related section links if the user owns the question. */
 export const deleteVariant = async (variantId, userId) => {
   try {
     const variant = await Variants.findOne({
@@ -751,6 +770,7 @@ export const deleteVariant = async (variantId, userId) => {
   }
 };
 
+/** Lists all variants for a question, including assessment context, for the owning user. */
 export const getVariantsByQuestion = async (questionId, userId) => {
   try {
     // Verify user owns the question

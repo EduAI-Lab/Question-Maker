@@ -1,3 +1,6 @@
+/**
+ * Core domain types for questions, variants, courses, topics, and assessments.
+ */
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'MCQ' | 'SA' | 'LA';
 export type ReasoningLevel = 'factual' | 'analytical' | 'application';

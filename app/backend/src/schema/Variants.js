@@ -1,3 +1,7 @@
+/**
+ * Sequelize model for individual question variants (question text, difficulty, answer, review status).
+ * Links back to `Question_Metadata`, optional assessments/sections, and tracks AI/draft flags.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 

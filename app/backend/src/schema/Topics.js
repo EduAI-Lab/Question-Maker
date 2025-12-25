@@ -1,3 +1,7 @@
+/**
+ * Sequelize model for course topics used to classify questions and variants.
+ * Each topic belongs to exactly one course and can be referenced as a primary or secondary tag.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 

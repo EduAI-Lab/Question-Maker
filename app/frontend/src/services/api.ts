@@ -1,3 +1,7 @@
+/**
+ * Axios client configured with base URL, auth token injection, and 401 handling redirect.
+ * Shared by all service modules to standardize headers and error behavior.
+ */
 import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
 const API_URL = (import.meta as any).env?.VITE_API_URL || '/api';
@@ -27,11 +31,13 @@ api.interceptors.response.use(
       // Token expired or invalid
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
+      // Only redirect if not already on login page to prevent infinite loops
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
 
 export default api;
-

@@ -1,3 +1,7 @@
+/**
+ * Sequelize model describing application users and their hashed credentials.
+ * Users own courses, questions, and integration records across the app.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 

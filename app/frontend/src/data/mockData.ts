@@ -1,3 +1,6 @@
+/**
+ * Mock data for courses, questions, and assessments used in development/testing.
+ */
 import { Question } from '../types/question';
 import { Assessment } from '../types/assessment';
 import { Course } from '../types/assessment';

@@ -1,3 +1,7 @@
+/**
+ * Sequelize model representing the question shell (metadata) that owns variants.
+ * Stores course/topic relationships, type, and per-assessment ordering for the question.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 

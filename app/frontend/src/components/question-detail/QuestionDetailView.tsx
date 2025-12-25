@@ -1,3 +1,7 @@
+/**
+ * Detailed drawer/card for a question and its variants with actions for duplication and deletion.
+ * Loads latest question data, displays metadata, and surfaces variant management controls.
+ */
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';

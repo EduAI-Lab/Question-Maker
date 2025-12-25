@@ -1,3 +1,7 @@
+/**
+ * Question bank list with search/sort controls, add/upload actions, and variant cards.
+ * Filters variants client-side and exposes callbacks for viewing/creating variants.
+ */
 import { useState, useMemo } from 'react';
 import { QuestionVariantEntry } from '../../types/question';
 import { QuestionCard } from './QuestionCard';
@@ -91,7 +95,7 @@ export const QuestionBank = ({
           <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading questions...
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" data-tour-id="question-list">
           {filteredVariants.map((entry, index) => (
             <QuestionCard
               key={`${entry.questionId}-${entry.variant.id}`}
@@ -112,7 +116,7 @@ export const QuestionBank = ({
                   </div>
                   <Button onClick={onOpenProfile} className="flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    <span>Open Profile to Add Courses</span>
+                    <span>Start Guided Tour</span>
                   </Button>
                 </div>
               ) : (

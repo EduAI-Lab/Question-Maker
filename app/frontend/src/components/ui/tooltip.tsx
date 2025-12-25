@@ -1,3 +1,6 @@
+/**
+ * Lightweight tooltip component for displaying content on hover/focus.
+ */
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +31,7 @@ export const Tooltip = ({ children, content, side = 'top', className, multiline 
 
   return (
     <div
-      className="relative inline-block"
+      className={cn("relative inline-block", className)}
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
     >
@@ -57,4 +60,3 @@ export const Tooltip = ({ children, content, side = 'top', className, multiline 
     </div>
   );
 };
-

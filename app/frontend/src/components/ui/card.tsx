@@ -1,3 +1,6 @@
+/**
+ * Shadcn card primitives for layout containers with header/content/footer.
+ */
 import * as React from "react"
 import { useTheme } from "@/components/theme-provider"
 

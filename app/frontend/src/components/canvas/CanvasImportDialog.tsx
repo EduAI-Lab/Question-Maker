@@ -1,3 +1,7 @@
+/**
+ * Dialog for importing a Canvas quiz into a local assessment with topic selection.
+ * Handles integration checks, course/quiz selection, and imports while reporting skips.
+ */
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -555,4 +559,3 @@ export const CanvasImportDialog = ({
 };
 
 export default CanvasImportDialog;
-

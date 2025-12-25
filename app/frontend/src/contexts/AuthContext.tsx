@@ -1,4 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+/**
+ * Auth context provider that manages user session state, token storage, and auth actions.
+ * Exposes hooks for login/register/logout and guards consumers until initialization completes.
+ */
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { User } from '../types/auth';
 import { authService } from '../services/authService';
 
@@ -13,6 +17,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Hook to read auth context; throws if used outside AuthProvider. */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -25,15 +30,18 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+/** Provides auth state/actions to the React tree and initializes from stored tokens. */
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const hasInitialized = useRef(false);
 
   // Initialize authentication state
   useEffect(() => {
-    if (isInitialized) return;
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
     
     const initAuth = async () => {
       console.log('AuthProvider: Initializing auth...');
@@ -58,7 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     };
 
     initAuth();
-  }, [isInitialized]);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
@@ -116,6 +124,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     setIsInitialized(false);
+    hasInitialized.current = false;
   }, []);
 
   const value = {

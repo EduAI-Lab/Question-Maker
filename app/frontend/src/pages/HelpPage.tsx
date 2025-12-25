@@ -1,10 +1,23 @@
+import { useGuidedTour } from '../contexts/GuidedTourContext';
+
 export const HelpPage = () => {
+    const { startTour } = useGuidedTour();
+
     return (
         <div className="min-h-screen bg-background text-foreground">
             <div className="mx-auto max-w-4xl px-6 py-10 space-y-10 text-base">
                 <header className="space-y-2">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">Help Center</p>
                     <h1 className="text-3xl font-bold">Question Maker User Guide</h1>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => startTour('main')}
+                            className="rounded-md border border-gray-300 px-3 py-1.5 text-sm text-gray-800 hover:border-gray-400"
+                        >
+                            Start Guided Tour
+                        </button>
+                    </div>
                 </header>
 
                 <section className="space-y-2">

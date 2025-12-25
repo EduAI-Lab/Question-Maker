@@ -1,3 +1,7 @@
+/**
+ * Animated floating letters SVG used for decorative background on the login page.
+ * Randomly seeds characters and updates their positions over time for a subtle motion effect.
+ */
 import { useEffect, useState } from 'react';
 
 interface Letter {

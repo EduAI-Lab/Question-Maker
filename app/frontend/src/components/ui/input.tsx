@@ -1,3 +1,6 @@
+/**
+ * Shadcn input component with forwarded ref and focus styling.
+ */
 import * as React from "react"
 
 export interface InputProps
