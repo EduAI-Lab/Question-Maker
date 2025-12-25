@@ -1,3 +1,6 @@
+/**
+ * Shadcn progress bar component for loading indicators.
+ */
 import * as React from "react"
 
 const Progress = React.forwardRef<

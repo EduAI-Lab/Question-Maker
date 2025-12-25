@@ -1,3 +1,7 @@
+/**
+ * Dialog for uploading PDF/image files, running OCR, and extracting questions via EduAI.
+ * Manages draft review, topic selection, optional assessment creation, and save flows.
+ */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Tesseract from 'tesseract.js';
@@ -23,6 +27,8 @@ import { Progress } from '../ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Tooltip } from '../ui/tooltip';
 import { useToast } from '../ui/use-toast';
+import { useEduAIStatus } from '../../hooks/useEduAIStatus';
+import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 
 import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '../../types/question';
 import { Topic } from '../../types/topic';
@@ -108,6 +114,7 @@ export const QuestionUploadDialog = ({
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
     const [providerApiKey, setProviderApiKey] = useState('');
+    const eduaiStatus = useEduAIStatus();
     const selectedModel = useMemo(
         () => availableModels.find((model) => model.id === aiModel),
         [aiModel, availableModels]
@@ -180,6 +187,8 @@ export const QuestionUploadDialog = ({
             setNewTopicName('Uploaded Questions');
         }
     }, [open, topics]);
+
+    // No auto-start; keep a single tour entry point.
 
     useEffect(() => {
         if (!open) return;
@@ -592,17 +601,19 @@ export const QuestionUploadDialog = ({
         <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
             <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>Upload Questions</DialogTitle>
-                    <DialogDescription>
-                        Upload a PDF or image containing questions for{' '}
-                        <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
-                        {' '}
-                        We&apos;ll extract them with OCR and AI so you can review before saving.
-                    </DialogDescription>
+                    <div>
+                        <DialogTitle>Upload Questions</DialogTitle>
+                        <DialogDescription>
+                            Upload a PDF or image containing questions for{' '}
+                            <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
+                            {' '}
+                            We&apos;ll extract them with OCR and AI so you can review before saving.
+                        </DialogDescription>
+                    </div>
                 </DialogHeader>
 
                 <div className="space-y-6 py-2">
-                    <Card>
+                    <Card data-tour-id="upload-assessment-meta">
                         <CardHeader className="space-y-1">
                             <CardTitle className="text-base font-semibold">Assessment details</CardTitle>
                             <p className="text-xs text-muted-foreground">
@@ -651,14 +662,22 @@ export const QuestionUploadDialog = ({
 
                     <Card>
                         <CardHeader className="space-y-1">
-                            <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
+                                <EduAIStatusBadge
+                                    status={eduaiStatus.status}
+                                    message={eduaiStatus.message}
+                                    onRefresh={eduaiStatus.refresh}
+                                    className="z-50"
+                                />
+                            </div>
                             <p className="text-xs text-muted-foreground">
                                 Questions will be saved to <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
                                 {' '}Topics are assigned automatically after extraction—you can adjust them in the review step.
                             </p>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="space-y-2">
+                            <div className="space-y-2" data-tour-id="upload-model">
                                 <Label htmlFor="ai-model">AI model</Label>
                                 <Select value={aiModel} onValueChange={setAiModel}>
                                     <SelectTrigger id="ai-model">
@@ -752,6 +771,7 @@ export const QuestionUploadDialog = ({
                             {(!lastFileName && draftQuestions.length === 0) && (
                                 <label
                                     htmlFor="question-upload"
+                                    data-tour-id="upload-file"
                                     className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/30 p-6 text-center transition hover:border-primary hover:bg-muted/50 cursor-pointer"
                                 >
                                     <UploadCloud className="h-10 w-10 text-muted-foreground" />
@@ -801,7 +821,7 @@ export const QuestionUploadDialog = ({
                     </Card>
 
                     {draftQuestions.length > 0 && (
-                        <Card>
+                        <Card data-tour-id="upload-review">
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle className="text-base font-semibold">
                                     Review extracted questions ({draftQuestions.length})
@@ -976,14 +996,14 @@ export const QuestionUploadDialog = ({
                         {disabledReason ? (
                             <Tooltip content={disabledReason} multiline>
                                 <span className="inline-block">
-                                    <Button onClick={() => void handleSave()} disabled={!canSave}>
+                                    <Button onClick={() => void handleSave()} disabled={!canSave} data-tour-id="upload-create">
                                         {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Create Questions
                                     </Button>
                                 </span>
                             </Tooltip>
                         ) : (
-                            <Button onClick={() => void handleSave()} disabled={!canSave}>
+                            <Button onClick={() => void handleSave()} disabled={!canSave} data-tour-id="upload-create">
                                 {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Create Questions
                             </Button>

@@ -1,3 +1,7 @@
+/**
+ * Configures the Sequelize/PostgreSQL connection and keeps it healthy via retries and background monitoring.
+ * Responsible for loading environment variables, authenticating, syncing schemas, and reconnecting when needed.
+ */
 import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -52,10 +56,8 @@ let isConnected = false;
 let connectionRetryInterval = null;
 
 /**
- * Retry database connection with exponential backoff
- * @param {number} maxRetries - Maximum number of retry attempts
- * @param {number} initialDelay - Initial delay in milliseconds
- * @returns {Promise<void>}
+ * Attempts to authenticate with exponential backoff until success or the retry limit is reached.
+ * Keeps startup resilient when Postgres containers or services take time to become available.
  */
 const retryConnection = async (maxRetries = 10, initialDelay = 1000) => {
   let attempt = 0;
@@ -92,8 +94,8 @@ const retryConnection = async (maxRetries = 10, initialDelay = 1000) => {
 };
 
 /**
- * Start background reconnection monitoring
- * This will periodically check and reconnect if the connection is lost
+ * Starts background reconnection monitoring to periodically verify the database connection.
+ * Automatically re-authenticates dropped pools so long-lived servers keep operating.
  */
 const startReconnectionMonitoring = () => {
   if (connectionRetryInterval) {
@@ -124,6 +126,10 @@ const startReconnectionMonitoring = () => {
   }, 10000); // Check every 10 seconds
 };
 
+/**
+ * Establishes the Sequelize connection, optionally retries/syncs schema, and bootstraps background monitoring.
+ * Options let callers control retry count, whether to tolerate failure, and how strict startup should be.
+ */
 export const connectDatabase = async (options = {}) => {
   const { 
     retryOnFailure = true, 
@@ -169,4 +175,3 @@ export const connectDatabase = async (options = {}) => {
 };
 
 export { sequelize };
-

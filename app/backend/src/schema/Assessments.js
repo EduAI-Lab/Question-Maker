@@ -1,3 +1,7 @@
+/**
+ * Sequelize model for assessment blueprints (midterm, quiz, etc.) tied to a course.
+ * Stores metadata like type, semester, description, and optional blueprint configuration JSON.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 

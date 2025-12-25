@@ -1,3 +1,7 @@
+/**
+ * Drag-free topic selector that manages primary, secondary, and excluded topic lists.
+ * Filters available topics, supports search, and emits changes per category.
+ */
 import * as React from 'react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';

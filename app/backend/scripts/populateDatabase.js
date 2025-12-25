@@ -1,3 +1,7 @@
+/**
+ * Seeds the application database with sample users, courses, topics, assessments, and variants.
+ * Loads environment variables from the project root and normalizes the DATABASE_URL for local vs Docker runs before touching Sequelize.
+ */
 // CRITICAL: Load environment variables FIRST before any imports that depend on them
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -58,6 +62,10 @@ const schemaModule = await import('../src/schema/index.js');
 const { sequelize } = dbModule;
 const { User, Course, Topics, Question_Metadata, Assessments, Variants } = schemaModule;
 
+/**
+ * Connects to the database, clears existing records, and inserts the predefined seed dataset.
+ * Emits progress logs for each stage so developers can verify connection, schema sync, and entity creation.
+ */
 const populateDatabase = async () => {
   try {
     console.log('Connecting to database...');

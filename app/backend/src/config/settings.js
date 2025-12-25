@@ -1,3 +1,7 @@
+/**
+ * Loads environment variables from the project root and exposes a normalized configuration object for the backend.
+ * Provides sensible defaults for development while enforcing required secrets (e.g., encryption key) in production.
+ */
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -11,6 +15,7 @@ const projectRoot = path.resolve(__dirname, '../../../../');
 // Load environment variables from project root
 dotenv.config({ path: path.join(projectRoot, '.env') });
 
+/** Centralized application settings derived from environment variables for use across services and routes. */
 export const config = {
   // Server
   port: process.env.PORT || 8000,

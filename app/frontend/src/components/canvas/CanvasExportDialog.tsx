@@ -1,3 +1,7 @@
+/**
+ * Dialog for exporting an assessment to Canvas, handling integration setup and course selection.
+ * Validates inputs, triggers export, and surfaces success/error toasts.
+ */
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -264,4 +268,3 @@ export const CanvasExportDialog = ({
 };
 
 export default CanvasExportDialog;
-

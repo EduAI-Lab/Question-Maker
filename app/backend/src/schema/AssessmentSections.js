@@ -1,3 +1,7 @@
+/**
+ * Sequelize model for assessment sections, which define groupings of variants within an assessment.
+ * Captures filters, difficulty settings, metadata, and ordering used by the builder UI.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 

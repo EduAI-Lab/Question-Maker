@@ -1,3 +1,7 @@
+/**
+ * Join model linking question variants to assessment sections with display order and metadata.
+ * Enforces uniqueness per section/variant pair to avoid duplicate placements.
+ */
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
 

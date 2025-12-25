@@ -1,3 +1,7 @@
+/**
+ * Card showing an assessment section with variant count, draft warnings, and edit/delete actions.
+ * Provides hooks for editing the section or removing individual variants.
+ */
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { AssessmentSection, SectionVariantLink } from '../../types/question';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';

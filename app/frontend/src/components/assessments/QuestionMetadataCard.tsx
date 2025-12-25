@@ -1,3 +1,7 @@
+/**
+ * Displays question metadata with variant tabs, topic labels, and review toggles.
+ * Lets users select a question, add variants, and change draft status inline.
+ */
 import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';

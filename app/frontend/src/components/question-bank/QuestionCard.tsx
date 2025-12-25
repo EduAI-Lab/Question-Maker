@@ -1,3 +1,7 @@
+/**
+ * Card rendering a single question/variant summary with actions to view or create variants.
+ * Displays metadata badges for type, difficulty, topic, AI status, and draft state.
+ */
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';

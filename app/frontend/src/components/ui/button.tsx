@@ -1,3 +1,6 @@
+/**
+ * Shadcn button with variant styling for primary/secondary/destructive/ghost actions.
+ */
 import * as React from "react"
 import { cn } from "@/lib/utils"
 

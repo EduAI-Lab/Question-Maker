@@ -1,3 +1,7 @@
+/**
+ * Centralizes Sequelize model imports and associations for the backend data layer.
+ * Exported models are wired together here so services can rely on eager/lazy relationships.
+ */
 import { sequelize } from '../config/database.js';
 import { User } from './User.js';
 import { Course } from './Course.js';

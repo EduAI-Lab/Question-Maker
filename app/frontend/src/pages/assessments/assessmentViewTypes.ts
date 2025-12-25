@@ -1,3 +1,6 @@
+/**
+ * Shared types/constants for the assessment builder views (filters, labels, defaults).
+ */
 import { QuestionType, ReasoningDataState } from '../../types/question';
 
 export type QuestionSearchFilters = {

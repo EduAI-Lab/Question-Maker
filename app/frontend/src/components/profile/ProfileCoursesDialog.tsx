@@ -1,3 +1,7 @@
+/**
+ * Dialog for linking EduAI courses into the local library, fetching topics, and handling logout.
+ * Lets users select courses from EduAI, skip ones already added, and persist them via courseService.
+ */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -16,6 +20,9 @@ import { eduaiService, EduAICourseOption, EduAITopicOption } from '../../service
 import { courseService } from '../../services/courseService';
 import { useToast } from '../ui/use-toast';
 import { useAuth } from '../../contexts/AuthContext';
+import { useEduAIStatus } from '../../hooks/useEduAIStatus';
+import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
+import { useGuidedTour } from '../../contexts/GuidedTourContext';
 
 interface ProfileCoursesDialogProps {
     open: boolean;
@@ -42,6 +49,8 @@ export const ProfileCoursesDialog = ({
     const { toast } = useToast();
     const { logout } = useAuth();
     const navigate = useNavigate();
+    const eduaiStatus = useEduAIStatus();
+    const { startTour } = useGuidedTour();
 
     const existingCourseCodeSet = useMemo(() => {
         const codes = new Set<string>();
@@ -273,10 +282,22 @@ export const ProfileCoursesDialog = ({
         <Dialog open={open} onOpenChange={handleDialogChange}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Add Courses</DialogTitle>
-                    <DialogDescription>
-                        Link courses from EduAI or create a test course to get started without connecting to EduAI.
-                    </DialogDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <DialogTitle>Add Courses</DialogTitle>
+                            <DialogDescription>
+                                Link courses from EduAI or create a test course to get started without connecting to EduAI.
+                            </DialogDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <EduAIStatusBadge
+                                status={eduaiStatus.status}
+                                message={eduaiStatus.message}
+                                onRefresh={eduaiStatus.refresh}
+                                className="z-50"
+                            />
+                        </div>
+                    </div>
                 </DialogHeader>
 
                 {error && (
@@ -334,7 +355,7 @@ export const ProfileCoursesDialog = ({
                             Loading courses from EduAI...
                         </div>
                     ) : (
-                        <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+                        <div className="max-h-80 space-y-3 overflow-y-auto pr-1" data-tour-id="profile-course-list">
                             {courseOptions.map((option) => {
                                 const normalized = normalizeCourseCode(option.code);
                                 const isAdded = normalized ? existingCourseCodeSet.has(normalized) : false;
@@ -369,7 +390,7 @@ export const ProfileCoursesDialog = ({
                                                         {option.term} {option.year}
                                                     </Badge>
                                                 )}
-                                                {isAdded && <Badge variant="outline">Already added</Badge>}
+                                                {isAdded && <Badge variant="outline" data-tour-id="profile-added-badge">Already added</Badge>}
                                                 {isSelected && !isAdded && !isSaving && (
                                                     <Badge variant="secondary">Selected</Badge>
                                                 )}
@@ -415,7 +436,7 @@ export const ProfileCoursesDialog = ({
                         <Button variant="ghost" onClick={onClose} disabled={isSaving}>
                             Cancel
                         </Button>
-                        <Button onClick={handleSave} disabled={isSaving || isLoading}>
+                        <Button onClick={handleSave} disabled={isSaving || isLoading} data-tour-id="profile-add-button">
                             {isSaving ? 'Linking…' : 'Add selected courses'}
                         </Button>
                     </div>

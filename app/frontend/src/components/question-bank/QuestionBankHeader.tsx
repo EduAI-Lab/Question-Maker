@@ -1,3 +1,7 @@
+/**
+ * Header for the question bank list with add/upload actions and course context.
+ * Shows counts and disables actions when appropriate.
+ */
 import { Button } from '../ui/button';
 import { Plus, Upload } from 'lucide-react';
 
@@ -34,6 +38,7 @@ export const QuestionBankHeader = ({
             onClick={onUploadQuestions}
             className="flex items-center space-x-2"
             disabled={disableUpload}
+            data-tour-id="upload-questions-btn"
           >
             <Upload className="h-4 w-4" />
             <span>Upload Questions</span>
@@ -42,6 +47,7 @@ export const QuestionBankHeader = ({
             onClick={onAddQuestion}
             className="flex items-center space-x-2"
             disabled={disableAdd}
+            data-tour-id="add-question-btn"
           >
             <Plus className="h-4 w-4" />
             <span>Add Question</span>

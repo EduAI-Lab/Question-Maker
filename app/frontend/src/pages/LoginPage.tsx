@@ -1,3 +1,7 @@
+/**
+ * Login/Registration page providing email/password auth with basic loading/error states.
+ * Redirects authenticated users to the landing page and shows a decorative background animation.
+ */
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';

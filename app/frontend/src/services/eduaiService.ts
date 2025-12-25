@@ -1,3 +1,7 @@
+/**
+ * Frontend wrapper around EduAI endpoints for chat, question generation, course/topics, and model list.
+ * Passes through provider API keys as needed and returns typed results.
+ */
 import api from './api';
 
 export interface EduAIMessage {
@@ -133,25 +137,19 @@ export interface EduAITestResponse {
 }
 
 class EduAIService {
-    /**
-     * Send a chat message to EduAI with course context
-     */
+    /** Sends a chat message to EduAI with course context. */
     async chat(request: EduAIChatRequest): Promise<EduAIChatResponse> {
         const response = await api.post('/api/eduai/chat', request);
         return response.data;
     }
 
-    /**
-     * Generate questions using EduAI with course context
-     */
+    /** Generates questions via EduAI with the provided course/prompt/model settings. */
     async generateQuestions(request: EduAIQuestionGenerationRequest): Promise<EduAIQuestionGenerationResponse> {
         const response = await api.post('/api/eduai/generate-questions', request);
         return response.data;
     }
 
-    /**
-     * Test EduAI API key validity
-     */
+    /** Tests configured EduAI credentials by calling the backend validation endpoint. */
     async testApiKey(): Promise<EduAITestResponse> {
         const response = await api.get('/api/eduai/test-api-key');
         return response.data;

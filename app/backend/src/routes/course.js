@@ -1,12 +1,14 @@
+/**
+ * Router responsible for course and topic CRUD scoped to authenticated instructors.
+ * Performs ownership checks before touching Sequelize models to keep tenant data isolated.
+ */
 import express from 'express';
 import { Course, Question_Metadata, Topics } from '../schema/index.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// @route   POST /api/course
-// @desc    Create a new course
-// @access  Private
+/** POST /api/course – creates a course tied to the authenticated user after basic validation. */
 router.post('/', authenticateToken, async (req, res, next) => {
   try {
     const { name, courseCode } = req.body;
@@ -34,9 +36,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/course
-// @desc    Get all courses for the current user
-// @access  Private
+/** GET /api/course – lists the user’s courses and optionally includes question/topic stats. */
 router.get('/', authenticateToken, async (req, res, next) => {
   try {
     const { includeStats = false } = req.query;
@@ -94,9 +94,7 @@ router.get('/', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/course/:id
-// @desc    Get a specific course
-// @access  Private
+/** GET /api/course/:id – fetches a single course with optional details if the requester owns it. */
 router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { includeDetails = false } = req.query;
@@ -145,9 +143,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   PUT /api/course/:id
-// @desc    Update a course
-// @access  Private
+/** PUT /api/course/:id – updates course metadata after confirming ownership. */
 router.put('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { name, courseCode } = req.body;
@@ -178,9 +174,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   DELETE /api/course/:id
-// @desc    Delete a course
-// @access  Private
+/** DELETE /api/course/:id – removes a course and its associations if it belongs to the user. */
 router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
     const courseData = await Course.findOne({
@@ -205,9 +199,7 @@ router.delete('/:id', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   GET /api/course/:id/topics
-// @desc    Get all topics for a specific course
-// @access  Private
+/** GET /api/course/:id/topics – returns the topic list for an owned course. */
 router.get('/:id/topics', authenticateToken, async (req, res, next) => {
   try {
     // Verify user owns the course
@@ -236,9 +228,7 @@ router.get('/:id/topics', authenticateToken, async (req, res, next) => {
   }
 });
 
-// @route   POST /api/course/:id/topics
-// @desc    Create a new topic for a course
-// @access  Private
+/** POST /api/course/:id/topics – adds a topic to the course after validation and ownership checks. */
 router.post('/:id/topics', authenticateToken, async (req, res, next) => {
   try {
     const { name } = req.body;
