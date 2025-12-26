@@ -676,11 +676,16 @@ export const createVariant = async (questionId, variantData, userId) => {
     }
 
     const secondaryTopics = normalizeSecondaryTopics(variantData.secondaryTopicsId);
+    const validReasoningLevels = ['factual', 'analytical', 'application'];
+    const reasoningLevel = variantData.reasoningLevel && validReasoningLevels.includes(variantData.reasoningLevel)
+      ? variantData.reasoningLevel
+      : 'factual';
 
     const variant = await Variants.create({
       questionMetadataId: questionId,
       questionText: variantData.questionText,
       difficulty: variantData.difficulty || 'medium',
+      reasoningLevel,
       assessmentId: variantData.assessmentId || null,
       secondaryTopicsId: secondaryTopics,
       answer: variantData.answer || null,

@@ -21,6 +21,8 @@ interface MatchingQuestionsPanelProps {
   searchError: string | null;
   hasSearched: boolean;
   topicsById: Record<number, Topic>;
+  selectedVariantByQuestion?: Record<number, number>;
+  onVariantChange?: (questionId: number, variantId: number) => void;
 }
 
 export const MatchingQuestionsPanel = ({
@@ -34,7 +36,9 @@ export const MatchingQuestionsPanel = ({
   isSearching,
   searchError,
   hasSearched,
-  topicsById
+  topicsById,
+  selectedVariantByQuestion,
+  onVariantChange
 }: MatchingQuestionsPanelProps) => {
   const selectedCount = selectedQuestionIds.size;
 
@@ -102,6 +106,8 @@ export const MatchingQuestionsPanel = ({
                 onAddVariant={() => onAddVariant(question)}
                 topicsById={topicsById}
                 onToggleReview={onToggleReview}
+                selectedVariantId={selectedVariantByQuestion?.[question.id]}
+                onVariantChange={onVariantChange}
               />
             );
           })}
