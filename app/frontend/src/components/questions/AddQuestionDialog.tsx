@@ -61,6 +61,7 @@ type FormState = {
     generationModel: string;
     generationDifficulty: QuestionDifficulty | 'balanced';
     generationReasoningLevel: ReasoningLevel | 'balanced';
+    batchSize: string; // Batch size for batch generation
 };
 
 const defaultForm: FormState = {
@@ -79,7 +80,8 @@ const defaultForm: FormState = {
     generationPrompt: '',
     generationModel: 'ollama:gpt-oss:120b',
     generationDifficulty: 'balanced',
-    generationReasoningLevel: 'balanced'
+    generationReasoningLevel: 'balanced',
+    batchSize: '5'
 };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
@@ -117,6 +119,7 @@ export const AddQuestionDialog = ({
     const [availableEduCourses, setAvailableEduCourses] = useState<EduAICourseOption[]>([]);
     const [isAiGenerated, setIsAiGenerated] = useState(false);
     const [markAsReviewed, setMarkAsReviewed] = useState(false); // false = draft (default), true = reviewed
+    const [isBatchGenerating, setIsBatchGenerating] = useState(false);
     const { toast } = useToast();
     const eduaiStatus = useEduAIStatus();
     const selectedGenerationModel = useMemo(
@@ -139,6 +142,7 @@ export const AddQuestionDialog = ({
             setAssessments([]);
             setCourseDetails(null);
             setIsGenerating(false);
+            setIsBatchGenerating(false);
             setIsAiGenerated(false);
             setMarkAsReviewed(false);
             return;
@@ -626,6 +630,118 @@ export const AddQuestionDialog = ({
             });
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleGenerateBatch = async () => {
+        if (!courseId) {
+            setError('Select a course before generating questions.');
+            return;
+        }
+
+        const courseCode = resolveCourseCodeForEduAI();
+
+        if (!courseCode) {
+            setError(
+                'EduAI requires a course code. Update the course with a code or ensure the course exists in EduAI.'
+            );
+            return;
+        }
+
+        if (!form.generationPrompt.trim()) {
+            setError('Enter a topic or prompt before asking EduAI to generate questions.');
+            return;
+        }
+
+        const batchSize = parseInt(form.batchSize);
+        if (!Number.isInteger(batchSize) || batchSize < 1 || batchSize > 100) {
+            setError('Batch size must be an integer between 1 and 100.');
+            return;
+        }
+
+        try {
+            setIsBatchGenerating(true);
+            setError(null);
+
+            const difficultyDistribution = (() => {
+                if (form.generationDifficulty === 'balanced') {
+                    return { easy: 0, medium: 1, hard: 0 };
+                }
+                return {
+                    easy: form.generationDifficulty === 'easy' ? 1 : 0,
+                    medium: form.generationDifficulty === 'medium' ? 1 : 0,
+                    hard: form.generationDifficulty === 'hard' ? 1 : 0
+                };
+            })();
+
+            const reasoningDistribution = (() => {
+                if (form.generationReasoningLevel === 'balanced') {
+                    return { factual: 33, analytical: 33, application: 34 };
+                }
+                return {
+                    factual: form.generationReasoningLevel === 'factual' ? 100 : 0,
+                    analytical: form.generationReasoningLevel === 'analytical' ? 100 : 0,
+                    application: form.generationReasoningLevel === 'application' ? 100 : 0
+                };
+            })();
+
+            const promptWithTopics = (() => {
+                const trimmedPrompt = form.generationPrompt.trim();
+                const sections: string[] = [trimmedPrompt];
+
+                if (topics.length > 0) {
+                    const topicLines = topics.map((topic) => `- [${topic.id}] ${topic.name}`).join('\n');
+                    sections.push(
+                        `Course topics:\n${topicLines}\n\nUse these numeric IDs for "primary_topic_id" and "secondary_topic_ids".`
+                    );
+                }
+
+                return sections.filter(Boolean).join('\n\n');
+            })();
+
+            const apiKeys = await apiKeyStorage.buildApiKeysForModel(form.generationModel);
+            const response = await eduaiService.generateQuestionsBatch({
+                prompt: promptWithTopics,
+                courseCode,
+                courseId: courseId,
+                model: form.generationModel,
+                batchSize,
+                difficultyDistribution,
+                reasoningDistribution,
+                apiKeys,
+                topics: topics.map((t) => ({ id: t.id, name: t.name }))
+            });
+
+            const generatedCount = response?.data?.totalGenerated || 0;
+            const requestedCount = response?.data?.totalRequested || batchSize;
+
+            if (generatedCount === 0) {
+                throw new Error('No questions were generated. Please try again with a different prompt.');
+            }
+
+            toast({
+                title: 'Batch generation complete',
+                description: `Generated ${generatedCount} out of ${requestedCount} questions. All questions are saved as drafts.`
+            });
+
+            // Close the dialog and refresh the question list
+            // The parent component should handle refreshing the question list
+            onClose();
+        } catch (generateError: any) {
+            console.error('EduAI batch generation failed', generateError);
+            const message =
+                generateError?.response?.data?.error ||
+                generateError?.response?.data?.details ||
+                generateError?.message ||
+                'Failed to generate questions.';
+            setError(message);
+            toast({
+                variant: 'destructive',
+                title: 'EduAI batch generation failed',
+                description: message
+            });
+        } finally {
+            setIsBatchGenerating(false);
         }
     };
 
@@ -1211,15 +1327,46 @@ export const AddQuestionDialog = ({
                                             </Select>
                                         </div>
 
-                                        <Button
-                                            type="button"
-                                            onClick={handleGenerateWithAI}
-                                            disabled={isGenerating}
-                                            className="w-full"
-                                            size="sm"
-                                        >
-                                            {isGenerating ? 'Generating...' : 'Generate'}
-                                        </Button>
+                                        <div className="space-y-2 pt-2 border-t">
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="batch-size" className="text-xs font-medium">Batch Size</Label>
+                                                <Input
+                                                    id="batch-size"
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    value={form.batchSize}
+                                                    onChange={(event) => handleFieldChange('batchSize', event.target.value)}
+                                                    placeholder="5"
+                                                    className="h-9 text-xs"
+                                                />
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    Number of independent questions to generate (1-100). Each question is generated separately.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Button
+                                                type="button"
+                                                onClick={handleGenerateWithAI}
+                                                disabled={isGenerating || isBatchGenerating}
+                                                className="w-full"
+                                                size="sm"
+                                                variant="outline"
+                                            >
+                                                {isGenerating ? 'Generating...' : 'Generate Single'}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                onClick={handleGenerateBatch}
+                                                disabled={isGenerating || isBatchGenerating}
+                                                className="w-full"
+                                                size="sm"
+                                            >
+                                                {isBatchGenerating ? `Generating ${form.batchSize} questions...` : `Generate Batch (${form.batchSize})`}
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

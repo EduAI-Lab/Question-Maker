@@ -67,6 +67,41 @@ export interface EduAIQuestionGenerationResponse {
     };
 }
 
+export interface EduAIBatchQuestionGenerationRequest {
+    prompt: string;
+    courseCode: string;
+    courseId: number;
+    model?: string;
+    apiKeys?: Record<string, any>;
+    batchSize: number;
+    difficultyDistribution?: {
+        easy: number;
+        medium: number;
+        hard: number;
+    };
+    reasoningDistribution?: {
+        factual: number;
+        analytical: number;
+        application: number;
+    };
+    topics?: Array<{ id: number; name: string }>;
+}
+
+export interface EduAIBatchQuestionGenerationResponse {
+    success: boolean;
+    data: {
+        questions: Array<any>; // Full question objects with variants
+        batchId: string;
+        totalRequested: number;
+        totalGenerated: number;
+        errors?: Array<{
+            index: number;
+            generationId: string;
+            error: string;
+        }>;
+    };
+}
+
 export interface EduAIModelOption {
     id: string;
     label: string;
@@ -146,6 +181,16 @@ class EduAIService {
     /** Generates questions via EduAI with the provided course/prompt/model settings. */
     async generateQuestions(request: EduAIQuestionGenerationRequest): Promise<EduAIQuestionGenerationResponse> {
         const response = await api.post('/api/eduai/generate-questions', request);
+        return response.data;
+    }
+
+    /**
+     * Generates a batch of N independent questions by calling single-question generation N times.
+     * Each question is generated independently with no shared context.
+     * All questions are persisted with batch_id, generation_id, and status="draft".
+     */
+    async generateQuestionsBatch(request: EduAIBatchQuestionGenerationRequest): Promise<EduAIBatchQuestionGenerationResponse> {
+        const response = await api.post('/api/eduai/generate-questions-batch', request);
         return response.data;
     }
 

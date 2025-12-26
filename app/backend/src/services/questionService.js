@@ -691,7 +691,9 @@ export const createVariant = async (questionId, variantData, userId) => {
       answer: variantData.answer || null,
       referenceId: variantData.referenceId || null,
       isAiGenerated: variantData.isAiGenerated !== undefined ? Boolean(variantData.isAiGenerated) : false,
-      isDraft: variantData.isDraft !== undefined ? Boolean(variantData.isDraft) : true
+      isDraft: variantData.isDraft !== undefined ? Boolean(variantData.isDraft) : true,
+      batchId: variantData.batchId || null,
+      generationId: variantData.generationId || null
     });
 
     return variant;

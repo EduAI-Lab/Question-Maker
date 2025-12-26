@@ -5,6 +5,7 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
 import eduaiService from '../services/eduaiService.js';
+import { generateBatchQuestions } from '../services/batchGenerationService.js';
 import { Course } from '../schema/Course.js';
 
 const router = express.Router();
@@ -200,6 +201,78 @@ router.get('/ai-models', authenticateToken, async (req, res) => {
     console.error('EduAI list models error:', error);
     res.status(500).json({
       error: 'Failed to retrieve AI models from EduAI',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/eduai/generate-questions-batch – generates N independent questions via batch orchestration.
+ * 
+ * ARCHITECTURAL PRINCIPLE:
+ * - Each question is generated independently by calling single-question generation N times
+ * - No shared context between questions
+ * - Each question gets a unique batch_id and generation_id
+ * - All questions are persisted with status="draft" (isDraft=true)
+ * 
+ * This is an infrastructure optimization that preserves per-question generation semantics.
+ */
+router.post('/generate-questions-batch', authenticateToken, async (req, res) => {
+  try {
+    const {
+      prompt,
+      courseCode,
+      courseId,
+      model,
+      apiKeys,
+      batchSize,
+      difficultyDistribution,
+      reasoningDistribution,
+      topics
+    } = req.body;
+    const userId = req.user.id;
+
+    // Validate required fields
+    if (!prompt || !courseCode || !courseId) {
+      return res.status(400).json({
+        error: 'Prompt, course code, and course ID are required'
+      });
+    }
+
+    if (!batchSize || !Number.isInteger(parseInt(batchSize)) || parseInt(batchSize) < 1) {
+      return res.status(400).json({
+        error: 'Batch size must be a positive integer'
+      });
+    }
+
+    // Call batch generation service
+    const result = await generateBatchQuestions({
+      prompt,
+      courseCode,
+      courseId: parseInt(courseId),
+      userId,
+      batchSize: parseInt(batchSize),
+      model: model || 'google:gemini-2.5-flash',
+      apiKeys: apiKeys || {},
+      difficultyDistribution: difficultyDistribution || { easy: 0, medium: 1, hard: 0 },
+      reasoningDistribution: reasoningDistribution || { factual: 33, analytical: 33, application: 34 },
+      topics: topics || []
+    });
+
+    res.json({
+      success: true,
+      data: {
+        questions: result.questions,
+        batchId: result.batchId,
+        totalRequested: result.totalRequested,
+        totalGenerated: result.totalGenerated,
+        errors: result.errors
+      }
+    });
+  } catch (error) {
+    console.error('EduAI batch question generation error:', error);
+    res.status(500).json({
+      error: 'Failed to generate batch questions',
       details: error.message
     });
   }

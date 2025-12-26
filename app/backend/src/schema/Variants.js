@@ -77,6 +77,18 @@ export const Variants = sequelize.define('Variants', {
     field: 'is_draft',
     comment: 'Indicates if this variant is a draft and needs review before being added to assessments. All new variants start as drafts.'
   },
+  batchId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    field: 'batch_id',
+    comment: 'Unique identifier for a batch generation session. All questions generated in the same batch share this ID.'
+  },
+  generationId: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    field: 'generation_id',
+    comment: 'Unique identifier for a single question generation within a batch. Each question has its own generation_id.'
+  },
   answer: {
     type: DataTypes.TEXT,
     allowNull: true
