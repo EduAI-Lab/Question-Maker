@@ -110,6 +110,7 @@ export const questionService = {
   async createVariant(questionId: number, payload: {
     questionText: string;
     difficulty?: QuestionDifficulty;
+    reasoningLevel?: 'factual' | 'analytical' | 'application';
     assessmentId?: number;
     secondaryTopicsId?: number[];
     answer?: string | null;

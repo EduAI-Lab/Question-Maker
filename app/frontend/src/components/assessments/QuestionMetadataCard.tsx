@@ -2,7 +2,7 @@
  * Displays question metadata with variant tabs, topic labels, and review toggles.
  * Lets users select a question, add variants, and change draft status inline.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
@@ -16,6 +16,8 @@ interface QuestionMetadataCardProps {
   onAddVariant: () => void;
   topicsById: Record<number, Topic>;
   onToggleReview?: (variantId: number, nextDraft: boolean) => void;
+  selectedVariantId?: number;
+  onVariantChange?: (questionId: number, variantId: number) => void;
 }
 
 const getTopicName = (topicsById: Record<number, Topic>, topicId?: number | null) => {
@@ -56,14 +58,30 @@ export const QuestionMetadataCard = ({
   onToggleSelection,
   onAddVariant,
   topicsById,
-  onToggleReview
+  onToggleReview,
+  selectedVariantId,
+  onVariantChange
 }: QuestionMetadataCardProps) => {
   const variants = question.variants || [];
-  const [activeVariantId, setActiveVariantId] = useState<number>(
-    variants[0]?.id || 0
-  );
+  // Use selectedVariantId from parent if provided, otherwise default to first variant
+  const defaultVariantId = selectedVariantId ?? variants[0]?.id ?? 0;
+  const [activeVariantId, setActiveVariantId] = useState<number>(defaultVariantId);
+
+  // Sync with parent's selectedVariantId when it changes
+  useEffect(() => {
+    if (selectedVariantId !== undefined && selectedVariantId !== activeVariantId) {
+      setActiveVariantId(selectedVariantId);
+    }
+  }, [selectedVariantId, activeVariantId]);
 
   const activeVariant = variants.find((v) => v.id === activeVariantId) || variants[0];
+
+  const handleVariantChange = (variantId: number) => {
+    setActiveVariantId(variantId);
+    if (onVariantChange && isSelected) {
+      onVariantChange(question.id, variantId);
+    }
+  };
 
   const secondaryTopicNames = Array.from(
     new Set(
@@ -175,7 +193,7 @@ export const QuestionMetadataCard = ({
       {variants.length > 1 ? (
         <Tabs
           value={activeVariantId.toString()}
-          onValueChange={(value) => setActiveVariantId(Number(value))}
+          onValueChange={(value) => handleVariantChange(Number(value))}
           className="w-full"
         >
           <div className="border-t border-gray-200 bg-gray-50 px-3 py-2">
