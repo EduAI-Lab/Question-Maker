@@ -150,12 +150,22 @@ export const buildDraftFromSection = (
     ? [difficultyRaw as 'easy' | 'medium' | 'hard']
     : null;
 
+  const reasoningLevelRaw = metadata.reasoningLevel || metadata.selectedReasoning;
+  const reasoningLevel: Array<'factual' | 'analytical' | 'application'> | null = Array.isArray(reasoningLevelRaw)
+    ? reasoningLevelRaw.filter((r): r is 'factual' | 'analytical' | 'application' =>
+        ['factual', 'analytical', 'application'].includes(r as string)
+      )
+    : reasoningLevelRaw && ['factual', 'analytical', 'application'].includes(reasoningLevelRaw as string)
+    ? [reasoningLevelRaw as 'factual' | 'analytical' | 'application']
+    : null;
+
   const filters: QuestionSearchFilters = {
     questionTypes,
     primaryTopicIds: topicFilters.primaryTopicIds,
     secondaryTopicIds: topicFilters.secondaryTopicIds,
     excludedTopicIds: topicFilters.excludedTopicIds,
-    difficulty
+    difficulty,
+    reasoningLevel
   };
 
   return { filters, payload };
@@ -199,5 +209,12 @@ export const questionMatchesFilters = (question: Question, filters: QuestionSear
       filters.difficulty!.includes(variant.difficulty)
     );
 
-  return matchesType && matchesTopic && !isExcluded && matchesDifficulty;
+  // Filter by reasoning level if specified
+  const matchesReasoningLevel =
+    !filters.reasoningLevel || filters.reasoningLevel.length === 0 ||
+    (question.variants ?? []).some((variant) =>
+      variant.reasoningLevel && filters.reasoningLevel!.includes(variant.reasoningLevel)
+    );
+
+  return matchesType && matchesTopic && !isExcluded && matchesDifficulty && matchesReasoningLevel;
 };

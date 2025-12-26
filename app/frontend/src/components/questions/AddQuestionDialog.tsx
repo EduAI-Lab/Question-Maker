@@ -20,7 +20,8 @@ import {
     Question,
     QuestionDifficulty,
     QuestionType,
-    QuestionVariantEntry
+    QuestionVariantEntry,
+    ReasoningLevel
 } from '../../types/question';
 import { questionService } from '../../services/questionService';
 import { courseService } from '../../services/courseService';
@@ -47,6 +48,7 @@ type FormState = {
     baseSelection: string; // encoded as `${questionId}:${variantId}`
     variantText: string;
     variantDifficulty: QuestionDifficulty;
+    variantReasoningLevel: ReasoningLevel;
     variantAnswer: string;
     variantSecondaryTopics: number[];
     variantAssessmentId: string;
@@ -58,12 +60,14 @@ type FormState = {
     generationPrompt: string;
     generationModel: string;
     generationDifficulty: QuestionDifficulty | 'balanced';
+    generationReasoningLevel: ReasoningLevel | 'balanced';
 };
 
 const defaultForm: FormState = {
     baseSelection: '',
     variantText: '',
     variantDifficulty: 'medium',
+    variantReasoningLevel: 'factual',
     variantAnswer: '',
     variantSecondaryTopics: [],
     variantAssessmentId: 'none',
@@ -74,10 +78,17 @@ const defaultForm: FormState = {
     questionOrder: '',
     generationPrompt: '',
     generationModel: 'ollama:gpt-oss:120b',
-    generationDifficulty: 'balanced'
+    generationDifficulty: 'balanced',
+    generationReasoningLevel: 'balanced'
 };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
+const reasoningLevelOptions: ReasoningLevel[] = ['factual', 'analytical', 'application'];
+const reasoningLevelLabels: Record<ReasoningLevel, string> = {
+    factual: 'Factual',
+    analytical: 'Analytical',
+    application: 'Application'
+};
 const questionTypes: QuestionType[] = ['MCQ', 'SA', 'LA'];
 const questionTypeLabels: Record<QuestionType, string> = {
     MCQ: 'Multiple Choice',
@@ -140,6 +151,7 @@ export const AddQuestionDialog = ({
                 baseSelection: `${presetVariant.questionId}:${presetVariant.variant.id}`,
                 variantReferenceId: referenceId ? referenceId.toString() : '',
                 variantDifficulty: presetVariant.variant.difficulty ?? 'medium',
+                variantReasoningLevel: presetVariant.variant.reasoningLevel ?? 'factual',
                 variantSecondaryTopics: presetVariant.variant.secondaryTopicsId || [],
                 variantAssessmentId: presetVariant.variant.assessmentId ? presetVariant.variant.assessmentId.toString() : 'none',
                 generationPrompt: 'Create a variant of this question...'
@@ -411,6 +423,7 @@ export const AddQuestionDialog = ({
             baseSelection: `${variantEntry.questionId}:${variantEntry.variant.id}`,
             variantText: variantEntry.variant.questionText,
             variantDifficulty: variantEntry.variant.difficulty ?? 'medium',
+            variantReasoningLevel: variantEntry.variant.reasoningLevel ?? 'factual',
             variantAnswer: variantEntry.variant.answer || '',
             variantSecondaryTopics: variantEntry.variant.secondaryTopicsId || [],
             variantAssessmentId: variantEntry.variant.assessmentId ? variantEntry.variant.assessmentId.toString() : 'none',
@@ -457,6 +470,17 @@ export const AddQuestionDialog = ({
                 };
             })();
 
+            const reasoningDistribution = (() => {
+                if (form.generationReasoningLevel === 'balanced') {
+                    return { factual: 33, analytical: 33, application: 34 };
+                }
+                return {
+                    factual: form.generationReasoningLevel === 'factual' ? 100 : 0,
+                    analytical: form.generationReasoningLevel === 'analytical' ? 100 : 0,
+                    application: form.generationReasoningLevel === 'application' ? 100 : 0
+                };
+            })();
+
             const promptWithTopics = (() => {
                 const trimmedPrompt = form.generationPrompt.trim();
                 const sections: string[] = [trimmedPrompt];
@@ -496,6 +520,7 @@ export const AddQuestionDialog = ({
                 model: form.generationModel,
                 numQuestions: 1,
                 difficultyDistribution,
+                reasoningDistribution,
                 apiKeys
             });
 
@@ -512,6 +537,10 @@ export const AddQuestionDialog = ({
                 generated.difficulty === 'easy' || generated.difficulty === 'hard'
                     ? generated.difficulty
                     : 'medium';
+            const inferredReasoningLevel: ReasoningLevel =
+                generated.reasoning_level === 'analytical' || generated.reasoning_level === 'application'
+                    ? generated.reasoning_level
+                    : 'factual';
 
             setForm((prev) => {
                 const topicIdSet = new Set(topics.map((topic) => topic.id));
@@ -536,11 +565,18 @@ export const AddQuestionDialog = ({
                     )
                     : [];
 
+                const resolvedAnswer =
+                    typeof generated.answer === 'string' && generated.answer.trim().length > 0
+                        ? generated.answer.trim()
+                        : '';
+
                 if (mode === 'variant') {
                     return {
                         ...prev,
                         variantText: generated.content ?? prev.variantText,
                         variantDifficulty: inferredDifficulty,
+                        variantReasoningLevel: inferredReasoningLevel,
+                        variantAnswer: resolvedAnswer || prev.variantAnswer,
                         generationPrompt: prev.generationPrompt,
                         variantSecondaryTopics:
                             resolvedSecondaryTopics.length > 0 ? resolvedSecondaryTopics : prev.variantSecondaryTopics
@@ -560,10 +596,11 @@ export const AddQuestionDialog = ({
                     questionType: inferredType,
                     variantText: generated.content ?? prev.variantText,
                     variantDifficulty: inferredDifficulty,
+                    variantReasoningLevel: inferredReasoningLevel,
                     questionDescription: resolvedDescription,
                     generationPrompt: prev.generationPrompt,
                     variantReferenceId: '',
-                    variantAnswer: '',
+                    variantAnswer: resolvedAnswer,
                     primaryTopicId: resolvedPrimaryTopicId,
                     variantSecondaryTopics:
                         resolvedSecondaryTopics.length > 0 ? resolvedSecondaryTopics : prev.variantSecondaryTopics
@@ -618,6 +655,7 @@ export const AddQuestionDialog = ({
                 await questionService.createVariant(questionId, {
                     questionText: form.variantText.trim(),
                     difficulty: form.variantDifficulty,
+                    reasoningLevel: form.variantReasoningLevel,
                     answer: form.variantAnswer.trim() || null,
                     assessmentId: form.variantAssessmentId === 'none' ? undefined : parseNumber(form.variantAssessmentId),
                     secondaryTopicsId: form.variantSecondaryTopics.length ? form.variantSecondaryTopics : undefined,
@@ -668,6 +706,7 @@ export const AddQuestionDialog = ({
             await questionService.createVariant(createdQuestion.id, {
                 questionText: form.variantText.trim(),
                 difficulty: form.variantDifficulty,
+                reasoningLevel: form.variantReasoningLevel,
                 answer: form.variantAnswer.trim() || null,
                 assessmentId: form.variantAssessmentId === 'none' ? undefined : parseNumber(form.variantAssessmentId),
                 secondaryTopicsId: form.variantSecondaryTopics.length ? form.variantSecondaryTopics : undefined,
@@ -828,15 +867,34 @@ export const AddQuestionDialog = ({
                                         </div>
 
                                         <div className="space-y-2">
-                                            <Label htmlFor="variant-reference">Reference Variant ID <span className="text-xs text-muted-foreground">(dev only)</span></Label>
-                                            <Input
-                                                id="variant-reference"
-                                                value={form.variantReferenceId}
-                                                placeholder="Auto-assigned"
-                                                readOnly
-                                                className="bg-muted/50"
-                                            />
+                                            <Label htmlFor="variant-reasoning-level">Reasoning Focus</Label>
+                                            <Select
+                                                value={form.variantReasoningLevel}
+                                                onValueChange={(value) => handleFieldChange('variantReasoningLevel', value as ReasoningLevel)}
+                                            >
+                                                <SelectTrigger id="variant-reasoning-level">
+                                                    <SelectValue placeholder="Select reasoning focus" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {reasoningLevelOptions.map((option) => (
+                                                        <SelectItem key={option} value={option}>
+                                                            {reasoningLevelLabels[option]}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="variant-reference">Reference Variant ID <span className="text-xs text-muted-foreground">(dev only)</span></Label>
+                                        <Input
+                                            id="variant-reference"
+                                            value={form.variantReferenceId}
+                                            placeholder="Auto-assigned"
+                                            readOnly
+                                            className="bg-muted/50"
+                                        />
                                     </div>
 
                                     <div className="space-y-2">
@@ -1129,6 +1187,26 @@ export const AddQuestionDialog = ({
                                                     <SelectItem value="easy" className="text-xs">Easy</SelectItem>
                                                     <SelectItem value="medium" className="text-xs">Medium</SelectItem>
                                                     <SelectItem value="hard" className="text-xs">Hard</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="ai-reasoning-level" className="text-xs font-medium">Reasoning Focus</Label>
+                                            <Select
+                                                value={form.generationReasoningLevel}
+                                                onValueChange={(value) =>
+                                                    handleFieldChange('generationReasoningLevel', value as ReasoningLevel | 'balanced')
+                                                }
+                                            >
+                                                <SelectTrigger id="ai-reasoning-level" className="h-9 text-xs">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="balanced" className="text-xs">Let EduAI decide</SelectItem>
+                                                    <SelectItem value="factual" className="text-xs">Factual</SelectItem>
+                                                    <SelectItem value="analytical" className="text-xs">Analytical</SelectItem>
+                                                    <SelectItem value="application" className="text-xs">Application</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>

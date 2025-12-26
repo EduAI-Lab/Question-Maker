@@ -123,17 +123,25 @@ Requirements:
 - Difficulty distribution: Easy: ${difficultyDistribution.easy}, Medium: ${difficultyDistribution.medium}, Hard: ${difficultyDistribution.hard}
 - Reasoning distribution: Factual: ${reasoningDistribution.factual}%, Analytical: ${reasoningDistribution.analytical}%, Application: ${reasoningDistribution.application}%
 - Each question should be relevant to the course material
+- For each question, you MUST generate a correct answer based on the question content
 - Format each question as a JSON object with these exact fields:
   {
     "content": "The complete question text",
     "description": "Brief summary (<= 15 words) that does not simply repeat the question text",
     "difficulty": "easy/medium/hard",
     "reasoning_level": "factual/analytical/application",
-    "bloom_level": "remember/understand/apply/analyze/evaluate/create",
     "type": "MCQ/SA/LA",
+    "answer": "The correct answer to the question (required for all question types)",
     "primary_topic_id": number | null,
     "secondary_topic_ids": number[]
   }
+
+Answer Guidelines:
+- For MCQ questions: Provide the correct option letter (A, B, C, D, etc.) or the full correct answer text
+- For SA (Short Answer) questions: Provide a concise, accurate answer (1-3 sentences)
+- For LA (Long Answer) questions: Provide a comprehensive, detailed answer that fully addresses the question
+- The answer must be accurate and directly address the question content
+- Do not leave answers as null or empty - always generate a valid answer
 
 If the user prompt includes a "Course topics" section, use those numeric IDs exactly when setting primary_topic_id and secondary_topic_ids.
 
@@ -186,19 +194,10 @@ Please ensure the questions are appropriate for the course level and cover the k
           q.content &&
           q.difficulty &&
           q.reasoning_level &&
-          q.bloom_level &&
           ["easy", "medium", "hard"].includes(q.difficulty) &&
           ["factual", "analytical", "application"].includes(
             q.reasoning_level
-          ) &&
-          [
-            "remember",
-            "understand",
-            "apply",
-            "analyze",
-            "evaluate",
-            "create",
-          ].includes(q.bloom_level)
+          )
       );
 
       if (validQuestions.length === 0) {
@@ -232,12 +231,16 @@ Please ensure the questions are appropriate for the course level and cover the k
             )
           : [];
 
+        const answer =
+          typeof question.answer === "string" && question.answer.trim().length > 0
+            ? question.answer.trim()
+            : null;
+
         return {
           content,
           description,
           difficulty: question.difficulty,
           reasoning_level: question.reasoning_level,
-          bloom_level: question.bloom_level,
           type:
             typeof question.type === "string" &&
             question.type.toUpperCase().trim() === "SA"
@@ -246,6 +249,7 @@ Please ensure the questions are appropriate for the course level and cover the k
                 question.type.toUpperCase().trim() === "LA"
                 ? "LA"
                 : "MCQ",
+          answer,
           primary_topic_id: primaryTopicId,
           secondary_topic_ids: secondaryTopicIds,
         };

@@ -9,6 +9,7 @@ export type QuestionSearchFilters = {
   secondaryTopicIds: number[];
   excludedTopicIds: number[];
   difficulty?: Array<'easy' | 'medium' | 'hard'> | null;
+  reasoningLevel?: Array<'factual' | 'analytical' | 'application'> | null;
 };
 
 export type DeleteActionType =

@@ -346,6 +346,13 @@ export const AssessmentViewPage = () => {
     });
   };
 
+  const handleVariantChange = (questionId: number, variantId: number) => {
+    setSelectedVariantByQuestion((prev) => ({
+      ...prev,
+      [questionId]: variantId
+    }));
+  };
+
   const handleViewQuestion = (question: Question) => {
     // Convert Question to QuestionVariantEntry
     const primaryVariant = question.variants?.[0];
@@ -1266,6 +1273,8 @@ export const AssessmentViewPage = () => {
                               searchError={questionSearchError}
                               hasSearched={hasSearched}
                               topicsById={topicsById}
+                              selectedVariantByQuestion={selectedVariantByQuestion}
+                              onVariantChange={handleVariantChange}
                             />
                           </div>
                         </CardContent>
@@ -1390,6 +1399,8 @@ export const AssessmentViewPage = () => {
                         searchError={questionSearchError}
                         hasSearched={hasSearched}
                         topicsById={topicsById}
+                        selectedVariantByQuestion={selectedVariantByQuestion}
+                        onVariantChange={handleVariantChange}
                       />
                     </div>
                   </CardContent>
