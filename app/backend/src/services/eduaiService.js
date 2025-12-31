@@ -65,7 +65,7 @@ class EduAIService {
             "Content-Type": "application/json",
             "x-api-key": this.apiKey,
           },
-          timeout: 30000, // 30 second timeout
+          timeout: 60000, // 60 second timeout
         }
       );
 
@@ -88,8 +88,30 @@ class EduAIService {
         throw new Error(`EduAI API error (${statusCode}): ${errorMessage}`);
       } else if (error.request) {
         // Request was made but no response received
-        console.error("EduAI Request Error:", error.request);
-        throw new Error("EduAI API request failed: No response received");
+        console.error("EduAI Request Error:", {
+          request: error.request,
+          message: error.message,
+          code: error.code,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+            timeout: error.config?.timeout,
+          }
+        });
+        
+        // Provide more specific error messages based on error code
+        let errorMessage = "EduAI API request failed: No response received";
+        if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+          errorMessage = "EduAI API request timed out after 60 seconds. The server may be slow or overloaded. Please try again.";
+        } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+          errorMessage = `EduAI API server is unreachable. Please check your network connection and verify the EduAI service URL (${this.baseURL}) is correct.`;
+        } else if (error.code === 'ECONNRESET') {
+          errorMessage = "EduAI API connection was reset. The server may have closed the connection. Please try again.";
+        } else if (error.code) {
+          errorMessage = `EduAI API request failed: ${error.code}. Please check your network connection and try again.`;
+        }
+        
+        throw new Error(errorMessage);
       } else {
         // Something else happened
         console.error("EduAI Error:", error.message);
@@ -294,7 +316,7 @@ Please ensure the questions are appropriate for the course level and cover the k
           "Content-Type": "application/json",
           "x-api-key": this.apiKey,
         },
-        timeout: 30000,
+        timeout: 60000, // 60 second timeout
       });
 
       return response.data;
@@ -342,7 +364,7 @@ Please ensure the questions are appropriate for the course level and cover the k
           "Content-Type": "application/json",
           "x-api-key": this.apiKey,
         },
-        timeout: 30000,
+        timeout: 60000, // 60 second timeout
       });
 
       return response.data;
@@ -386,7 +408,7 @@ Please ensure the questions are appropriate for the course level and cover the k
           "Content-Type": "application/json",
           "x-api-key": this.apiKey,
         },
-        timeout: 30000,
+        timeout: 60000, // 60 second timeout
       });
 
       return response.data;
