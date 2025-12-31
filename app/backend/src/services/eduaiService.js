@@ -145,7 +145,16 @@ Answer Guidelines:
 
 If the user prompt includes a "Course topics" section, use those numeric IDs exactly when setting primary_topic_id and secondary_topic_ids.
 
-IMPORTANT: Return ONLY a valid JSON array of question objects. No other text.`;
+ERROR HANDLING:
+If you are unable to generate the requested question(s) for any reason (e.g., insufficient information, ambiguous prompt, topic not covered in course material, conflicting requirements), you MUST return a JSON object with this exact format instead of a question array:
+{
+  "error": true,
+  "reason": "A clear, detailed explanation of why you could not generate the question. Be specific about what is missing, unclear, or problematic in the request."
+}
+
+IMPORTANT: 
+- If you can generate the question(s), return ONLY a valid JSON array of question objects. No other text.
+- If you cannot generate the question(s), return ONLY the error object above. No other text.`;
 
     const userPrompt = `Generate questions about: ${prompt}
 
@@ -164,9 +173,9 @@ Please ensure the questions are appropriate for the course level and cover the k
       });
 
       // Parse the response
-      let questions;
+      let parsedResponse;
       try {
-        questions = JSON.parse(
+        parsedResponse = JSON.parse(
           response.content || response.message || response
         );
       } catch (parseError) {
@@ -175,18 +184,26 @@ Please ensure the questions are appropriate for the course level and cover the k
           response.content ||
           response.message ||
           response
-        ).match(/\[[\s\S]*\]/);
+        ).match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
         if (jsonMatch) {
-          questions = JSON.parse(jsonMatch[0]);
+          parsedResponse = JSON.parse(jsonMatch[0]);
         } else {
-          throw new Error("Could not parse questions from EduAI response");
+          throw new Error("Could not parse response from EduAI");
         }
       }
 
-      // Validate questions
-      if (!Array.isArray(questions)) {
+      // Check if the response is an error object
+      if (parsedResponse && typeof parsedResponse === 'object' && parsedResponse.error === true) {
+        const errorReason = parsedResponse.reason || "AI was unable to generate the question";
+        throw new Error(errorReason);
+      }
+
+      // Validate that we have an array of questions
+      if (!Array.isArray(parsedResponse)) {
         throw new Error("EduAI response is not an array of questions");
       }
+
+      const questions = parsedResponse;
 
       // Filter and validate each question
       const validQuestions = questions.filter(
@@ -466,3 +483,4 @@ Please ensure the questions are appropriate for the course level and cover the k
 // Export singleton instance
 export const eduaiService = new EduAIService();
 export default eduaiService;
+

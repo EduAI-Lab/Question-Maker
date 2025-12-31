@@ -112,7 +112,16 @@ export const ApiTestPage = () => {
       const response = await request();
       onSuccess(response.data);
     } catch (error: any) {
-      const message = error.response?.data?.error || error.message || 'Request failed';
+      // Prioritize AI-provided error reason (from details/aiErrorReason fields) over generic error message
+      const aiErrorReason = error.response?.data?.aiErrorReason;
+      const details = error.response?.data?.details;
+      const errorMessage = error.response?.data?.error;
+      const message =
+        aiErrorReason ||
+        details ||
+        errorMessage ||
+        error.message ||
+        'Request failed';
       onError(message);
       toast({
         variant: 'destructive',

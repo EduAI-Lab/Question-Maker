@@ -115,9 +115,15 @@ router.post('/generate-questions', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('EduAI question generation error:', error);
+    // If the error message is from the AI (contains detailed reason), use it as the main error
+    // Otherwise, use a generic message with details
+    const errorMessage = error.message || 'Failed to generate questions';
+    const isAiError = errorMessage && !errorMessage.includes('EduAI question generation failed:');
+    
     res.status(500).json({ 
-      error: 'Failed to generate questions',
-      details: error.message 
+      error: isAiError ? errorMessage : 'Failed to generate questions',
+      details: errorMessage,
+      aiErrorReason: isAiError ? errorMessage : undefined
     });
   }
 });
