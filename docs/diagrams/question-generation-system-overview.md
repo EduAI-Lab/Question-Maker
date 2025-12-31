@@ -7,23 +7,23 @@ This system enables educators to automatically generate educational questions us
 ## Core Workflow
 
 ```mermaid
-flowchart TD
-    Start([Instructor initiates question generation]) --> Configure[Instructor configures generation parameters:<br/>- Question prompt/context<br/>- Difficulty distribution<br/>- Cognitive reasoning levels<br/>- AI model selection]
+flowchart LR
+    Start([Instructor initiates<br/>question generation]) --> Configure[Configure parameters:<br/>Prompt, Difficulty,<br/>Reasoning Level, Model]
     
-    Configure --> Generate[System sends request to AI service<br/>with structured requirements]
+    Configure --> Generate[Send request to<br/>AI service]
     
-    Generate --> AIProcessing[AI service processes request:<br/>- Analyzes course content<br/>- Generates question text<br/>- Assigns difficulty and reasoning levels<br/>- Provides answer key]
+    Generate --> AIProcessing[AI processes:<br/>Analyzes content,<br/>Generates question,<br/>Assigns levels]
     
-    AIProcessing --> Review[Generated question returned to instructor<br/>for review and editing]
+    AIProcessing --> Review[Question returned<br/>for review]
     
-    Review --> Edit{Instructor reviews<br/>and edits if needed}
+    Review --> Edit{Review<br/>& Edit?}
     
     Edit -->|Needs changes| Review
-    Edit -->|Approved| Save[Instructor saves question<br/>to question bank]
+    Edit -->|Approved| Save[Save to<br/>question bank]
     
-    Save --> Store[(Question stored in database<br/>with metadata and variant information)]
+    Save --> Store[(Store in<br/>database)]
     
-    Store --> Available[Question available for use<br/>in assessments]
+    Store --> Available[Available for<br/>assessments]
     
     style Start fill:#e1f5ff
     style Store fill:#fff4e1
