@@ -3,9 +3,9 @@
  * Filters variants client-side and exposes callbacks for viewing/creating variants.
  */
 import { useState, useMemo } from 'react';
-import { QuestionVariantEntry } from '../../types/question';
+import { QuestionVariantEntry, QuestionType, QuestionDifficulty, ReasoningLevel } from '../../types/question';
 import { QuestionCard } from './QuestionCard';
-import { SearchAndFilters } from './SearchAndFilters';
+import { SearchAndFilters, QuestionFilters } from './SearchAndFilters';
 import { QuestionBankHeader } from './QuestionBankHeader';
 import { Loader2, User, Info } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -39,18 +39,67 @@ export const QuestionBank = ({
 }: QuestionBankProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'type'>('newest');
+  const [filters, setFilters] = useState<QuestionFilters>({
+    questionTypes: [],
+    reasoningLevels: [],
+    difficulties: [],
+    aiGenerated: 'all',
+    draftStatus: 'all'
+  });
 
   const filteredVariants = useMemo(() => {
     let filtered = [...variants];
 
+    // Apply text search filter
     if (searchTerm) {
       const lowered = searchTerm.toLowerCase();
       filtered = filtered.filter((entry) =>
         entry.variant.questionText.toLowerCase().includes(lowered) ||
-        entry.questionDescription.toLowerCase().includes(lowered)
+        entry.questionDescription?.toLowerCase().includes(lowered)
       );
     }
 
+    // Apply question type filter
+    if (filters.questionTypes.length > 0) {
+      filtered = filtered.filter((entry) =>
+        filters.questionTypes.includes(entry.questionType)
+      );
+    }
+
+    // Apply reasoning level filter
+    if (filters.reasoningLevels.length > 0) {
+      filtered = filtered.filter((entry) =>
+        entry.variant.reasoningLevel &&
+        filters.reasoningLevels.includes(entry.variant.reasoningLevel)
+      );
+    }
+
+    // Apply difficulty filter
+    if (filters.difficulties.length > 0) {
+      filtered = filtered.filter((entry) =>
+        filters.difficulties.includes(entry.variant.difficulty)
+      );
+    }
+
+    // Apply AI generated filter
+    if (filters.aiGenerated !== 'all') {
+      if (filters.aiGenerated === 'ai') {
+        filtered = filtered.filter((entry) => entry.isAiGenerated === true);
+      } else {
+        filtered = filtered.filter((entry) => entry.isAiGenerated !== true);
+      }
+    }
+
+    // Apply draft status filter
+    if (filters.draftStatus !== 'all') {
+      if (filters.draftStatus === 'draft') {
+        filtered = filtered.filter((entry) => entry.isDraft === true);
+      } else {
+        filtered = filtered.filter((entry) => entry.isDraft !== true);
+      }
+    }
+
+    // Apply sorting
     switch (sortBy) {
       case 'newest':
         filtered.sort((a, b) =>
@@ -70,7 +119,7 @@ export const QuestionBank = ({
     }
 
     return filtered;
-  }, [variants, searchTerm, sortBy]);
+  }, [variants, searchTerm, sortBy, filters]);
 
   return (
     <div className="space-y-6">
@@ -86,8 +135,8 @@ export const QuestionBank = ({
       <SearchAndFilters
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
-        sortBy={sortBy}
-        onSortChange={(value) => setSortBy(value)}
+        filters={filters}
+        onFiltersChange={setFilters}
       />
 
       {isLoading ? (
