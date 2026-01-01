@@ -55,6 +55,7 @@ export interface EduAIQuestionGenerationResponse {
             reasoning_level: 'factual' | 'analytical' | 'application';
             bloom_level: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create';
             type: 'MCQ' | 'SA' | 'LA';
+            answer?: string;
             primary_topic_id?: number | null;
             secondary_topic_ids?: number[];
         }>;

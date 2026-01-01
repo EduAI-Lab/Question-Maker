@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle
@@ -29,6 +30,7 @@ import assessmentService from '../../services/assessmentService';
 import { Assessment } from '../../types/question';
 import { Topic } from '../../types/topic';
 import { useToast } from '../ui/use-toast';
+import { ToastAction } from '../ui/toast';
 import eduaiService, { EduAIModelOption, EduAICourseOption } from '../../services/eduaiService';
 import { Course } from '../../types/question';
 import { apiKeyStorage } from '../../services/apiKeyStorage';
@@ -117,6 +119,8 @@ export const AddQuestionDialog = ({
     const [availableEduCourses, setAvailableEduCourses] = useState<EduAICourseOption[]>([]);
     const [isAiGenerated, setIsAiGenerated] = useState(false);
     const [markAsReviewed, setMarkAsReviewed] = useState(false); // false = draft (default), true = reviewed
+    const [errorModalOpen, setErrorModalOpen] = useState(false);
+    const [errorModalMessage, setErrorModalMessage] = useState<string>('');
     const { toast } = useToast();
     const eduaiStatus = useEduAIStatus();
     const selectedGenerationModel = useMemo(
@@ -614,15 +618,35 @@ export const AddQuestionDialog = ({
             });
         } catch (generateError: any) {
             console.error('EduAI generation failed', generateError);
+            // Prioritize AI-provided error reason (from details field) over generic error message
+            const aiErrorReason = generateError?.response?.data?.aiErrorReason;
+            const details = generateError?.response?.data?.details;
+            const errorMessage = generateError?.response?.data?.error;
             const message =
-                generateError?.response?.data?.error ||
+                aiErrorReason ||
+                details ||
+                errorMessage ||
                 generateError?.message ||
                 'Failed to generate question.';
             setError(message);
+            
+            // Store the error message for the modal
+            setErrorModalMessage(message);
+            
+            // Show a persistent toast with a click action to view details
             toast({
                 variant: 'destructive',
-                title: 'EduAI generation failed',
-                description: message
+                title: 'EduAI has thrown an error',
+                description: 'Click to see why',
+                duration: Infinity, // Prevent auto-dismissal - user must manually dismiss
+                action: (
+                    <ToastAction
+                        altText="View error details"
+                        onClick={() => setErrorModalOpen(true)}
+                    >
+                        View Details
+                    </ToastAction>
+                )
             });
         } finally {
             setIsGenerating(false);
@@ -1268,6 +1292,28 @@ export const AddQuestionDialog = ({
                     </div>
                 </DialogFooter>
             </DialogContent>
+            
+            {/* Error Details Modal */}
+            <Dialog open={errorModalOpen} onOpenChange={setErrorModalOpen}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>AI Generation Error Details</DialogTitle>
+                        <DialogDescription>
+                            The AI was unable to generate the question. Here's the detailed explanation:
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <div className="rounded-lg border bg-destructive/10 p-4">
+                            <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                                {errorModalMessage}
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={() => setErrorModalOpen(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Dialog>
     );
 };
