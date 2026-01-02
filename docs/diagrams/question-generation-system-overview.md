@@ -7,7 +7,7 @@ This system enables educators to automatically generate educational questions us
 ## Core Workflow
 
 ```mermaid
-flowchart LR
+flowchart TB
     Start([Instructor initiates<br/>question generation]) --> Configure[Configure parameters:<br/>Prompt, Difficulty,<br/>Reasoning Level, Model]
     
     Configure --> Generate[Send request to<br/>AI service]
