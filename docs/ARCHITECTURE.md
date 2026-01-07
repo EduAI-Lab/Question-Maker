@@ -9,6 +9,10 @@ Internet → Apache (Reverse Proxy) → Docker Containers
                                     ├── Frontend (Nginx + React)
                                     ├── Backend (Node.js API)
                                     └── Database (PostgreSQL)
+                                    
+Backend Container → External Services
+                    ├── EduAI API (Question Generation/Extraction)
+                    └── Canvas LMS API (Quiz Export/Import)
 ```
 
 ## Component Details
@@ -51,6 +55,7 @@ Internet → Apache (Reverse Proxy) → Docker Containers
 - Authentication middleware
 - Database connection pooling
 - Health check endpoint
+- External API integrations (EduAI, Canvas)
 
 ### 4. Database Container
 **Base Image**: postgres:15-alpine
@@ -62,6 +67,36 @@ Internet → Apache (Reverse Proxy) → Docker Containers
 - Persistent data storage
 - Health checks
 - Initialization scripts support
+
+### 5. External Services
+
+#### EduAI API
+**Role**: AI-powered question generation and text extraction
+**Connection**: HTTPS (external API)
+**Endpoints Used**: `/api/chat`, `/api/generate-questions`, `/api/courses`, `/api/topics`
+**Configuration**: `EDUAI_API_URL`, `EDUAI_API_KEY` environment variables
+**Backend Service**: `app/backend/src/services/eduaiService.js`
+**Backend Routes**: `app/backend/src/routes/eduai.js`
+
+**Features:**
+- Question generation from prompts
+- Text extraction from uploaded documents
+- Course and topic metadata retrieval
+- AI model selection and configuration
+
+#### Canvas LMS API
+**Role**: Quiz export and import functionality
+**Connection**: HTTPS (external API)
+**Endpoints Used**: Canvas REST API v1
+**Configuration**: User-provided Canvas URL and API key (encrypted at rest)
+**Backend Service**: `app/backend/src/services/canvasService.js`
+**Backend Routes**: `app/backend/src/routes/canvas.js`
+
+**Features:**
+- Assessment export to Canvas quizzes
+- Quiz import from Canvas
+- Course mapping and synchronization
+- Test mode for development/demo
 
 ## Network Architecture
 
@@ -84,9 +119,11 @@ Browser → Apache → Frontend: http://localhost:3005/*
 Browser → Apache → Backend: http://localhost:8000/api/*
 Frontend Container → Backend Container: http://backend:8000 (via Docker network, fallback only)
 Backend Container → Database Container: postgres:5432 (via Docker network)
+Backend Container → EduAI API: HTTPS (external)
+Backend Container → Canvas LMS API: HTTPS (external)
 ```
 
-**Note**: In production, API requests from the browser go through Apache proxy. The frontend container's Nginx also has API proxying configured, but it's not used since Apache handles routing.
+**Note**: In production, API requests from the browser go through Apache proxy. The frontend container's Nginx also has API proxying configured, but it's not used since Apache handles routing. External API calls (EduAI, Canvas) are made directly from the backend container over HTTPS.
 
 ## Data Flow
 
@@ -123,6 +160,49 @@ User Browser
 Frontend Container (Nginx)
     ↓ Static File
 Apache
+    ↓ HTTPS Response
+User Browser
+```
+
+### 4. EduAI Integration Flow
+```
+User Browser
+    ↓ HTTPS Request (POST /api/eduai/generate-questions)
+Apache Reverse Proxy
+    ↓ HTTP Request (routes to backend)
+Backend Container
+    ↓ HTTPS Request (with API key)
+EduAI API
+    ↓ Generated Questions (JSON)
+Backend Container
+    ↓ Processed & Validated
+Apache Reverse Proxy
+    ↓ HTTPS Response
+User Browser
+```
+
+### 5. Canvas Export Flow
+```
+User Browser
+    ↓ HTTPS Request (POST /api/canvas/export/:assessmentId)
+Apache Reverse Proxy
+    ↓ HTTP Request (routes to backend)
+Backend Container
+    ↓ Load Assessment Data
+PostgreSQL Container
+    ↓ Assessment/Sections/Variants
+Backend Container
+    ↓ Convert to Canvas Format
+    ↓ HTTPS Request (with encrypted API key)
+Canvas LMS API
+    ↓ Quiz Created
+Backend Container
+    ↓ Store Mapping
+PostgreSQL Container
+    ↓ Mapping Saved
+Backend Container
+    ↓ JSON Response
+Apache Reverse Proxy
     ↓ HTTPS Response
 User Browser
 ```
@@ -302,6 +382,7 @@ sudo cp /etc/httpd/conf.d/question-maker.conf question-maker.conf.backup
 - **Database**: PostgreSQL 15
 - **Authentication**: JWT
 - **API**: RESTful
+- **External Integrations**: EduAI API, Canvas LMS API
 
 ### Infrastructure
 - **Containerization**: Docker + Docker Compose
@@ -332,6 +413,10 @@ graph TB
         Database[(🗄️ PostgreSQL Database<br/>Port 55432→5432<br/>Database: eduquery)]
     end
     
+    %% External Services
+    EduAI[🤖 EduAI API<br/>Question Generation<br/>Text Extraction]
+    Canvas[🎓 Canvas LMS API<br/>Quiz Export/Import]
+    
     %% Request Flow
     User --> Internet
     Internet --> Apache
@@ -343,6 +428,10 @@ graph TB
     %% Internal Communication
     Backend -->|"SQL Queries<br/>postgres:5432"| Database
     
+    %% External API Calls
+    Backend -->|"HTTPS<br/>Question Gen/Extract"| EduAI
+    Backend -->|"HTTPS<br/>Quiz Export/Import"| Canvas
+    
     %% Data Flow Labels
     User -.->|"HTTPS Request"| Apache
     Apache -.->|"HTTP Response"| User
@@ -353,12 +442,14 @@ graph TB
     classDef frontend fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
     classDef backend fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     classDef database fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    classDef extapi fill:#fce4ec,stroke:#c2185b,stroke-width:2px
     
     class User,Internet external
     class Apache proxy
     class Frontend frontend
     class Backend backend
     class Database database
+    class EduAI,Canvas extapi
 ```
 
 ## Request Flow Diagram
@@ -397,7 +488,7 @@ sequenceDiagram
 
 ---
 
-**Architecture Version**: 1.0  
-**Last Updated**: October 2024  
+**Architecture Version**: 1.1  
+**Last Updated**: December 2024  
 **Deployment**: Production
 
