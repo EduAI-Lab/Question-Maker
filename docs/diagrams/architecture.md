@@ -1,27 +1,27 @@
 ```mermaid
 graph TB
     %% External Layer
-    User[👤 User Browser]
-    Internet[🌐 Internet]
+    User[User Browser]
+    Internet[Internet]
     
     %% Apache Reverse Proxy
-    Apache[🔀 Apache Reverse Proxy<br/>Port 80/443<br/>SSL Termination]
+    Apache[Apache Reverse Proxy<br/>Port 80/443<br/>SSL Termination]
     
     %% Docker Network
-    subgraph Docker["🐳 Docker Network (eduquery-network)"]
+    subgraph Docker["Docker Network (eduquery-network)"]
         %% Frontend Container
-        Frontend[📱 Frontend Container<br/>Nginx + React<br/>Port 3005→80]
+        Frontend[Frontend Container<br/>Nginx + React<br/>Port 3005→80]
         
         %% Backend Container
-        Backend[⚙️ Backend Container<br/>Node.js + Express<br/>Port 8000]
+        Backend[Backend Container<br/>Node.js + Express<br/>Port 8000]
         
         %% Database Container
-        Database[(🗄️ PostgreSQL Database<br/>Port 55432→5432<br/>Database: eduquery)]
+        Database[(PostgreSQL Database<br/>Port 55432→5432<br/>Database: eduquery)]
     end
     
     %% External Services
-    EduAI[🤖 EduAI API<br/>Question Generation<br/>Text Extraction]
-    Canvas[🎓 Canvas LMS API<br/>Quiz Export/Import]
+    EduAI[EduAI API<br/>Question Generation<br/>Text Extraction]
+    Canvas[Canvas LMS API<br/>Quiz Export/Import]
     
     %% Request Flow
     User --> Internet
