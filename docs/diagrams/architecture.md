@@ -1,59 +1,48 @@
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'fontSize':'45px', 'primaryColor':'#000000', 'primaryTextColor':'#ffffff', 'primaryBorderColor':'#000000', 'lineColor':'#000000', 'secondaryColor':'#ffffff', 'tertiaryColor':'#f9f9f9'}}}%%
 graph TB
     %% External Layer
     User[User Browser]
     Internet[Internet]
     
     %% Apache Reverse Proxy
-    Apache[Apache Reverse Proxy<br/>Port 80/443<br/>SSL Termination]
+    Apache[Apache Reverse Proxy]
     
     %% Docker Network
-    subgraph Docker["Docker Network (eduquery-network)"]
+    subgraph .
         %% Frontend Container
-        Frontend[Frontend Container<br/>Nginx + React<br/>Port 3005→80]
+        Frontend["Frontend (React)"]
         
         %% Backend Container
-        Backend[Backend Container<br/>Node.js + Express<br/>Port 8000]
+        Backend["Backend (Node.js)"]
         
         %% Database Container
-        Database[(PostgreSQL Database<br/>Port 55432→5432<br/>Database: eduquery)]
+        Database["Database (PostgreSQL)"]
     end
     
     %% External Services
-    EduAI[EduAI API<br/>Question Generation<br/>Text Extraction]
-    Canvas[Canvas LMS API<br/>Quiz Export/Import]
+    EduAI[External AI Service]
+    Canvas[Canvas LMS]
     
     %% Request Flow
     User --> Internet
     Internet --> Apache
     
     %% Apache Routing
-    Apache -->|"/api/* → Backend"| Backend
-    Apache -->|"/* → Frontend"| Frontend
+    Apache --> Backend
+    Apache --> Frontend
     
     %% Internal Communication
-    Backend -->|"SQL Queries<br/>postgres:5432"| Database
+    Backend --> Database
     
     %% External API Calls
-    Backend -->|"HTTPS<br/>Question Gen/Extract"| EduAI
-    Backend -->|"HTTPS<br/>Quiz Export/Import"| Canvas
+    Backend --> EduAI
+    Backend --> Canvas
     
-    %% Data Flow Labels
-    User -.->|"HTTPS Request"| Apache
-    Apache -.->|"HTTP Response"| User
+    %% Styling - Black/White only with thick lines
+    classDef default fill:#ffffff,stroke:#000000,stroke-width:4px,color:#000000
+    classDef database fill:#f5f5f5,stroke:#000000,stroke-width:4px,color:#000000
     
-    %% Styling
-    classDef external fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef proxy fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef frontend fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    classDef backend fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef database fill:#fff8e1,stroke:#f57f17,stroke-width:2px
-    classDef extapi fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    
-    class User,Internet external
-    class Apache proxy
-    class Frontend frontend
-    class Backend backend
+    class User,Internet,Apache,Frontend,Backend,EduAI,Canvas default
     class Database database
-    class EduAI,Canvas extapi
 ```
