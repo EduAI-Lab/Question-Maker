@@ -1,106 +1,62 @@
 ```mermaid
-graph TB
-    %% User Layer
-    Instructor[👤 Instructor]
-    
-    %% Core System Components
-    subgraph QM["Question Maker System"]
-        subgraph RAG["RAG Course-Aware Context"]
-            VectorDB[(Course Vector Database<br/>PGVector Index)]
-            ContextRetrieval[Context Retrieval<br/>& Augmentation]
-        end
+graph LR
+    %% Column 1: Instructor Actions (Left, Thin)
+    subgraph Col1[" "]
+        direction TB
+        Request[Generate Variant]
+        ReviewAction[Review Variant]
+        Assemble[Assemble Assessment]
         
-        subgraph QMgt["Question Management"]
-            AIGen[AI Question Generation<br/>RAG-Enhanced]
-            PDFImport[PDF/Image Import<br/>OCR + AI Extraction]
-            Review[Draft Review System<br/>Human-in-the-Loop]
-            QuestionBank[(Question Bank<br/>with Variants)]
-        end
-        
-        subgraph AMgt["Assessment Management"]
-            Blueprint[Assessment Blueprint<br/>Topic Selection]
-            TopicFilter[Topic Filtering<br/>Include/Exclude]
-            Matching[Intelligent Matching<br/>Multi-Criteria]
-            Assessment[(Assessment<br/>Sections & Questions)]
-        end
-        
-        subgraph CanvasInt["Canvas Integration"]
-            Export[Canvas Export<br/>Quiz Creation]
-        end
+        Request --> ReviewAction
+        ReviewAction --> Assemble
     end
     
-    %% External Services
-    subgraph AI["AI Providers"]
-        EduAI[External AI Service<br/>RAG + Multi-Provider]
-        Ollama[Ollama<br/>Local]
-        Gemini[Google Gemini]
-        OpenAI[OpenAI]
+    %% Column 2: Core Question Maker Workflow (Center, Main - 60-70%)
+    subgraph Col2[" "]
+        direction TB
+        RAG[Course Context Retrieval]
+        Generation[AI-Assisted Question Generation]
+        ReviewGate[Review Gating]
+        QuestionStore[( Store Reviewed Questions)]
+        TopicRetrieval[Topic-Constrained Retrieval]
+        AssessmentAssembly[Assessment Assembly]
+        
+        RAG --> Generation
+        Generation --> ReviewGate
+        ReviewGate -->|Reviewed content only| QuestionStore
+        QuestionStore --> TopicRetrieval
+        TopicRetrieval --> AssessmentAssembly
     end
     
-    Canvas[🎓 Canvas LMS]
+    %% Column 3: External Interfaces (Right, Thin)
+    subgraph Col3[" "]
+        direction TB
+        AIService[External AI Service <br/> + RAG backend]
+        LMSExport[LMS Export]
+    end
     
-    %% User Interactions
-    Instructor -->|1. Generate Questions| AIGen
-    Instructor -->|2. Upload PDF/Image| PDFImport
-    Instructor -->|3. Review & Approve| Review
-    Instructor -->|4. Build Assessment| Blueprint
-    Instructor -->|5. Export to Canvas| Export
+    %% Connections from Column 1 to Column 2
+    Request -.->|triggers| RAG
+    ReviewAction -.->|triggers| ReviewGate
+    Assemble -.->|triggers| TopicRetrieval
     
-    %% Question Generation Flow
-    AIGen -->|Course Code| ContextRetrieval
-    ContextRetrieval -->|Retrieve Context| VectorDB
-    ContextRetrieval -->|Augmented Prompt| EduAI
-    EduAI -->|Generate| AIGen
-    AIGen -->|Draft Questions| Review
-    Review -->|Approved| QuestionBank
+    %% Connections from Column 2 to Column 3
+    Generation <-->|AI request| AIService
+    AssessmentAssembly -->|export| LMSExport
     
-    %% PDF Import Flow
-    PDFImport -->|Extract Text| PDFImport
-    PDFImport -->|Course Code| ContextRetrieval
-    ContextRetrieval -->|Retrieve Context| VectorDB
-    ContextRetrieval -->|Augmented Prompt| EduAI
-    EduAI -->|Extract Questions| PDFImport
-    PDFImport -->|Draft Questions| Review
-    Review -->|Approved| QuestionBank
-    
-    %% Assessment Building Flow
-    Blueprint -->|Configure Topics| TopicFilter
-    TopicFilter -->|Primary/Secondary/Excluded| Matching
-    Matching -->|Filter Questions| QuestionBank
-    QuestionBank -->|Matched Questions| Matching
-    Matching -->|Selected Questions| Assessment
-    Assessment -->|Ready for Export| Export
-    
-    %% Canvas Export Flow
-    Export -->|Validate Drafts| Assessment
-    Assessment -->|Convert Questions| Export
-    Export -->|Create Quiz| Canvas
-    
-    %% AI Provider Selection
-    EduAI -->|Route to| Ollama
-    EduAI -->|Route to| Gemini
-    EduAI -->|Route to| OpenAI
-    
-    %% RAG Integration (shown as background process)
-    ContextRetrieval -.->|All AI Requests| EduAI
+    %% RAG connection to AI Service
+    RAG -.->|context| AIService
     
     %% Styling
-    classDef user fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef rag fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef question fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
-    classDef assessment fill:#fff3e0,stroke:#f57c00,stroke-width:2px
-    classDef canvas fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    classDef ai fill:#e0f2f1,stroke:#00796b,stroke-width:2px
-    classDef external fill:#f5f5f5,stroke:#616161,stroke-width:2px
+    classDef instructor fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef core fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef reviewGate fill:#ffebee,stroke:#c62828,stroke-width:4px
     classDef database fill:#fff8e1,stroke:#f57f17,stroke-width:3px
+    classDef external fill:#e0f2f1,stroke:#00796b,stroke-width:2px
     
-    class Instructor user
-    class VectorDB,ContextRetrieval rag
-    class AIGen,PDFImport,Review,QuestionBank question
-    class Blueprint,TopicFilter,Matching,Assessment assessment
-    class Export,CanvasInt canvas
-    class EduAI,Ollama,Gemini,OpenAI ai
-    class Canvas external
-    class QuestionBank,Assessment,VectorDB database
+    class Request,ReviewAction,Assemble instructor
+    class RAG,Generation,TopicRetrieval,AssessmentAssembly core
+    class ReviewGate reviewGate
+    class QuestionStore database
+    class AIService,LMSExport external
 ```
-
