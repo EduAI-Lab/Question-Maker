@@ -44,8 +44,9 @@ const isProduction = typeof window !== 'undefined' &&
     (window.location.hostname !== 'localhost' && !window.location.hostname.startsWith('127.0.0.1'));
 
 if (isProduction) {
-    // Use jsDelivr CDN in production for reliability (matches pdfjs-dist version 4.6.82)
-    GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.mjs';
+    // Use jsDelivr CDN in production for reliability
+    // Version 4.10.38 matches the installed pdfjs-dist package version
+    GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.mjs';
 } else {
     // Use local worker in development
     GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
