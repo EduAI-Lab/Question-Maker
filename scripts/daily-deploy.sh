@@ -130,15 +130,23 @@ if [ -z "$REPO_URL" ]; then
     exit 1
 fi
 
-# Convert SSH URL to HTTPS if needed, or use HTTPS URL with token
+# Extract repository path from URL (handles both SSH and HTTPS, with or without token)
+# Remove authentication if present, convert SSH to HTTPS format, extract path
 if [[ "$REPO_URL" == git@* ]]; then
-    # Convert git@github.com:user/repo.git to https://github.com/user/repo.git
-    REPO_URL=$(echo "$REPO_URL" | sed 's/git@github.com:/https:\/\/github.com\//' | sed 's/\.git$//')
+    # SSH format: git@github.com:user/repo.git -> github.com/user/repo
+    REPO_PATH=$(echo "$REPO_URL" | sed 's/git@github.com://' | sed 's/\.git$//' | sed 's/\.git\/$//')
+elif [[ "$REPO_URL" == https://* ]]; then
+    # HTTPS format: https://user:token@github.com/user/repo.git or https://github.com/user/repo.git
+    # Remove https:// and any authentication, then extract path
+    REPO_PATH=$(echo "$REPO_URL" | sed 's|^https://||' | sed 's|^[^@]*@||' | sed 's/\.git$//' | sed 's/\.git\/$//' | sed 's/\/$//')
+else
+    print_error "Unknown repository URL format: $REPO_URL"
+    exit 1
 fi
 
 # Configure git to use token for this repository
 print_status "Configuring git authentication..."
-GIT_URL_WITH_TOKEN="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@${REPO_URL#https://}"
+GIT_URL_WITH_TOKEN="https://${GITHUB_USERNAME}:${GITHUB_TOKEN}@${REPO_PATH}"
 git remote set-url origin "$GIT_URL_WITH_TOKEN" 2>/dev/null || {
     print_warning "Could not update git remote URL, continuing with existing config"
 }
@@ -176,18 +184,32 @@ fi
 # Changes detected - proceed with deployment
 print_status "Changes detected! Updating from ${LOCAL_COMMIT:0:7} to ${REMOTE_COMMIT:0:7}"
 
-# Check if there are any local changes
-if ! git diff-index --quiet HEAD --; then
-    print_warning "Local changes detected. Stashing them..."
-    git stash save "Auto-stash before pull - $(date)"
+# For automated deployment, always favor remote changes
+# Discard any local modifications to ensure clean deployment
+ACTIVE_LOG=$(get_log_file)
+if ! git diff-index --quiet HEAD -- || ! git diff --quiet || ! git diff --cached --quiet; then
+    print_warning "Local changes detected. Discarding them to match remote (automated deployment favors remote)..."
+    # Reset to match remote exactly (favors remote in all cases)
+    git reset --hard "origin/$BRANCH" 2>&1 | tee -a "$ACTIVE_LOG" || {
+        print_warning "Reset to remote failed, trying clean reset..."
+        git clean -fd 2>&1 | tee -a "$ACTIVE_LOG" || true
+        git reset --hard HEAD 2>&1 | tee -a "$ACTIVE_LOG" || true
+        # Now try to pull with merge strategy favoring remote
+        git pull origin "$BRANCH" --no-edit -X theirs 2>&1 | tee -a "$ACTIVE_LOG" || {
+            print_error "Failed to sync with remote. Manual intervention required."
+            print_error "Run: cd $PROJECT_DIR && git reset --hard origin/$BRANCH"
+            exit 1
+        }
+    }
+    print_status "Local changes discarded. Repository now matches remote."
+else
+    # No local changes, safe to pull normally
+    print_status "Pulling latest changes from origin/$BRANCH..."
+    git pull origin "$BRANCH" 2>&1 | tee -a "$ACTIVE_LOG" || {
+        print_error "Failed to pull changes. Check git credentials and network."
+        exit 1
+    }
 fi
-
-# Pull latest changes
-print_status "Pulling latest changes from origin/$BRANCH..."
-git pull origin "$BRANCH" || {
-    print_error "Failed to pull changes. Check git credentials and network."
-    exit 1
-}
 
 # Rebuild and restart Docker containers
 print_status "Rebuilding Docker images (no cache)..."
