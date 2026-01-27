@@ -22,7 +22,8 @@ import {
     QuestionDifficulty,
     QuestionType,
     QuestionVariantEntry,
-    ReasoningLevel
+    ReasoningLevel,
+    MCQChoice
 } from '../../types/question';
 import { questionService } from '../../services/questionService';
 import { courseService } from '../../services/courseService';
@@ -71,6 +72,7 @@ const defaultForm: FormState = {
     variantDifficulty: 'medium',
     variantReasoningLevel: 'factual',
     variantAnswer: '',
+    variantChoices: [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }],
     variantSecondaryTopics: [],
     variantAssessmentId: 'none',
     variantReferenceId: '',
@@ -421,6 +423,16 @@ export const AddQuestionDialog = ({
             : null;
 
     const handleCopyFromVariant = (variantEntry: QuestionVariantEntry) => {
+        // Handle choices for MCQ
+        let copiedChoices: MCQChoice[] = [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }];
+        if (variantEntry.questionType === 'MCQ' && variantEntry.variant.choices && Array.isArray(variantEntry.variant.choices) && variantEntry.variant.choices.length > 0) {
+            copiedChoices = variantEntry.variant.choices.map(c => ({ ...c }));
+            // Ensure at least 4 choices for display
+            while (copiedChoices.length < 4) {
+                const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+                copiedChoices.push({ letter: letters[copiedChoices.length], text: '' });
+            }
+        }
         const referenceId = variantEntry.variant.referenceId ?? variantEntry.variant.id;
         setForm((prev) => ({
             ...prev,
@@ -429,6 +441,7 @@ export const AddQuestionDialog = ({
             variantDifficulty: variantEntry.variant.difficulty ?? 'medium',
             variantReasoningLevel: variantEntry.variant.reasoningLevel ?? 'factual',
             variantAnswer: variantEntry.variant.answer || '',
+            variantChoices: copiedChoices,
             variantSecondaryTopics: variantEntry.variant.secondaryTopicsId || [],
             variantAssessmentId: variantEntry.variant.assessmentId ? variantEntry.variant.assessmentId.toString() : 'none',
             variantReferenceId: referenceId ? referenceId.toString() : ''
@@ -574,6 +587,22 @@ export const AddQuestionDialog = ({
                         ? generated.answer.trim()
                         : '';
 
+                // Handle choices for MCQ questions
+                let resolvedChoices: MCQChoice[] = prev.variantChoices;
+                if (inferredType === 'MCQ' && Array.isArray(generated.choices) && generated.choices.length > 0) {
+                    resolvedChoices = generated.choices.map((c: any) => ({
+                        letter: typeof c.letter === 'string' ? c.letter.toUpperCase() : c.letter,
+                        text: typeof c.text === 'string' ? c.text.trim() : String(c.text || '')
+                    })).filter((c: MCQChoice) => c.text.length > 0);
+                    // Ensure at least 2 choices
+                    if (resolvedChoices.length < 2) {
+                        resolvedChoices = prev.variantChoices;
+                    }
+                } else if (inferredType !== 'MCQ') {
+                    // Reset choices for non-MCQ
+                    resolvedChoices = [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }];
+                }
+
                 if (mode === 'variant') {
                     return {
                         ...prev,
@@ -581,6 +610,7 @@ export const AddQuestionDialog = ({
                         variantDifficulty: inferredDifficulty,
                         variantReasoningLevel: inferredReasoningLevel,
                         variantAnswer: resolvedAnswer || prev.variantAnswer,
+                        variantChoices: resolvedChoices,
                         generationPrompt: prev.generationPrompt,
                         variantSecondaryTopics:
                             resolvedSecondaryTopics.length > 0 ? resolvedSecondaryTopics : prev.variantSecondaryTopics
@@ -605,6 +635,7 @@ export const AddQuestionDialog = ({
                     generationPrompt: prev.generationPrompt,
                     variantReferenceId: '',
                     variantAnswer: resolvedAnswer,
+                    variantChoices: resolvedChoices,
                     primaryTopicId: resolvedPrimaryTopicId,
                     variantSecondaryTopics:
                         resolvedSecondaryTopics.length > 0 ? resolvedSecondaryTopics : prev.variantSecondaryTopics
@@ -676,11 +707,22 @@ export const AddQuestionDialog = ({
                     throw new Error('Invalid base question selection.');
                 }
 
+                // Validate MCQ choices
+                let choices: MCQChoice[] | null = null;
+                if (presetVariant?.questionType === 'MCQ') {
+                    const validChoices = form.variantChoices.filter(c => c.text.trim().length > 0);
+                    if (validChoices.length < 2) {
+                        throw new Error('MCQ questions require at least 2 choices with text.');
+                    }
+                    choices = validChoices;
+                }
+
                 await questionService.createVariant(questionId, {
                     questionText: form.variantText.trim(),
                     difficulty: form.variantDifficulty,
                     reasoningLevel: form.variantReasoningLevel,
                     answer: form.variantAnswer.trim() || null,
+                    choices: choices,
                     assessmentId: form.variantAssessmentId === 'none' ? undefined : parseNumber(form.variantAssessmentId),
                     secondaryTopicsId: form.variantSecondaryTopics.length ? form.variantSecondaryTopics : undefined,
                     referenceId: parseNumber(form.variantReferenceId),
@@ -727,11 +769,22 @@ export const AddQuestionDialog = ({
                 questionOrder
             });
 
+            // Validate MCQ choices
+            let choices: MCQChoice[] | null = null;
+            if (form.questionType === 'MCQ') {
+                const validChoices = form.variantChoices.filter(c => c.text.trim().length > 0);
+                if (validChoices.length < 2) {
+                    throw new Error('MCQ questions require at least 2 choices with text.');
+                }
+                choices = validChoices;
+            }
+
             await questionService.createVariant(createdQuestion.id, {
                 questionText: form.variantText.trim(),
                 difficulty: form.variantDifficulty,
                 reasoningLevel: form.variantReasoningLevel,
                 answer: form.variantAnswer.trim() || null,
+                choices: choices,
                 assessmentId: form.variantAssessmentId === 'none' ? undefined : parseNumber(form.variantAssessmentId),
                 secondaryTopicsId: form.variantSecondaryTopics.length ? form.variantSecondaryTopics : undefined,
                 referenceId: parseNumber(form.variantReferenceId),
@@ -865,10 +918,90 @@ export const AddQuestionDialog = ({
                                             id="variant-text"
                                             value={form.variantText}
                                             onChange={(event) => handleFieldChange('variantText', event.target.value)}
-                                            placeholder="Enter the full question text"
+                                            placeholder={form.questionType === 'MCQ' ? "Enter the question text (without choices)" : "Enter the full question text"}
                                             rows={6}
                                         />
                                     </div>
+
+                                    {form.questionType === 'MCQ' && (
+                                        <div className="space-y-2">
+                                            <Label>Choices <span className="text-xs text-muted-foreground">(required for MCQ)</span></Label>
+                                            <div className="space-y-3 border rounded-md p-4 bg-muted/30">
+                                                {form.variantChoices.map((choice, index) => (
+                                                    <div key={index} className="flex items-center gap-3">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
+                                                            {choice.letter}
+                                                        </div>
+                                                        <Input
+                                                            value={choice.text}
+                                                            onChange={(e) => {
+                                                                const newChoices = [...form.variantChoices];
+                                                                newChoices[index] = { ...choice, text: e.target.value };
+                                                                handleFieldChange('variantChoices', newChoices);
+                                                            }}
+                                                            placeholder={`Enter option ${choice.letter}`}
+                                                            className="flex-1"
+                                                        />
+                                                        {form.variantChoices.length > 2 && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => {
+                                                                    const newChoices = form.variantChoices.filter((_, i) => i !== index);
+                                                                    // Reassign letters
+                                                                    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+                                                                    const updatedChoices = newChoices.map((c, i) => ({ ...c, letter: letters[i] }));
+                                                                    handleFieldChange('variantChoices', updatedChoices);
+                                                                }}
+                                                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                                            >
+                                                                ×
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {form.variantChoices.length < 8 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+                                                            const nextLetter = letters[form.variantChoices.length];
+                                                            if (nextLetter) {
+                                                                handleFieldChange('variantChoices', [
+                                                                    ...form.variantChoices,
+                                                                    { letter: nextLetter, text: '' }
+                                                                ]);
+                                                            }
+                                                        }}
+                                                        className="w-full"
+                                                    >
+                                                        + Add Choice
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="variant-answer-mcq">Correct Answer</Label>
+                                                <Select
+                                                    value={form.variantAnswer}
+                                                    onValueChange={(value) => handleFieldChange('variantAnswer', value)}
+                                                >
+                                                    <SelectTrigger id="variant-answer-mcq">
+                                                        <SelectValue placeholder="Select correct answer" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {form.variantChoices.map((choice) => (
+                                                            <SelectItem key={choice.letter} value={choice.letter}>
+                                                                {choice.letter}) {choice.text || 'Option ' + choice.letter}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
@@ -921,16 +1054,18 @@ export const AddQuestionDialog = ({
                                         />
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="variant-answer">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                        <Textarea
-                                            id="variant-answer"
-                                            value={form.variantAnswer}
-                                            onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
-                                            placeholder="Provide an answer or leave blank"
-                                            rows={3}
-                                        />
-                                    </div>
+                                    {form.questionType !== 'MCQ' && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="variant-answer">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                                            <Textarea
+                                                id="variant-answer"
+                                                value={form.variantAnswer}
+                                                onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
+                                                placeholder="Provide an answer or leave blank"
+                                                rows={3}
+                                            />
+                                        </div>
+                                    )}
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">

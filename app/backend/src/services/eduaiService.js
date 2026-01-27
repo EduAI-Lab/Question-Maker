@@ -146,22 +146,31 @@ Requirements:
 - Reasoning distribution: Factual: ${reasoningDistribution.factual}%, Analytical: ${reasoningDistribution.analytical}%, Application: ${reasoningDistribution.application}%
 - Each question should be relevant to the course material
 - For each question, you MUST generate a correct answer based on the question content
-- Format each question as a JSON object with these exact fields:
+
+Format each question as a JSON object with these exact fields:
   {
-    "content": "The complete question text",
+    "content": "The question text only (for MCQ: do NOT include choices in content)",
     "description": "Brief summary (<= 15 words) that does not simply repeat the question text",
     "difficulty": "easy/medium/hard",
     "reasoning_level": "factual/analytical/application",
     "type": "MCQ/SA/LA",
-    "answer": "The correct answer to the question (required for all question types)",
+    "answer": "The correct answer (see guidelines below)",
     "primary_topic_id": number | null,
-    "secondary_topic_ids": number[]
+    "secondary_topic_ids": number[],
+    "choices": [{"letter": "A", "text": "Option A"}, ...]  // REQUIRED for MCQ questions only
   }
 
+IMPORTANT FOR MCQ QUESTIONS:
+- "content" must contain ONLY the question text, without any choices
+- "choices" is REQUIRED and must be an array of objects with "letter" (A, B, C, D, etc.) and "text" (the choice text)
+- Each choice must have a unique letter (A, B, C, D, E, etc.)
+- Provide at least 2 choices, typically 4 choices
+- "answer" must be the letter of the correct choice (e.g., "B" for the second choice)
+
 Answer Guidelines:
-- For MCQ questions: Provide the correct option letter (A, B, C, D, etc.) or the full correct answer text
-- For SA (Short Answer) questions: Provide a concise, accurate answer (1-3 sentences)
-- For LA (Long Answer) questions: Provide a comprehensive, detailed answer that fully addresses the question
+- For MCQ questions: "answer" must be the letter of the correct choice (e.g., "A", "B", "C", "D")
+- For SA (Short Answer) questions: Provide a concise, accurate answer (1-3 sentences) in the "answer" field
+- For LA (Long Answer) questions: Provide a comprehensive, detailed answer that fully addresses the question in the "answer" field
 - The answer must be accurate and directly address the question content
 - Do not leave answers as null or empty - always generate a valid answer
 
@@ -270,25 +279,74 @@ Please ensure the questions are appropriate for the course level and cover the k
             )
           : [];
 
-        const answer =
-          typeof question.answer === "string" && question.answer.trim().length > 0
-            ? question.answer.trim()
-            : null;
+        const questionType =
+          typeof question.type === "string" &&
+          question.type.toUpperCase().trim() === "SA"
+            ? "SA"
+            : typeof question.type === "string" &&
+              question.type.toUpperCase().trim() === "LA"
+              ? "LA"
+              : "MCQ";
+
+        // Handle choices for MCQ questions
+        let choices = null;
+        let answer = null;
+
+        if (questionType === "MCQ") {
+          // Validate and normalize choices
+          if (Array.isArray(question.choices) && question.choices.length > 0) {
+            choices = question.choices
+              .map((choice) => {
+                if (typeof choice === "object" && choice !== null) {
+                  const letter = typeof choice.letter === "string" 
+                    ? choice.letter.toUpperCase().trim() 
+                    : null;
+                  const text = typeof choice.text === "string" 
+                    ? choice.text.trim() 
+                    : "";
+                  
+                  if (letter && text) {
+                    return { letter, text };
+                  }
+                }
+                return null;
+              })
+              .filter((choice) => choice !== null);
+
+            // Ensure unique letters
+            const seenLetters = new Set();
+            choices = choices.filter((choice) => {
+              if (seenLetters.has(choice.letter)) {
+                return false;
+              }
+              seenLetters.add(choice.letter);
+              return true;
+            });
+          }
+
+          // Normalize answer to just the letter for MCQ
+          if (typeof question.answer === "string" && question.answer.trim().length > 0) {
+            const answerText = question.answer.trim();
+            // Extract letter from formats like "B", "B)", "B) Option B", etc.
+            const letterMatch = answerText.match(/^([A-Za-z])/);
+            answer = letterMatch ? letterMatch[1].toUpperCase() : answerText;
+          }
+        } else {
+          // For SA/LA, keep full answer text
+          answer =
+            typeof question.answer === "string" && question.answer.trim().length > 0
+              ? question.answer.trim()
+              : null;
+        }
 
         return {
           content,
           description,
           difficulty: question.difficulty,
           reasoning_level: question.reasoning_level,
-          type:
-            typeof question.type === "string" &&
-            question.type.toUpperCase().trim() === "SA"
-              ? "SA"
-              : typeof question.type === "string" &&
-                question.type.toUpperCase().trim() === "LA"
-                ? "LA"
-                : "MCQ",
+          type: questionType,
           answer,
+          choices, // Will be null for SA/LA, array for MCQ
           primary_topic_id: primaryTopicId,
           secondary_topic_ids: secondaryTopicIds,
         };

@@ -405,14 +405,60 @@ export const QuestionDetailView = ({
                             </div>
                         </section>
 
+                        {entry.questionType === 'MCQ' && variant.choices && variant.choices.length > 0 && (
+                            <section>
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Choices
+                                </h3>
+                                <div className="mt-3 space-y-2">
+                                    {variant.choices.map((choice, index) => {
+                                        const isCorrect = variant.answer && choice.letter === variant.answer.trim().toUpperCase();
+                                        return (
+                                            <div
+                                                key={index}
+                                                className={`rounded-lg border p-4 shadow-sm ${
+                                                    isCorrect
+                                                        ? 'border-emerald-300 bg-emerald-50'
+                                                        : 'border-gray-200 bg-gray-50'
+                                                }`}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <span
+                                                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                                                            isCorrect
+                                                                ? 'bg-emerald-500 text-white'
+                                                                : 'bg-gray-200 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        {choice.letter}
+                                                    </span>
+                                                    <p className="flex-1 text-sm font-medium text-gray-900 leading-relaxed">
+                                                        {choice.text}
+                                                    </p>
+                                                    {isCorrect && (
+                                                        <span className="text-xs font-semibold text-emerald-700">
+                                                            Correct
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        )}
+
                         {variant.answer && (
                             <section>
                                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Answer
+                                    {entry.questionType === 'MCQ' ? 'Correct Answer' : 'Answer'}
                                 </h3>
                                 <div className="mt-3 rounded-lg border border-gray-200 bg-emerald-50/60 p-5 shadow-sm">
                                     <p className="text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
-                                        {variant.answer}
+                                        {entry.questionType === 'MCQ' 
+                                            ? `Option ${variant.answer.toUpperCase()}`
+                                            : variant.answer
+                                        }
                                     </p>
                                 </div>
                             </section>

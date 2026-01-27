@@ -283,8 +283,21 @@ const convertVariantToCanvasQuestion = (variant, questionMetadata, position, sec
   };
 
   if (isMCQ) {
-    // Parse MCQ options from question text and determine correct answer
-    const options = parseMCQOptions(questionText, answerText);
+    // Use choices array if available, otherwise fallback to parsing from questionText
+    let options = [];
+    
+    if (variant.choices && Array.isArray(variant.choices) && variant.choices.length > 0) {
+      // Use choices array directly
+      const correctLetter = answerText ? answerText.trim().toUpperCase().charAt(0) : null;
+      options = variant.choices.map((choice) => ({
+        text: choice.text,
+        letter: choice.letter,
+        isCorrect: choice.letter === correctLetter
+      }));
+    } else {
+      // Fallback to parsing from questionText for legacy data
+      options = parseMCQOptions(questionText, answerText);
+    }
     
     return {
       ...baseQuestion,
@@ -467,20 +480,19 @@ const convertCanvasQuestionToVariant = (canvasQuestion) => {
   if (questionType === 'multiple_choice_question' || questionType === 'true_false_question') {
     localType = 'MCQ';
     
-    // Reconstruct question text with options
+    // Extract choices from Canvas answers array
     const answers = canvasQuestion.answers || [];
+    const choices = [];
+    let correctLetter = null;
+    
     if (answers.length > 0) {
       // Find correct answer
       const correctAnswer = answers.find(a => a.answer_weight === 100 || a.answer_weight > 0);
       
-      // Build options text
-      const options = [];
-      let correctLetter = null;
-      
       if (questionType === 'true_false_question') {
         // True/False questions
-        options.push('A) True');
-        options.push('B) False');
+        choices.push({ letter: 'A', text: 'True' });
+        choices.push({ letter: 'B', text: 'False' });
         if (correctAnswer) {
           correctLetter = correctAnswer.answer_text === 'True' ? 'A' : 'B';
         }
@@ -491,29 +503,35 @@ const convertCanvasQuestionToVariant = (canvasQuestion) => {
           const letter = letters[index];
           // Strip HTML from answer text
           const answerText = stripHtmlTags(ans.answer_text || '');
-          options.push(`${letter}) ${answerText}`);
+          choices.push({ letter, text: answerText });
           if (ans.answer_weight === 100 || ans.answer_weight > 0) {
             correctLetter = letter;
           }
         });
       }
       
-      // If question text doesn't already contain options, add them
-      if (!questionText.match(/^[A-H]\)/m)) {
-        processedQuestionText = questionText.trim();
-        if (processedQuestionText && !processedQuestionText.endsWith('\n')) {
-          processedQuestionText += '\n';
-        }
-        processedQuestionText += options.join('\n');
-      }
+      // Question text should not include choices - keep it clean
+      processedQuestionText = questionText.trim();
       
-      // Set answer
+      // Set answer to just the letter
       if (correctLetter) {
         answer = correctLetter;
       } else if (correctAnswer) {
-        answer = correctAnswer.answer_text;
+        // Fallback: try to extract letter from answer text
+        const letterMatch = stripHtmlTags(correctAnswer.answer_text || '').match(/^([A-Za-z])/);
+        answer = letterMatch ? letterMatch[1].toUpperCase() : null;
       }
     }
+    
+    // Return choices along with other data
+    return {
+      questionText: processedQuestionText,
+      answer: answer,
+      choices: choices.length > 0 ? choices : null,
+      type: localType,
+      description: description,
+      position: canvasQuestion.position || 0
+    };
   } else if (questionType === 'essay_question') {
     localType = 'LA';
     // Essay questions - extract answer if available
@@ -537,9 +555,11 @@ const convertCanvasQuestionToVariant = (canvasQuestion) => {
   const descriptionMatch = questionName.match(/^\d+\.\s*(.+)$/);
   const description = descriptionMatch ? descriptionMatch[1] : (questionName || 'Imported Question');
 
+  // For non-MCQ questions, return here
   return {
     questionText: processedQuestionText,
     answer: answer,
+    choices: null, // No choices for SA/LA
     type: localType,
     description: description,
     position: canvasQuestion.position || 0
@@ -632,6 +652,7 @@ export const importQuizFromCanvas = async (userId, canvasCourseId, quizId, local
           questionText: converted.questionText,
           difficulty: 'medium', // Default difficulty
           answer: converted.answer,
+          choices: converted.choices || null, // Include choices for MCQ
           assessmentId: assessment.id,
           secondaryTopicsId: [],
           isAiGenerated: false,

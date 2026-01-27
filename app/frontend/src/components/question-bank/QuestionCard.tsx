@@ -52,6 +52,21 @@ export const QuestionCard = ({ entry, questionNumber, onView, onCreateVariant }:
                             <p className="text-gray-900 line-clamp-2 leading-relaxed">
                                 {entry.variant.questionText}
                             </p>
+                            {entry.questionType === 'MCQ' && entry.variant.choices && entry.variant.choices.length > 0 && (
+                                <div className="text-xs text-gray-600 space-y-1">
+                                    {entry.variant.choices.slice(0, 2).map((choice, idx) => (
+                                        <div key={idx} className="flex items-center gap-1.5">
+                                            <span className="font-medium">{choice.letter})</span>
+                                            <span className="line-clamp-1">{choice.text}</span>
+                                        </div>
+                                    ))}
+                                    {entry.variant.choices.length > 2 && (
+                                        <span className="text-muted-foreground">
+                                            +{entry.variant.choices.length - 2} more options
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                             <p className="text-xs text-muted-foreground line-clamp-1">
                                 {entry.questionDescription}
                             </p>

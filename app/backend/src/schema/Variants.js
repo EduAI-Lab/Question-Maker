@@ -81,6 +81,13 @@ export const Variants = sequelize.define('Variants', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  choices: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: null,
+    field: 'choices',
+    comment: 'Array of choice objects for MCQ questions: [{letter: "A", text: "Option A"}, ...]'
+  },
   createdAt: {
     type: DataTypes.DATE,
     allowNull: false,
