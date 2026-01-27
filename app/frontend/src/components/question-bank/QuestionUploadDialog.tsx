@@ -36,7 +36,20 @@ import { questionService } from '../../services/questionService';
 import { eduaiService, EduAIModelOption } from '../../services/eduaiService';
 import { apiKeyStorage } from '../../services/apiKeyStorage';
 
-GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
+// Configure PDF.js worker
+// In production, use CDN to avoid issues with worker file path resolution
+// In development, use the local worker file
+// This fixes the "Failed to fetch dynamically imported module" error in production
+const isProduction = typeof window !== 'undefined' && 
+    (window.location.hostname !== 'localhost' && !window.location.hostname.startsWith('127.0.0.1'));
+
+if (isProduction) {
+    // Use jsDelivr CDN in production for reliability (matches pdfjs-dist version 4.6.82)
+    GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.min.mjs';
+} else {
+    // Use local worker in development
+    GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
+}
 
 type DraftQuestion = Required<Pick<ExtractedQuestion, 'question'>> &
     Omit<ExtractedQuestion, 'question'> & {
