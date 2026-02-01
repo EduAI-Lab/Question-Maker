@@ -16,6 +16,7 @@ interface QuestionMetadataCardProps {
   onAddVariant: () => void;
   topicsById: Record<number, Topic>;
   onToggleReview?: (variantId: number, nextDraft: boolean) => void;
+  onViewQuestion?: (question: Question, variantId?: number) => void;
   selectedVariantId?: number;
   onVariantChange?: (questionId: number, variantId: number) => void;
 }
@@ -59,6 +60,7 @@ export const QuestionMetadataCard = ({
   onAddVariant,
   topicsById,
   onToggleReview,
+  onViewQuestion,
   selectedVariantId,
   onVariantChange
 }: QuestionMetadataCardProps) => {
@@ -158,7 +160,20 @@ export const QuestionMetadataCard = ({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {onToggleReview && activeVariant && activeVariant.isDraft !== undefined && (
+              {onViewQuestion ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewQuestion(question, activeVariant?.id);
+                  }}
+                  className="text-xs"
+                >
+                  View Question
+                </Button>
+              ) : onToggleReview && activeVariant && activeVariant.isDraft !== undefined ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -171,7 +186,7 @@ export const QuestionMetadataCard = ({
                 >
                   {activeVariant.isDraft ? 'Mark Reviewed' : 'Mark Draft'}
                 </Button>
-              )}
+              ) : null}
               <Button
                 type="button"
                 variant="default"
@@ -229,8 +244,7 @@ export const QuestionMetadataCard = ({
 };
 
 const VariantContent = ({ variant }: { variant: QuestionVariant }) => {
-  const isMCQ = variant.questionMetadata?.type === 'MCQ';
-  const hasChoices = isMCQ && variant.choices && Array.isArray(variant.choices) && variant.choices.length > 0;
+  const hasChoices = variant.choices && Array.isArray(variant.choices) && variant.choices.length > 0;
 
   return (
     <div className="space-y-2">

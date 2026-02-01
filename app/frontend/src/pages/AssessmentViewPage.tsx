@@ -354,10 +354,10 @@ export const AssessmentViewPage = () => {
     }));
   };
 
-  const handleViewQuestion = (question: Question) => {
-    // Convert Question to QuestionVariantEntry
-    const primaryVariant = question.variants?.[0];
-    if (!primaryVariant) {
+  const handleViewQuestion = (question: Question, variantId?: number) => {
+    const variant =
+      question.variants?.find((v) => v.id === variantId) ?? question.variants?.[0];
+    if (!variant) {
       toast({
         variant: 'destructive',
         title: 'No variant found',
@@ -367,8 +367,8 @@ export const AssessmentViewPage = () => {
     }
 
     const resolveTopicName = (topicId: number) => topicsById[topicId]?.name ?? `Topic ${topicId}`;
-    const secondaryTopicNames = Array.isArray(primaryVariant.secondaryTopicsId)
-      ? (primaryVariant.secondaryTopicsId
+    const secondaryTopicNames = Array.isArray(variant.secondaryTopicsId)
+      ? (variant.secondaryTopicsId
           .map((topicId) => resolveTopicName(topicId))
           .filter(Boolean) as string[])
       : undefined;
@@ -384,9 +384,9 @@ export const AssessmentViewPage = () => {
       courseCode: question.course?.code,
       secondaryTopicNames:
         secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-      isAiGenerated: primaryVariant.isAiGenerated,
-      isDraft: primaryVariant.isDraft,
-      variant: primaryVariant
+      isAiGenerated: variant.isAiGenerated,
+      isDraft: variant.isDraft,
+      variant
     };
 
     setSelectedVariant(entry);

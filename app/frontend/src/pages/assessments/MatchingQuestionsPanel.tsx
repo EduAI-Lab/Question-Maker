@@ -15,7 +15,7 @@ interface MatchingQuestionsPanelProps {
   onToggleQuestion: (question: Question) => void;
   onClearSelection: () => void;
   onAddVariant: (question: Question) => void;
-  onViewQuestion?: (question: Question) => void;
+  onViewQuestion?: (question: Question, variantId?: number) => void;
   onToggleReview: (variantId: number, nextDraft: boolean) => void;
   isSearching: boolean;
   searchError: string | null;
@@ -106,6 +106,7 @@ export const MatchingQuestionsPanel = ({
                 onAddVariant={() => onAddVariant(question)}
                 topicsById={topicsById}
                 onToggleReview={onToggleReview}
+                onViewQuestion={onViewQuestion}
                 selectedVariantId={selectedVariantByQuestion?.[question.id]}
                 onVariantChange={onVariantChange}
               />
