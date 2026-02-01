@@ -25,6 +25,7 @@ import {
     ReasoningLevel,
     MCQChoice
 } from '../../types/question';
+import { MCQChoicesField } from './MCQChoicesField';
 import { questionService } from '../../services/questionService';
 import { courseService } from '../../services/courseService';
 import assessmentService from '../../services/assessmentService';
@@ -53,6 +54,7 @@ type FormState = {
     variantDifficulty: QuestionDifficulty;
     variantReasoningLevel: ReasoningLevel;
     variantAnswer: string;
+    variantChoices: MCQChoice[];
     variantSecondaryTopics: number[];
     variantAssessmentId: string;
     variantReferenceId: string;
@@ -912,6 +914,16 @@ export const AddQuestionDialog = ({
                                         </div>
                                     )}
 
+                                    {form.questionType === 'MCQ' && (
+                                        <MCQChoicesField
+                                            choices={form.variantChoices ?? defaultForm.variantChoices}
+                                            answer={form.variantAnswer}
+                                            onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
+                                            onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
+                                            idPrefix="aq-mcq"
+                                        />
+                                    )}
+
                                     <div className="space-y-2">
                                         <Label htmlFor="variant-text">Question Text</Label>
                                         <Textarea
@@ -922,86 +934,6 @@ export const AddQuestionDialog = ({
                                             rows={6}
                                         />
                                     </div>
-
-                                    {form.questionType === 'MCQ' && (
-                                        <div className="space-y-2">
-                                            <Label>Choices <span className="text-xs text-muted-foreground">(required for MCQ)</span></Label>
-                                            <div className="space-y-3 border rounded-md p-4 bg-muted/30">
-                                                {form.variantChoices.map((choice, index) => (
-                                                    <div key={index} className="flex items-center gap-3">
-                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-semibold">
-                                                            {choice.letter}
-                                                        </div>
-                                                        <Input
-                                                            value={choice.text}
-                                                            onChange={(e) => {
-                                                                const newChoices = [...form.variantChoices];
-                                                                newChoices[index] = { ...choice, text: e.target.value };
-                                                                handleFieldChange('variantChoices', newChoices);
-                                                            }}
-                                                            placeholder={`Enter option ${choice.letter}`}
-                                                            className="flex-1"
-                                                        />
-                                                        {form.variantChoices.length > 2 && (
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                onClick={() => {
-                                                                    const newChoices = form.variantChoices.filter((_, i) => i !== index);
-                                                                    // Reassign letters
-                                                                    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-                                                                    const updatedChoices = newChoices.map((c, i) => ({ ...c, letter: letters[i] }));
-                                                                    handleFieldChange('variantChoices', updatedChoices);
-                                                                }}
-                                                                className="h-8 w-8 text-destructive hover:text-destructive"
-                                                            >
-                                                                ×
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                                {form.variantChoices.length < 8 && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                            const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-                                                            const nextLetter = letters[form.variantChoices.length];
-                                                            if (nextLetter) {
-                                                                handleFieldChange('variantChoices', [
-                                                                    ...form.variantChoices,
-                                                                    { letter: nextLetter, text: '' }
-                                                                ]);
-                                                            }
-                                                        }}
-                                                        className="w-full"
-                                                    >
-                                                        + Add Choice
-                                                    </Button>
-                                                )}
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="variant-answer-mcq">Correct Answer</Label>
-                                                <Select
-                                                    value={form.variantAnswer}
-                                                    onValueChange={(value) => handleFieldChange('variantAnswer', value)}
-                                                >
-                                                    <SelectTrigger id="variant-answer-mcq">
-                                                        <SelectValue placeholder="Select correct answer" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {form.variantChoices.map((choice) => (
-                                                            <SelectItem key={choice.letter} value={choice.letter}>
-                                                                {choice.letter}) {choice.text || 'Option ' + choice.letter}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                        </div>
-                                    )}
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
