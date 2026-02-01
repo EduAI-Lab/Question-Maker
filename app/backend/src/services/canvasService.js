@@ -85,22 +85,25 @@ const makeCanvasRequest = async (integration, method, endpoint, data = null) => 
       return { data: { id: Math.floor(Math.random() * 1000) } };
     }
     if (endpoint.includes('/questions') && method === 'GET') {
-      // Mock questions
-      return { data: [
-        {
-          id: 1,
-          question_name: '1. Test Question',
-          question_text: 'What is 2+2?\nA) 3\nB) 4\nC) 5\nD) 6',
-          question_type: 'multiple_choice_question',
-          position: 1,
-          answers: [
-            { id: 1, answer_text: '3', answer_weight: 0 },
-            { id: 2, answer_text: '4', answer_weight: 100 },
-            { id: 3, answer_text: '5', answer_weight: 0 },
-            { id: 4, answer_text: '6', answer_weight: 0 }
-          ]
-        }
-      ] };
+      const singleQuestionMatch = endpoint.match(/\/questions\/(\d+)$/);
+      const singleQuestion = {
+        id: 1,
+        question_name: '1. Test Question',
+        question_text: 'What is 2+2?\nA) 3\nB) 4\nC) 5\nD) 6',
+        question_type: 'multiple_choice_question',
+        position: 1,
+        answers: [
+          { id: 1, answer_text: '3', answer_weight: 0 },
+          { id: 2, answer_text: '4', answer_weight: 100 },
+          { id: 3, answer_text: '5', answer_weight: 0 },
+          { id: 4, answer_text: '6', answer_weight: 0 }
+        ]
+      };
+      // Single question by ID returns one object; list returns array
+      if (singleQuestionMatch) {
+        return { data: { ...singleQuestion, id: parseInt(singleQuestionMatch[1], 10) } };
+      }
+      return { data: [singleQuestion] };
     }
     if (endpoint.includes('/quizzes') && method === 'GET' && endpoint.match(/\/quizzes\/\d+$/)) {
       // Single quiz details
@@ -406,11 +409,14 @@ export const getCanvasQuizzes = async (userId, canvasCourseId) => {
   }
 };
 
-/** Fetches the question list for a Canvas quiz. */
+// Debug prefix for Canvas import troubleshooting (grep for this to see all import logs)
+const DEBUG_PREFIX = '[Canvas Import]';
+
+/** Fetches the question list for a Canvas quiz. Note: list endpoint often returns answers as null; use getCanvasQuizQuestionById for full details. */
 export const getCanvasQuizQuestions = async (userId, canvasCourseId, quizId) => {
   try {
     const integration = await getCanvasIntegration(userId);
-    
+
     if (!integration) {
       throw new Error('Canvas integration not configured. Please connect your Canvas account first.');
     }
@@ -421,9 +427,56 @@ export const getCanvasQuizQuestions = async (userId, canvasCourseId, quizId) => 
       `/courses/${canvasCourseId}/quizzes/${quizId}/questions`
     );
 
-    return Array.isArray(response.data) ? response.data : [response.data];
+    const list = Array.isArray(response.data) ? response.data : [response.data];
+    console.log(`${DEBUG_PREFIX} getCanvasQuizQuestions: got ${list.length} question(s). isTestMode=${!!integration?.isTestMode}`);
+    if (list.length > 0) {
+      const first = list[0];
+      const firstKeys = first && typeof first === 'object' ? Object.keys(first) : [];
+      const firstAnswers = first?.answers;
+      console.log(`${DEBUG_PREFIX} list[0] keys: ${firstKeys.join(', ')}; answers type=${typeof firstAnswers}, isArray=${Array.isArray(firstAnswers)}, length=${firstAnswers?.length ?? 'N/A'}`);
+      if (first?.question_text) {
+        console.log(`${DEBUG_PREFIX} list[0] question_text (first 120 chars): ${String(first.question_text).slice(0, 120)}...`);
+      }
+    }
+    return list;
   } catch (error) {
     throw new Error(`Failed to get Canvas quiz questions: ${error.message}`);
+  }
+};
+
+/** Fetches a single Canvas quiz question by ID, including the answers array (required for MCQ choices and correct answer). */
+export const getCanvasQuizQuestionById = async (userId, canvasCourseId, quizId, questionId) => {
+  try {
+    const integration = await getCanvasIntegration(userId);
+
+    if (!integration) {
+      throw new Error('Canvas integration not configured. Please connect your Canvas account first.');
+    }
+
+    const response = await makeCanvasRequest(
+      integration,
+      'GET',
+      `/courses/${canvasCourseId}/quizzes/${quizId}/questions/${questionId}`
+    );
+
+    const data = response.data;
+    const topLevelKeys = data && typeof data === 'object' ? Object.keys(data) : [];
+    console.log(`${DEBUG_PREFIX} getCanvasQuizQuestionById(${questionId}) response keys: ${topLevelKeys.join(', ')}; has data.question=${!!(data?.question)}`);
+
+    // Some Canvas API responses wrap the question in a 'question' key
+    const question = (data && typeof data === 'object' && data.question != null) ? data.question : data;
+    const questionKeys = question && typeof question === 'object' ? Object.keys(question) : [];
+    const answers = question?.answers;
+    console.log(`${DEBUG_PREFIX} getCanvasQuizQuestionById(${questionId}) question keys: ${questionKeys.join(', ')}; answers type=${typeof answers}, isArray=${Array.isArray(answers)}, length=${answers?.length ?? 'N/A'}`);
+    if (answers?.length > 0) {
+      console.log(`${DEBUG_PREFIX} getCanvasQuizQuestionById(${questionId}) first answer: ${JSON.stringify(answers[0])}`);
+    }
+    if (question?.question_text) {
+      console.log(`${DEBUG_PREFIX} getCanvasQuizQuestionById(${questionId}) question_text (first 150 chars): ${String(question.question_text).slice(0, 150)}...`);
+    }
+    return question;
+  } catch (error) {
+    throw new Error(`Failed to get Canvas quiz question: ${error.message}`);
   }
 };
 
@@ -464,106 +517,181 @@ const stripHtmlTags = (html) => {
   return text;
 };
 
+/** Normalize Canvas question_type for comparison (align with export types). */
+const normalizeCanvasQuestionType = (questionType) => {
+  if (questionType == null) return '';
+  return String(questionType).toLowerCase().trim();
+};
+
+/** Canvas API uses either answer_text/answer_weight (docs) or text/weight (submission/list API). Normalize to one shape. */
+const getCanvasAnswerText = (ans) => ans?.answer_text ?? ans?.text ?? '';
+const getCanvasAnswerWeight = (ans) => {
+  const w = ans?.answer_weight ?? ans?.weight;
+  return w != null ? Number(w) : null;
+};
+const isCanvasAnswerCorrect = (ans) => {
+  const w = getCanvasAnswerWeight(ans);
+  return w === 100 || (w != null && w > 0);
+};
+
+/**
+ * Parses MCQ choices from question text when Canvas returns answers as null.
+ * Handles formats like "Question text\nA) Option A\nB) Option B\nC) Option C\nD) Option D".
+ * Returns { questionText: string, choices: Array<{letter: string, text: string}> }.
+ */
+const parseChoicesFromQuestionText = (questionText) => {
+  if (!questionText || typeof questionText !== 'string') {
+    return { questionText: questionText || '', choices: [] };
+  }
+  const lines = questionText.split('\n');
+  const choices = [];
+  const questionLines = [];
+  const choicePattern = /^([A-Za-z])\)\s*(.+)$/;
+  let foundChoices = false;
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    const match = trimmedLine.match(choicePattern);
+    if (match) {
+      foundChoices = true;
+      choices.push({ letter: match[1].toUpperCase(), text: match[2].trim() });
+    } else if (trimmedLine && !foundChoices) {
+      questionLines.push(line);
+    }
+  }
+  const cleanQuestionText = questionLines.join('\n').trim();
+  return {
+    questionText: cleanQuestionText || questionText,
+    choices
+  };
+};
+
 /** Converts a Canvas question into local variant metadata, throwing for unsupported types. */
 const convertCanvasQuestionToVariant = (canvasQuestion) => {
-  const questionType = canvasQuestion.question_type;
+  const questionTypeRaw = canvasQuestion.question_type;
+  const questionType = normalizeCanvasQuestionType(questionTypeRaw);
   const questionTextRaw = canvasQuestion.question_text || '';
   const questionName = canvasQuestion.question_name || '';
-  
+
+  const answersInput = canvasQuestion.answers;
+  console.log(`${DEBUG_PREFIX} convertCanvasQuestionToVariant: question_type raw="${questionTypeRaw}" normalized="${questionType}"; answers type=${typeof answersInput}, length=${answersInput?.length ?? 'N/A'}; question_text length=${questionTextRaw?.length ?? 0}`);
+
+  // Extract description from question name first (used in all return paths)
+  const descriptionMatch = questionName.match(/^\d+\.\s*(.+)$/);
+  const description = descriptionMatch ? descriptionMatch[1].trim() : (questionName || 'Imported Question').trim();
+
   // Strip HTML tags from question text
   const questionText = stripHtmlTags(questionTextRaw);
-  
-  let localType = 'SA'; // Default to short answer
+  if (questionType === 'multiple_choice_question' && questionText) {
+    console.log(`${DEBUG_PREFIX} convertCanvasQuestionToVariant: questionText after stripHtml (first 200 chars): ${questionText.slice(0, 200)}`);
+  }
+
+  let localType = 'SA';
   let processedQuestionText = questionText;
   let answer = null;
+  let choices = null;
 
+  // Match export types: multiple_choice_question, true_false_question, essay_question, short_answer_question
   if (questionType === 'multiple_choice_question' || questionType === 'true_false_question') {
     localType = 'MCQ';
-    
-    // Extract choices from Canvas answers array
     const answers = canvasQuestion.answers || [];
-    const choices = [];
+    const choicesList = [];
     let correctLetter = null;
-    
+
     if (answers.length > 0) {
-      // Find correct answer
-      const correctAnswer = answers.find(a => a.answer_weight === 100 || a.answer_weight > 0);
-      
+      console.log(`${DEBUG_PREFIX} convertCanvasQuestionToVariant: using answers array (${answers.length} items) for MCQ`);
+      const correctAnswer = answers.find((a) => isCanvasAnswerCorrect(a));
+
       if (questionType === 'true_false_question') {
-        // True/False questions
-        choices.push({ letter: 'A', text: 'True' });
-        choices.push({ letter: 'B', text: 'False' });
+        choicesList.push({ letter: 'A', text: 'True' });
+        choicesList.push({ letter: 'B', text: 'False' });
         if (correctAnswer) {
-          correctLetter = correctAnswer.answer_text === 'True' ? 'A' : 'B';
+          const text = stripHtmlTags(getCanvasAnswerText(correctAnswer)).trim();
+          correctLetter = text.toLowerCase() === 'true' ? 'A' : 'B';
         }
       } else {
-        // Multiple choice - use answer positions to determine letters
         const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
         answers.forEach((ans, index) => {
           const letter = letters[index];
-          // Strip HTML from answer text
-          const answerText = stripHtmlTags(ans.answer_text || '');
-          choices.push({ letter, text: answerText });
-          if (ans.answer_weight === 100 || ans.answer_weight > 0) {
+          const answerText = stripHtmlTags(getCanvasAnswerText(ans));
+          choicesList.push({ letter, text: answerText });
+          if (isCanvasAnswerCorrect(ans)) {
             correctLetter = letter;
           }
         });
       }
-      
-      // Question text should not include choices - keep it clean
+
       processedQuestionText = questionText.trim();
-      
-      // Set answer to just the letter
       if (correctLetter) {
         answer = correctLetter;
       } else if (correctAnswer) {
-        // Fallback: try to extract letter from answer text
-        const letterMatch = stripHtmlTags(correctAnswer.answer_text || '').match(/^([A-Za-z])/);
+        const text = stripHtmlTags(getCanvasAnswerText(correctAnswer));
+        const letterMatch = text.match(/^([A-Za-z])/);
         answer = letterMatch ? letterMatch[1].toUpperCase() : null;
       }
+      choices = choicesList.length > 0 ? choicesList : null;
     }
-    
-    // Return choices along with other data
+
+    // Fallback: when Canvas returns answers as null/empty (common for list or some instances), parse choices from question_text
+    if (choices == null && (questionType === 'multiple_choice_question')) {
+      const parsed = parseChoicesFromQuestionText(questionText);
+      console.log(`${DEBUG_PREFIX} convertCanvasQuestionToVariant: fallback parseChoicesFromQuestionText => ${parsed.choices.length} choices`);
+      if (parsed.choices.length > 0) {
+        processedQuestionText = parsed.questionText;
+        choices = parsed.choices;
+        console.log(`${DEBUG_PREFIX} convertCanvasQuestionToVariant: MCQ result from fallback: choices=${JSON.stringify(choices)}, answer=${answer}`);
+        // answer stays null; user can set correct answer after import
+      } else {
+        console.log(`${DEBUG_PREFIX} convertCanvasQuestionToVariant: fallback found no choices (pattern A) B) etc. not matched)`);
+      }
+    } else if (choices != null) {
+      console.log(`${DEBUG_PREFIX} convertCanvasQuestionToVariant: MCQ result from answers: choices count=${choices.length}, answer=${answer}`);
+    }
+
     return {
       questionText: processedQuestionText,
       answer: answer,
-      choices: choices.length > 0 ? choices : null,
+      choices,
       type: localType,
-      description: description,
-      position: canvasQuestion.position || 0
+      description,
+      position: canvasQuestion.position ?? 0
     };
-  } else if (questionType === 'essay_question') {
-    localType = 'LA';
-    // Essay questions - extract answer if available
-    const answers = canvasQuestion.answers || [];
-    if (answers.length > 0 && answers[0].answer_text) {
-      answer = stripHtmlTags(answers[0].answer_text);
-    }
-  } else if (questionType === 'short_answer_question' || questionType === 'fill_in_multiple_blanks_question') {
-    localType = 'SA';
-    // Short answer - extract answer
-    const answers = canvasQuestion.answers || [];
-    if (answers.length > 0 && answers[0].answer_text) {
-      answer = stripHtmlTags(answers[0].answer_text);
-    }
-  } else {
-    // Unsupported question type
-    throw new Error(`Unsupported question type: ${questionType}`);
   }
 
-  // Extract description from question name (remove position number)
-  const descriptionMatch = questionName.match(/^\d+\.\s*(.+)$/);
-  const description = descriptionMatch ? descriptionMatch[1] : (questionName || 'Imported Question');
+  if (questionType === 'essay_question') {
+    localType = 'LA';
+    const answers = canvasQuestion.answers || [];
+    if (answers.length > 0) {
+      const text = getCanvasAnswerText(answers[0]);
+      if (text) answer = stripHtmlTags(text);
+    }
+    return {
+      questionText: processedQuestionText,
+      answer: answer,
+      choices: null,
+      type: localType,
+      description,
+      position: canvasQuestion.position ?? 0
+    };
+  }
 
-  // For non-MCQ questions, return here
-  return {
-    questionText: processedQuestionText,
-    answer: answer,
-    choices: null, // No choices for SA/LA
-    type: localType,
-    description: description,
-    position: canvasQuestion.position || 0
-  };
+  if (questionType === 'short_answer_question' || questionType === 'fill_in_multiple_blanks_question') {
+    localType = 'SA';
+    const answers = canvasQuestion.answers || [];
+    if (answers.length > 0) {
+      const text = getCanvasAnswerText(answers[0]);
+      if (text) answer = stripHtmlTags(text);
+    }
+    return {
+      questionText: processedQuestionText,
+      answer: answer,
+      choices: null,
+      type: localType,
+      description,
+      position: canvasQuestion.position ?? 0
+    };
+  }
+
+  throw new Error(`Unsupported question type: ${questionTypeRaw ?? 'unknown'}`);
 };
 
 /** Imports a Canvas quiz into a local assessment, creating sections/questions/variants. */
@@ -631,11 +759,32 @@ export const importQuizFromCanvas = async (userId, canvasCourseId, quizId, local
     }
 
     for (let i = 0; i < canvasQuestions.length; i++) {
-      const canvasQuestion = canvasQuestions[i];
-      
+      const listItem = canvasQuestions[i];
+      const questionId = listItem.id;
+
+      console.log(`${DEBUG_PREFIX} importQuizFromCanvas: processing question ${i + 1}/${canvasQuestions.length} id=${questionId} type=${listItem.question_type} listItem.answers length=${listItem?.answers?.length ?? 'N/A'}`);
+
       try {
+        // Fetch full question by ID so we get the answers array (list endpoint often returns answers: null)
+        let canvasQuestion = listItem;
+        if (questionId != null) {
+          try {
+            canvasQuestion = await getCanvasQuizQuestionById(userId, canvasCourseId, quizId, questionId);
+            // Preserve position from list if full question doesn't have it
+            if (canvasQuestion.position == null && listItem.position != null) {
+              canvasQuestion = { ...canvasQuestion, position: listItem.position };
+            }
+            console.log(`${DEBUG_PREFIX} importQuizFromCanvas: after getById question ${i + 1}: answers length=${canvasQuestion?.answers?.length ?? 'N/A'}`);
+          } catch (fetchErr) {
+            console.log(`${DEBUG_PREFIX} importQuizFromCanvas: getCanvasQuizQuestionById failed for id=${questionId}: ${fetchErr.message}; using list item`);
+            // Fall back to list item if per-question fetch fails (e.g. permissions)
+            canvasQuestion = listItem;
+          }
+        }
+
         // Try to convert the question - this will throw if unsupported
         const converted = convertCanvasQuestionToVariant(canvasQuestion);
+        console.log(`${DEBUG_PREFIX} importQuizFromCanvas: converted question ${i + 1} => type=${converted.type} choices count=${converted.choices?.length ?? 0} answer=${converted.answer ?? 'null'}`);
 
         // Create question metadata
         const questionMetadata = await Question_Metadata.create({
@@ -647,6 +796,7 @@ export const importQuizFromCanvas = async (userId, canvasCourseId, quizId, local
         });
 
         // Create variant
+        console.log(`${DEBUG_PREFIX} importQuizFromCanvas: creating variant with answer=${converted.answer ?? 'null'}, choices count=${converted.choices?.length ?? 0}`);
         const variant = await Variants.create({
           questionMetadataId: questionMetadata.id,
           questionText: converted.questionText,
