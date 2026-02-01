@@ -8,7 +8,7 @@ import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { Course, Question, Assessment, QuestionVariantEntry, AssessmentGenerationParams } from '../types/question';
+import { Course, Question, Assessment, QuestionVariantEntry, AssessmentGenerationParams, MCQChoice } from '../types/question';
 import { Topic } from '../types/topic';
 import { useCourses } from '../hooks/useCourses';
 import { questionService } from '../services/questionService';
@@ -218,16 +218,26 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
-  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
+  const handleUpdateVariant = (
+    variantId: number,
+    updates: {
+      isAiGenerated?: boolean;
+      isDraft?: boolean;
+      choices?: MCQChoice[] | null;
+      answer?: string | null;
+    }
+  ) => {
     setQuestions((prev) =>
       prev.map((question) => {
-        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        const variantIndex = question.variants?.findIndex((v) => v.id === variantId);
         if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
           const updatedVariants = [...question.variants];
           updatedVariants[variantIndex] = {
             ...updatedVariants[variantIndex],
             ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
-            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft }),
+            ...(updates.choices !== undefined && { choices: updates.choices }),
+            ...(updates.answer !== undefined && { answer: updates.answer })
           };
           return { ...question, variants: updatedVariants };
         }

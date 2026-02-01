@@ -62,7 +62,7 @@ export const getAssessmentsByUser = async (userId, options = {}) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'answer', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
+          attributes: ['id', 'questionText', 'difficulty', 'answer', 'choices', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
           include: [
             {
               model: Question_Metadata,
@@ -90,7 +90,7 @@ export const getAssessmentsByUser = async (userId, options = {}) => {
                 {
                   model: Variants,
                   as: 'variant',
-                  attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
+                  attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'choices', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
                   include: [
                     {
                       model: Question_Metadata,
@@ -141,7 +141,7 @@ export const getAssessmentById = async (assessmentId, userId) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'answer', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
+          attributes: ['id', 'questionText', 'difficulty', 'answer', 'choices', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
           include: [
             {
               model: Question_Metadata,
@@ -169,7 +169,7 @@ export const getAssessmentById = async (assessmentId, userId) => {
                 {
                   model: Variants,
                   as: 'variant',
-                  attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
+                  attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'choices', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
                   include: [
                     {
                       model: Question_Metadata,
@@ -449,7 +449,7 @@ export const getQuestionsInAssessment = async (assessmentId, userId) => {
           model: Variants,
           as: 'variants',
           where: { assessmentId: assessmentId },
-          attributes: ['id', 'questionText', 'difficulty', 'answer']
+          attributes: ['id', 'questionText', 'difficulty', 'answer', 'choices']
         }
       ],
       order: [

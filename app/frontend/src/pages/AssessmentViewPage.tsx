@@ -14,7 +14,8 @@ import {
   AssessmentSection,
   AssessmentSectionCreateInput,
   Question,
-  QuestionVariantEntry
+  QuestionVariantEntry,
+  MCQChoice
 } from '../types/question';
 import { Topic } from '../types/topic';
 import { Button } from '../components/ui/button';
@@ -395,16 +396,26 @@ export const AssessmentViewPage = () => {
     setSelectedVariant(null);
   };
 
-  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
+  const handleUpdateVariant = (
+    variantId: number,
+    updates: {
+      isAiGenerated?: boolean;
+      isDraft?: boolean;
+      choices?: MCQChoice[] | null;
+      answer?: string | null;
+    }
+  ) => {
     setMatchingQuestions((prev) =>
       prev.map((question) => {
-        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        const variantIndex = question.variants?.findIndex((v) => v.id === variantId);
         if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
           const updatedVariants = [...question.variants];
           updatedVariants[variantIndex] = {
             ...updatedVariants[variantIndex],
             ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
-            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft }),
+            ...(updates.choices !== undefined && { choices: updates.choices }),
+            ...(updates.answer !== undefined && { answer: updates.answer })
           };
           return { ...question, variants: updatedVariants };
         }

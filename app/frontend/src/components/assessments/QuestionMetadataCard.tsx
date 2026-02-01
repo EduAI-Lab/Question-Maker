@@ -235,7 +235,7 @@ const VariantContent = ({ variant }: { variant: QuestionVariant }) => {
   return (
     <div className="space-y-2">
       <p className="text-sm text-gray-900">{variant.questionText}</p>
-      {hasChoices && (
+      {hasChoices && variant.choices && (
         <div className="mt-2 space-y-1.5">
           {variant.choices.map((choice, index) => {
             const isCorrect = variant.answer && choice.letter === variant.answer.trim().toUpperCase();
@@ -291,7 +291,15 @@ const VariantContent = ({ variant }: { variant: QuestionVariant }) => {
       {variant.answer && (
         <div className="mt-2 pt-2 border-t border-gray-100">
           <p className="text-xs font-medium text-muted-foreground mb-1">Answer:</p>
-          <p className="text-xs text-gray-700">{variant.answer}</p>
+          <p className="text-xs text-gray-700">
+            {hasChoices
+              ? (() => {
+                  const letter = variant.answer.trim().toUpperCase().charAt(0);
+                  const choice = variant.choices?.find((c) => c.letter === letter);
+                  return choice ? `${choice.letter}) ${choice.text}` : variant.answer;
+                })()
+              : variant.answer}
+          </p>
         </div>
       )}
     </div>

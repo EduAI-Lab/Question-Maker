@@ -7,7 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { X, Copy, Trash2, ArrowLeft, Sparkles, FileEdit } from 'lucide-react';
-import { QuestionVariantEntry } from '../../types/question';
+import { QuestionVariantEntry, MCQChoice } from '../../types/question';
+import { MCQChoicesField } from '../questions/MCQChoicesField';
 import { questionService } from '../../services/questionService';
 import { assessmentService } from '../../services/assessmentService';
 import { useToast } from '../ui/use-toast';
@@ -56,7 +57,10 @@ interface QuestionDetailViewProps {
     onCreateVariant: (entry: QuestionVariantEntry) => void;
     onDeleteVariant: (entry: QuestionVariantEntry) => void;
     onSelectVariant: (entry: QuestionVariantEntry) => void;
-    onUpdateVariant?: (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => void;
+    onUpdateVariant?: (
+        variantId: number,
+        updates: { isAiGenerated?: boolean; isDraft?: boolean; choices?: MCQChoice[] | null; answer?: string | null }
+    ) => void;
 }
 
 export const QuestionDetailView = ({
@@ -72,6 +76,9 @@ export const QuestionDetailView = ({
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
     const [isToggling, setIsToggling] = useState(false);
     const [isTogglingDraft, setIsTogglingDraft] = useState(false);
+    const [editingChoices, setEditingChoices] = useState(false);
+    const [editChoices, setEditChoices] = useState<MCQChoice[]>([]);
+    const [editAnswer, setEditAnswer] = useState('');
     const { toast } = useToast();
     const { variant } = entry;
     const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
@@ -405,11 +412,68 @@ export const QuestionDetailView = ({
                             </div>
                         </section>
 
-                        {entry.questionType === 'MCQ' && variant.choices && variant.choices.length > 0 && (
+                        {entry.questionType === 'MCQ' && (editingChoices ? (
                             <section>
-                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Choices
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                                    Edit choices
                                 </h3>
+                                <MCQChoicesField
+                                    choices={editChoices}
+                                    answer={editAnswer}
+                                    onChoicesChange={setEditChoices}
+                                    onAnswerChange={setEditAnswer}
+                                    idPrefix="detail-mcq"
+                                />
+                                <div className="mt-3 flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        onClick={async () => {
+                                            try {
+                                                const validChoices = editChoices.filter((c) => c.text.trim().length > 0);
+                                                await questionService.updateVariant(variant.id, {
+                                                    choices: validChoices,
+                                                    answer: editAnswer
+                                                });
+                                                const updatedVariant = { ...entry.variant, choices: validChoices, answer: editAnswer };
+                                                const updatedEntry: QuestionVariantEntry = {
+                                                    ...entry,
+                                                    variant: updatedVariant
+                                                };
+                                                onSelectVariant(updatedEntry);
+                                                onUpdateVariant?.(variant.id, { choices: validChoices, answer: editAnswer });
+                                                setEditingChoices(false);
+                                                toast({ title: 'Choices saved', description: 'Variant choices and correct answer updated.' });
+                                            } catch (err: any) {
+                                                toast({ variant: 'destructive', title: 'Failed to save choices', description: err?.message });
+                                            }
+                                        }}
+                                    >
+                                        Save choices
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => setEditingChoices(false)}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </section>
+                        ) : variant.choices && variant.choices.length > 0 ? (
+                            <section>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        Choices
+                                    </h3>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-xs"
+                                        onClick={() => {
+                                            setEditChoices(variant.choices!.map((c) => ({ ...c })));
+                                            setEditAnswer(variant.answer?.trim().toUpperCase().charAt(0) ?? '');
+                                            setEditingChoices(true);
+                                        }}
+                                    >
+                                        Edit choices
+                                    </Button>
+                                </div>
                                 <div className="mt-3 space-y-2">
                                     {variant.choices.map((choice, index) => {
                                         const isCorrect = variant.answer && choice.letter === variant.answer.trim().toUpperCase();
@@ -446,17 +510,45 @@ export const QuestionDetailView = ({
                                     })}
                                 </div>
                             </section>
-                        )}
+                        ) : (
+                            <section>
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Choices
+                                </h3>
+                                <p className="mt-2 text-sm text-muted-foreground">No choices defined.</p>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-2"
+                                    onClick={() => {
+                                        setEditChoices([
+                                            { letter: 'A', text: '' },
+                                            { letter: 'B', text: '' },
+                                            { letter: 'C', text: '' },
+                                            { letter: 'D', text: '' }
+                                        ]);
+                                        setEditAnswer('');
+                                        setEditingChoices(true);
+                                    }}
+                                >
+                                    Add choices
+                                </Button>
+                            </section>
+                        ))}
 
-                        {variant.answer && (
+                        {variant.answer && !(entry.questionType === 'MCQ' && editingChoices) && (
                             <section>
                                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                     {entry.questionType === 'MCQ' ? 'Correct Answer' : 'Answer'}
                                 </h3>
                                 <div className="mt-3 rounded-lg border border-gray-200 bg-emerald-50/60 p-5 shadow-sm">
                                     <p className="text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
-                                        {entry.questionType === 'MCQ' 
-                                            ? `Option ${variant.answer.toUpperCase()}`
+                                        {entry.questionType === 'MCQ' && variant.choices && variant.choices.length > 0
+                                            ? (() => {
+                                                const letter = variant.answer.trim().toUpperCase().charAt(0);
+                                                const choice = variant.choices.find((c) => c.letter === letter);
+                                                return choice ? `${choice.letter}) ${choice.text}` : `Option ${variant.answer.toUpperCase()}`;
+                                            })()
                                             : variant.answer
                                         }
                                     </p>
