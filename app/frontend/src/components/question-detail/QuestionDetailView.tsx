@@ -32,9 +32,9 @@ const DetailItem = ({
                 className={`rounded-lg border border-gray-200 bg-gray-50 p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${spanFull ? 'sm:col-span-2' : ''}`}
             >
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-                <p className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
+                <div className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
                     {value}
-                </p>
+                </div>
                 <p className="mt-3 text-xs font-medium text-blue-600">View all variants</p>
             </button>
         ) : (
@@ -42,9 +42,9 @@ const DetailItem = ({
                 className={`rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm ${spanFull ? 'sm:col-span-2' : ''}`}
             >
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-                <p className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
+                <div className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
                     {value}
-                </p>
+                </div>
             </div>
         )}
     </>
