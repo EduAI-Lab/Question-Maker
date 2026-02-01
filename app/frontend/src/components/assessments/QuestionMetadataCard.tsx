@@ -302,20 +302,6 @@ const VariantContent = ({ variant }: { variant: QuestionVariant }) => {
           </p>
         </div>
       )}
-      {variant.answer && (
-        <div className="mt-2 pt-2 border-t border-gray-100">
-          <p className="text-xs font-medium text-muted-foreground mb-1">Answer:</p>
-          <p className="text-xs text-gray-700">
-            {hasChoices
-              ? (() => {
-                  const letter = variant.answer.trim().toUpperCase().charAt(0);
-                  const choice = variant.choices?.find((c) => c.letter === letter);
-                  return choice ? `${choice.letter}) ${choice.text}` : variant.answer;
-                })()
-              : variant.answer}
-          </p>
-        </div>
-      )}
     </div>
   );
 };
