@@ -223,6 +223,7 @@ export const LandingPage = () => {
     updates: {
       isAiGenerated?: boolean;
       isDraft?: boolean;
+      difficulty?: import('../types/question').QuestionDifficulty;
       choices?: MCQChoice[] | null;
       answer?: string | null;
     }
@@ -236,6 +237,7 @@ export const LandingPage = () => {
             ...updatedVariants[variantIndex],
             ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
             ...(updates.isDraft !== undefined && { isDraft: updates.isDraft }),
+            ...(updates.difficulty !== undefined && { difficulty: updates.difficulty }),
             ...(updates.choices !== undefined && { choices: updates.choices }),
             ...(updates.answer !== undefined && { answer: updates.answer })
           };
@@ -244,6 +246,42 @@ export const LandingPage = () => {
         return question;
       })
     );
+  };
+
+  const handleUpdateQuestionMetadata = (
+    questionId: number,
+    updates: {
+      description?: string | null;
+      primaryTopicId?: number;
+      type?: import('../types/question').QuestionType;
+      primaryTopicName?: string;
+    }
+  ) => {
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === questionId
+          ? {
+              ...q,
+              ...(updates.description !== undefined && { description: updates.description }),
+              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+              ...(updates.type !== undefined && { type: updates.type })
+            }
+          : q
+      )
+    );
+    if (selectedVariant?.questionId === questionId) {
+      setSelectedVariant((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
+              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+              ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
+              ...(updates.type !== undefined && { questionType: updates.type })
+            }
+          : prev
+      );
+    }
   };
 
 
@@ -644,6 +682,7 @@ export const LandingPage = () => {
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
           onUpdateVariant={handleUpdateVariant}
+          onUpdateQuestionMetadata={handleUpdateQuestionMetadata}
         />
       )}
 
