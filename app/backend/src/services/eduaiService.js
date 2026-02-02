@@ -5,6 +5,9 @@
 import axios from "axios";
 import { config } from "../config/settings.js";
 
+// Debug prefix for EduAI troubleshooting (grep for this to see all EduAI logs)
+const DEBUG_PREFIX = "[EduAI]";
+
 class EduAIService {
   constructor() {
     this.baseURL = config.eduaiApiUrl;
@@ -37,6 +40,7 @@ class EduAIService {
       );
     }
 
+    let chatStartMs;
     try {
       const requestPayload = {
         messages: params.messages || [],
@@ -46,15 +50,16 @@ class EduAIService {
         streaming: params.streaming || false,
       };
 
-      console.log("EduAI Request:", {
+      const timeoutMs = 60000;
+      chatStartMs = Date.now();
+      console.log(`${DEBUG_PREFIX} chat request starting`, {
         url: `${this.baseURL}/api/chat`,
-        payload: requestPayload,
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": this.apiKey
-            ? this.apiKey.substring(0, 8) + "..."
-            : "none",
-        },
+        timeoutMs,
+        model: requestPayload.model,
+        courseCode: requestPayload.courseCode,
+        messageCount: (requestPayload.messages || []).length,
+        systemPromptLength: (requestPayload.messages || []).find((m) => m.role === "system")?.content?.length ?? 0,
+        userPromptLength: (requestPayload.messages || []).find((m) => m.role === "user")?.content?.length ?? 0,
       });
 
       const response = await axios.post(
@@ -65,11 +70,28 @@ class EduAIService {
             "Content-Type": "application/json",
             "x-api-key": this.apiKey,
           },
-          timeout: 60000, // 60 second timeout
+          timeout: timeoutMs,
         }
       );
 
-      return response.data;
+      const elapsedMs = Date.now() - chatStartMs;
+      const responseData = response.data;
+      const responseKeys = responseData && typeof responseData === "object" ? Object.keys(responseData) : [];
+      const contentPreview =
+        responseData?.content != null
+          ? String(responseData.content).slice(0, 200)
+          : responseData?.message != null
+            ? String(responseData.message).slice(0, 200)
+            : "(no content/message)";
+      console.log(`${DEBUG_PREFIX} chat response received`, {
+        elapsedMs,
+        status: response.status,
+        responseKeys,
+        contentLength: responseData?.content?.length ?? responseData?.message?.length ?? "n/a",
+        contentPreview: contentPreview.length > 100 ? contentPreview + "..." : contentPreview,
+      });
+
+      return responseData;
     } catch (error) {
       if (error.response) {
         // API returned an error response
@@ -87,8 +109,19 @@ class EduAIService {
         });
         throw new Error(`EduAI API error (${statusCode}): ${errorMessage}`);
       } else if (error.request) {
-        // Request was made but no response received
-        console.error("EduAI Request Error:", {
+        // Request was made but no response received – log enough to tell real timeout from other failures
+        const elapsedMs = typeof chatStartMs === "number" ? Date.now() - chatStartMs : null;
+        console.error(`${DEBUG_PREFIX} chat request failed (no response)`, {
+          code: error.code,
+          message: error.message,
+          elapsedMs,
+          configuredTimeoutMs: error.config?.timeout,
+          isECONNABORTED: error.code === "ECONNABORTED",
+          messageIncludesTimeout: (error.message || "").toLowerCase().includes("timeout"),
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+        });
+        console.error("EduAI Request Error (full):", {
           request: error.request,
           message: error.message,
           code: error.code,
@@ -161,11 +194,10 @@ Format each question as a JSON object with these exact fields:
   }
 
 IMPORTANT FOR MCQ QUESTIONS:
-- "content" must contain ONLY the question text, without any choices
-- "choices" is REQUIRED and must be an array of objects with "letter" (A, B, C, D, etc.) and "text" (the choice text)
-- Each choice must have a unique letter (A, B, C, D, E, etc.)
-- Provide at least 2 choices, typically 4 choices
-- "answer" must be the letter of the correct choice (e.g., "B" for the second choice)
+- "content" must contain ONLY the question text, without any choices. Do NOT put options inside content.
+- "choices" is REQUIRED: you MUST include a "choices" array with at least 2 items (typically 4). Each item: {"letter": "A", "text": "the option text"}.
+- Each choice must have a unique letter (A, B, C, D, E, etc.). Never omit "choices" for MCQ.
+- "answer" must be the single letter of the correct choice (e.g., "B").
 
 Answer Guidelines:
 - For MCQ questions: "answer" must be the letter of the correct choice (e.g., "A", "B", "C", "D")
@@ -184,7 +216,7 @@ If you are unable to generate the requested question(s) for any reason (e.g., in
 }
 
 IMPORTANT: 
-- If you can generate the question(s), return ONLY a valid JSON array of question objects. No other text.
+- If you can generate the question(s), return ONLY a valid JSON array of question objects. Do NOT wrap the array in an object (e.g. do not use {"questions": [...]}). Return the array directly, e.g. [{...}, {...}]. No other text, no markdown, no code fence.
 - If you cannot generate the question(s), return ONLY the error object above. No other text.`;
 
     const userPrompt = `Generate questions about: ${prompt}
@@ -192,6 +224,15 @@ IMPORTANT:
 Please ensure the questions are appropriate for the course level and cover the key concepts comprehensively.`;
 
     try {
+      const genStartMs = Date.now();
+      console.log(`${DEBUG_PREFIX} generateQuestions calling chat`, {
+        courseCode,
+        model,
+        numQuestions,
+        systemPromptLength: systemPrompt.length,
+        userPromptLength: userPrompt.length,
+      });
+
       const response = await this.chat({
         messages: [
           { role: "system", content: systemPrompt },
@@ -201,6 +242,18 @@ Please ensure the questions are appropriate for the course level and cover the k
         apiKeys,
         courseCode,
         streaming: false,
+      });
+
+      const genElapsedMs = Date.now() - genStartMs;
+      const rawContent = response?.content ?? response?.message ?? response;
+      const rawType = rawContent == null ? "null" : typeof rawContent;
+      const rawLength = typeof rawContent === "string" ? rawContent.length : "n/a";
+      console.log(`${DEBUG_PREFIX} generateQuestions chat returned`, {
+        genElapsedMs,
+        responseKeys: response && typeof response === "object" ? Object.keys(response) : [],
+        rawContentType: rawType,
+        rawContentLength: rawLength,
+        rawContentPreview: typeof rawContent === "string" ? rawContent.slice(0, 150) + (rawContent.length > 150 ? "..." : "") : String(rawContent).slice(0, 150),
       });
 
       // Parse the response
@@ -229,12 +282,26 @@ Please ensure the questions are appropriate for the course level and cover the k
         throw new Error(errorReason);
       }
 
-      // Validate that we have an array of questions
-      if (!Array.isArray(parsedResponse)) {
-        throw new Error("EduAI response is not an array of questions");
+      // Accept raw array or unwrap from common wrapper keys (EduAI/LLM may return { questions: [...] } or { data: [...] })
+      let questions = null;
+      if (Array.isArray(parsedResponse)) {
+        questions = parsedResponse;
+      } else if (parsedResponse && typeof parsedResponse === 'object') {
+        questions =
+          parsedResponse.questions ??
+          parsedResponse.data ??
+          parsedResponse.results ??
+          (() => {
+            const firstArray = Object.values(parsedResponse).find((v) => Array.isArray(v));
+            return firstArray ?? null;
+          })();
       }
 
-      const questions = parsedResponse;
+      if (!Array.isArray(questions)) {
+        throw new Error(
+          "EduAI response is not an array of questions. Expected a JSON array of question objects (or an object with a 'questions' array)."
+        );
+      }
 
       // Filter and validate each question
       const validQuestions = questions.filter(
@@ -252,8 +319,36 @@ Please ensure the questions are appropriate for the course level and cover the k
         throw new Error("No valid questions found in EduAI response");
       }
 
-      const normalizedQuestions = validQuestions.map((question) => {
-        const content = question.content.trim();
+      /** Parse MCQ choices from content when model embeds "A) ... B) ..." in content. Returns { questionText, choices }. */
+      const parseChoicesFromContent = (text) => {
+        if (!text || typeof text !== "string") return { questionText: text || "", choices: [] };
+        const lines = text.split("\n");
+        const choices = [];
+        const questionLines = [];
+        const choicePattern = /^([A-Za-z])\)\s*(.+)$/;
+        let foundChoices = false;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          const match = trimmed.match(choicePattern);
+          if (match) {
+            foundChoices = true;
+            choices.push({ letter: match[1].toUpperCase(), text: match[2].trim() });
+          } else if (trimmed && !foundChoices) {
+            questionLines.push(line);
+          }
+        }
+        const questionText = questionLines.join("\n").trim() || text;
+        return { questionText, choices };
+      };
+
+      const normalizedQuestions = validQuestions.map((question, index) => {
+        console.log(`${DEBUG_PREFIX} raw question ${index + 1}`, {
+          type: question.type,
+          choicesLength: Array.isArray(question.choices) ? question.choices.length : "not array",
+          contentLength: question.content?.length ?? 0,
+        });
+
+        let content = question.content.trim();
 
         const description =
           typeof question.description === "string" &&
@@ -324,6 +419,27 @@ Please ensure the questions are appropriate for the course level and cover the k
             });
           }
 
+          // Fallback 1: model may omit "choices" or embed them in content (e.g. "Question?\nA) ...\nB) ...")
+          if ((!choices || choices.length === 0) && content) {
+            const parsed = parseChoicesFromContent(content);
+            if (parsed.choices.length >= 2) {
+              content = parsed.questionText;
+              choices = parsed.choices;
+              console.log(`${DEBUG_PREFIX} MCQ choices parsed from content`, { count: choices.length });
+            }
+          }
+
+          // Fallback 2: model returned MCQ but no choices – use placeholders so user can edit
+          if (!choices || choices.length === 0) {
+            choices = [
+              { letter: "A", text: "Option A" },
+              { letter: "B", text: "Option B" },
+              { letter: "C", text: "Option C" },
+              { letter: "D", text: "Option D" },
+            ];
+            console.log(`${DEBUG_PREFIX} MCQ had no choices; using placeholders`);
+          }
+
           // Normalize answer to just the letter for MCQ
           if (typeof question.answer === "string" && question.answer.trim().length > 0) {
             const answerText = question.answer.trim();
@@ -352,8 +468,14 @@ Please ensure the questions are appropriate for the course level and cover the k
         };
       });
 
+      console.log(`${DEBUG_PREFIX} generateQuestions success`, { count: normalizedQuestions.length });
       return normalizedQuestions;
     } catch (error) {
+      console.error(`${DEBUG_PREFIX} generateQuestions failed`, {
+        message: error.message,
+        name: error.name,
+        code: error?.code,
+      });
       throw new Error(`EduAI question generation failed: ${error.message}`);
     }
   }
