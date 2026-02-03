@@ -36,9 +36,9 @@ graph LR
     end
     
     %% Connections from Column 1 to Column 2
-    Request -.->|triggers| RAG
-    ReviewAction -.->|triggers| ReviewGate
-    Assemble -.->|triggers| TopicRetrieval
+    Request -.->|requests context| RAG
+    ReviewAction -.->|submits for review| ReviewGate
+    Assemble -.->|invokes generation| TopicRetrieval
     
     %% Connections from Column 2 to Column 3 (our system drives external services)
     Generation -->|prompt + context| AIService
