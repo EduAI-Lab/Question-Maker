@@ -1,60 +1,62 @@
 ```mermaid
-graph LR
-    %% Column 1: Instructor Actions (Left, Thin)
-    subgraph Col1[" "]
-        direction TB
+%%{init: {'theme':'base', 'flowchart': {'useMaxWidth': false}, 'themeVariables': {'fontSize':'14px', 'primaryColor':'#000000', 'primaryTextColor':'#000000', 'primaryBorderColor':'#000000', 'lineColor':'#000000', 'secondaryColor':'#000000', 'tertiaryColor':'#f9f9f9', 'textColor':'#000000'}}}%%
+graph TB
+    %% Row 1: Instructor Actions
+    subgraph Row1[" "]
+        direction LR
         Request[Generate Variant]
         ReviewAction[Review Variant]
         Assemble[Assemble Assessment]
-        
         Request --> ReviewAction
         ReviewAction --> Assemble
     end
-    
-    %% Column 2: Core Question Maker Workflow (Center, Main - 60-70%)
-    subgraph Col2[" "]
-        direction TB
+
+    %% Row 2: Core workflow (first half)
+    subgraph Row2[" "]
+        direction LR
         RAG[Course Context Retrieval]
         Generation[AI-Assisted Question Generation]
         ReviewGate[Review Gating]
+        RAG --> Generation
+        Generation --> ReviewGate
+    end
+
+    %% Row 3: Core workflow (second half) + store
+    subgraph Row3[" "]
+        direction LR
         QuestionStore[( Store Reviewed Questions)]
         TopicRetrieval[Topic-Constrained Retrieval]
         AssessmentAssembly[Assessment Assembly]
-        
-        RAG --> Generation
-        Generation --> ReviewGate
-        ReviewGate -->|Reviewed content only| QuestionStore
         QuestionStore --> TopicRetrieval
         TopicRetrieval --> AssessmentAssembly
     end
-    
-    %% Column 3: External Interfaces (Right, Thin)
-    subgraph Col3[" "]
-        direction TB
+
+    %% Row 4: External
+    subgraph Row4[" "]
+        direction LR
         AIService[External AI Service <br/> + RAG backend]
         LMSExport[LMS Export]
     end
-    
-    %% Connections from Column 1 to Column 2
+
+    %% Vertical flow within core
+    ReviewGate -->|Reviewed content only| QuestionStore
+
+    %% Instructor → Core (directional triggers)
     Request -.->|requests context| RAG
     ReviewAction -.->|submits for review| ReviewGate
     Assemble -.->|invokes generation| TopicRetrieval
-    
-    %% Connections from Column 2 to Column 3 (our system drives external services)
+
+    %% Core ↔ External
     Generation -->|prompt + context| AIService
     AIService -->|generated draft| Generation
     AssessmentAssembly -->|export| LMSExport
-    
-    %% Styling
-    classDef instructor fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
-    classDef core fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
-    classDef reviewGate fill:#ffebee,stroke:#c62828,stroke-width:4px
-    classDef database fill:#fff8e1,stroke:#f57f17,stroke-width:3px
-    classDef external fill:#e0f2f1,stroke:#00796b,stroke-width:2px
-    
-    class Request,ReviewAction,Assemble instructor
-    class RAG,Generation,TopicRetrieval,AssessmentAssembly core
-    class ReviewGate reviewGate
+
+    %% Styling - greyscale, large text (match architecture.md)
+    classDef default fill:#ffffff,stroke:#000000,stroke-width:4px,color:#000000
+    classDef database fill:#f5f5f5,stroke:#000000,stroke-width:4px,color:#000000
+
+    class Request,ReviewAction,Assemble,RAG,Generation,ReviewGate,TopicRetrieval,AssessmentAssembly,AIService,LMSExport default
     class QuestionStore database
-    class AIService,LMSExport external
 ```
+
+<!-- Render in a 600×600 container for square aspect ratio, e.g. <div style="width:600px;height:600px"> -->
