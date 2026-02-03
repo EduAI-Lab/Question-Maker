@@ -40,12 +40,10 @@ graph LR
     ReviewAction -.->|triggers| ReviewGate
     Assemble -.->|triggers| TopicRetrieval
     
-    %% Connections from Column 2 to Column 3
-    Generation <-->|AI request| AIService
+    %% Connections from Column 2 to Column 3 (our system drives external services)
+    Generation -->|prompt + context| AIService
+    AIService -->|generated draft| Generation
     AssessmentAssembly -->|export| LMSExport
-    
-    %% RAG connection to AI Service
-    RAG -.->|context| AIService
     
     %% Styling
     classDef instructor fill:#e3f2fd,stroke:#1976d2,stroke-width:2px

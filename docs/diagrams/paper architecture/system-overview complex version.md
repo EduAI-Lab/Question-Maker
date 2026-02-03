@@ -1,5 +1,3 @@
-# Question Maker - System Overview Diagram
-
 ```mermaid
 graph TB
     %% User Layer
@@ -105,20 +103,3 @@ graph TB
     class Canvas external
     class QuestionBank,Assessment,VectorDB database
 ```
-
-## Key Flows
-
-### 1. Question Generation Flow
-Instructor → AI Generation → RAG Context Retrieval → EduAI → Draft Review → Question Bank
-
-### 2. PDF Import Flow
-Instructor → PDF Upload → OCR → RAG Context Retrieval → AI Extraction → Draft Review → Question Bank
-
-### 3. Assessment Building Flow
-Instructor → Blueprint Creation → Topic Filtering (Include/Exclude) → Intelligent Matching → Assessment Assembly
-
-### 4. Canvas Export Flow
-Assessment → Draft Validation → Question Conversion → Canvas Quiz Creation
-
-### 5. RAG Integration
-All AI operations automatically retrieve course context from the vector database before processing.
