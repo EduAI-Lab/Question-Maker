@@ -14,7 +14,8 @@ import {
   AssessmentSection,
   AssessmentSectionCreateInput,
   Question,
-  QuestionVariantEntry
+  QuestionVariantEntry,
+  MCQChoice
 } from '../types/question';
 import { Topic } from '../types/topic';
 import { Button } from '../components/ui/button';
@@ -353,10 +354,10 @@ export const AssessmentViewPage = () => {
     }));
   };
 
-  const handleViewQuestion = (question: Question) => {
-    // Convert Question to QuestionVariantEntry
-    const primaryVariant = question.variants?.[0];
-    if (!primaryVariant) {
+  const handleViewQuestion = (question: Question, variantId?: number) => {
+    const variant =
+      question.variants?.find((v) => v.id === variantId) ?? question.variants?.[0];
+    if (!variant) {
       toast({
         variant: 'destructive',
         title: 'No variant found',
@@ -366,8 +367,8 @@ export const AssessmentViewPage = () => {
     }
 
     const resolveTopicName = (topicId: number) => topicsById[topicId]?.name ?? `Topic ${topicId}`;
-    const secondaryTopicNames = Array.isArray(primaryVariant.secondaryTopicsId)
-      ? (primaryVariant.secondaryTopicsId
+    const secondaryTopicNames = Array.isArray(variant.secondaryTopicsId)
+      ? (variant.secondaryTopicsId
           .map((topicId) => resolveTopicName(topicId))
           .filter(Boolean) as string[])
       : undefined;
@@ -383,9 +384,9 @@ export const AssessmentViewPage = () => {
       courseCode: question.course?.code,
       secondaryTopicNames:
         secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
-      isAiGenerated: primaryVariant.isAiGenerated,
-      isDraft: primaryVariant.isDraft,
-      variant: primaryVariant
+      isAiGenerated: variant.isAiGenerated,
+      isDraft: variant.isDraft,
+      variant
     };
 
     setSelectedVariant(entry);
@@ -395,22 +396,70 @@ export const AssessmentViewPage = () => {
     setSelectedVariant(null);
   };
 
-  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
+  const handleUpdateVariant = (
+    variantId: number,
+    updates: {
+      isAiGenerated?: boolean;
+      isDraft?: boolean;
+      difficulty?: import('../types/question').QuestionDifficulty;
+      choices?: MCQChoice[] | null;
+      answer?: string | null;
+    }
+  ) => {
     setMatchingQuestions((prev) =>
       prev.map((question) => {
-        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        const variantIndex = question.variants?.findIndex((v) => v.id === variantId);
         if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
           const updatedVariants = [...question.variants];
           updatedVariants[variantIndex] = {
             ...updatedVariants[variantIndex],
             ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
-            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft }),
+            ...(updates.difficulty !== undefined && { difficulty: updates.difficulty }),
+            ...(updates.choices !== undefined && { choices: updates.choices }),
+            ...(updates.answer !== undefined && { answer: updates.answer })
           };
           return { ...question, variants: updatedVariants };
         }
         return question;
       })
     );
+  };
+
+  const handleUpdateQuestionMetadata = (
+    questionId: number,
+    updates: {
+      description?: string | null;
+      primaryTopicId?: number;
+      type?: import('../types/question').QuestionType;
+      primaryTopicName?: string;
+    }
+  ) => {
+    setMatchingQuestions((prev) =>
+      prev.map((q) =>
+        q.id === questionId
+          ? {
+              ...q,
+              ...(updates.description !== undefined && { description: updates.description }),
+              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+              ...(updates.type !== undefined && { type: updates.type })
+            }
+          : q
+      )
+    );
+    if (selectedVariant?.questionId === questionId) {
+      setSelectedVariant((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
+              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+              ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
+              ...(updates.type !== undefined && { questionType: updates.type })
+            }
+          : prev
+      );
+    }
   };
 
   const handleViewVariant = async (entry: QuestionVariantEntry) => {
@@ -1474,6 +1523,7 @@ export const AssessmentViewPage = () => {
            onClose={handleCloseDetail}
            onCreateVariant={handleCreateVariant}
            onUpdateVariant={handleUpdateVariant}
+           onUpdateQuestionMetadata={handleUpdateQuestionMetadata}
            onDeleteVariant={handleDeleteVariant}
            onSelectVariant={handleViewVariant}
          />

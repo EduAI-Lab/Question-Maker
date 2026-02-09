@@ -11,7 +11,8 @@ import {
   QuestionStats,
   QuestionVariant,
   QuestionDifficulty,
-  ExtractedQuestion
+  ExtractedQuestion,
+  MCQChoice
 } from '../types/question';
 
 /** Normalizes backend variant payload into frontend QuestionVariant shape. */
@@ -21,6 +22,7 @@ const mapVariant = (variant: any): QuestionVariant => ({
   difficulty: variant.difficulty ?? 'medium',
   reasoningLevel: variant.reasoningLevel ?? variant.reasoning_level ?? undefined,
   answer: variant.answer ?? null,
+  choices: Array.isArray(variant.choices) ? variant.choices : (variant.choices ? [variant.choices] : null),
   questionMetadataId: variant.questionMetadataId ?? variant.question_metadata_id ?? undefined,
   assessmentId: variant.assessmentId ?? null,
   secondaryTopicsId: Array.isArray(variant.secondaryTopicsId)
@@ -114,6 +116,7 @@ export const questionService = {
     assessmentId?: number;
     secondaryTopicsId?: number[];
     answer?: string | null;
+    choices?: MCQChoice[] | null;
     referenceId?: number;
     isAiGenerated?: boolean;
     isDraft?: boolean;
@@ -129,6 +132,7 @@ export const questionService = {
     assessmentId?: number;
     secondaryTopicsId?: number[];
     answer?: string | null;
+    choices?: MCQChoice[] | null;
     referenceId?: number;
     isAiGenerated?: boolean;
     isDraft?: boolean;

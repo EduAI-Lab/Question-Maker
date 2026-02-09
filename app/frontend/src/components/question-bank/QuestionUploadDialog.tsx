@@ -1,5 +1,5 @@
 /**
- * Dialog for uploading PDF/image files, running OCR, and extracting questions via EduAI.
+ * Dialog for uploading PDF, image, or TXT files; runs OCR for PDF/image or uses text as-is for TXT, then extracts questions via EduAI.
  * Manages draft review, topic selection, optional assessment creation, and save flows.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -30,7 +30,8 @@ import { useToast } from '../ui/use-toast';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 
-import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '../../types/question';
+import { ExtractedQuestion, MCQChoice, Question, QuestionDifficulty, QuestionType } from '../../types/question';
+import { MCQChoicesField } from '../questions/MCQChoicesField';
 import { Topic } from '../../types/topic';
 import { questionService } from '../../services/questionService';
 import { eduaiService, EduAIModelOption } from '../../services/eduaiService';
@@ -73,6 +74,14 @@ const questionTypeLabels: Record<QuestionType, string> = {
 };
 const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
 
+/** Params for starting extraction in the background (modal closes, parent runs API and shows toasts). */
+export interface BackgroundExtractionParams {
+    text: string;
+    courseId: number;
+    model: string;
+    apiKeys: Record<string, unknown>;
+}
+
 interface QuestionUploadDialogProps {
     open: boolean;
     onClose: () => void;
@@ -81,6 +90,10 @@ interface QuestionUploadDialogProps {
     topics: Topic[];
     onEnsureTopics: (courseId: number) => Promise<Topic[]>;
     onQuestionsSaved: (questions: Question[]) => void;
+    /** When set, extraction runs in parent; modal closes and toasts show progress/result. */
+    onExtractInBackground?: (params: BackgroundExtractionParams) => void;
+    /** Pre-filled drafts when opening for review after background extraction (e.g. from toast "View"). */
+    initialDraftQuestions?: DraftQuestion[] | null;
 }
 
 const generateId = () => {
@@ -90,12 +103,64 @@ const generateId = () => {
     return Math.random().toString(36).slice(2, 11);
 };
 
+/** Maps API extracted questions to draft shape. Used by dialog and by parent for background extraction. */
+export function mapExtractedToDraftQuestions(items: ExtractedQuestion[]): DraftQuestion[] {
+    return items
+        .filter((item): item is ExtractedQuestion & { summary: string } =>
+            Boolean(
+                item.question?.trim() &&
+                item.summary?.trim()
+            )
+        )
+        .map((item) => {
+            const primaryCandidate = item.primaryTopicId !== undefined && item.primaryTopicId !== null
+                ? Number(item.primaryTopicId)
+                : null;
+            const primaryTopicId = Number.isInteger(primaryCandidate) ? primaryCandidate : null;
+            const secondaryTopicIds = Array.isArray(item.secondaryTopicIds)
+                ? Array.from(
+                    new Set(
+                        item.secondaryTopicIds
+                            .map((v) => Number(v))
+                            .filter((v) => Number.isInteger(v) && v !== primaryTopicId)
+                    )
+                )
+                : [];
+            const isMCQ = item.type === 'MCQ';
+            const defaultChoices: MCQChoice[] = [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }];
+            const normalizedChoices: MCQChoice[] | null =
+                isMCQ && Array.isArray(item.choices) && item.choices.length >= 2
+                    ? item.choices.map((c: { letter?: string; text?: string }) => ({
+                        letter: typeof c.letter === 'string' ? c.letter.trim().toUpperCase() || 'A' : 'A',
+                        text: typeof c.text === 'string' ? c.text.trim() : String(c.text ?? '')
+                    })).filter((c: MCQChoice) => c.text.length > 0)
+                    : null;
+            const choices: MCQChoice[] | null = isMCQ ? (normalizedChoices && normalizedChoices.length >= 2 ? normalizedChoices : defaultChoices) : null;
+            return {
+                id: (item as { id?: string }).id ?? generateId(),
+                question: item.question.trim(),
+                instructions: item.instructions?.trim() ?? '',
+                difficulty: item.difficulty && ['easy', 'medium', 'hard'].includes(item.difficulty) ? (item.difficulty as QuestionDifficulty) : 'medium',
+                answer: item.answer ?? '',
+                type: item.type && ['MCQ', 'SA', 'LA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
+                summary: item.summary.trim(),
+                primaryTopicId,
+                secondaryTopicIds,
+                choices,
+                include: (item as { include?: boolean }).include !== false
+            };
+        });
+}
+
 const isPdfFile = (file: File) =>
     file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
 const isImageFile = (file: File) =>
     file.type.startsWith('image/') ||
     /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(file.name);
+
+const isTextFile = (file: File) =>
+    file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
 
 export const QuestionUploadDialog = ({
     open,
@@ -104,7 +169,9 @@ export const QuestionUploadDialog = ({
     courseName,
     topics: providedTopics,
     onEnsureTopics,
-    onQuestionsSaved
+    onQuestionsSaved,
+    onExtractInBackground,
+    initialDraftQuestions
 }: QuestionUploadDialogProps) => {
     const { toast } = useToast();
     const navigate = useNavigate();
@@ -150,19 +217,27 @@ export const QuestionUploadDialog = ({
             setPrimaryTopicId('');
             setNewTopicName('Uploaded Questions');
         }
-        setDraftQuestions([]);
-        setProcessingStage('idle');
-        setProgress(0);
         setError(null);
-        setLastFileName('');
         setAssessmentType('Assignment');
         setAssessmentName('Assignment 1');
+
+        if (initialDraftQuestions && initialDraftQuestions.length > 0) {
+            setDraftQuestions(initialDraftQuestions);
+            setProcessingStage('review');
+            setProgress(100);
+            setLastFileName('');
+        } else {
+            setDraftQuestions([]);
+            setProcessingStage('idle');
+            setProgress(0);
+            setLastFileName('');
+        }
         setAssessmentSemester(() => {
             const now = new Date();
             const year = now.getFullYear();
             return `Fall ${year}`;
         });
-    }, [open, providedTopics]);
+    }, [open, providedTopics, initialDraftQuestions]);
 
     useEffect(() => {
         if (!open || !courseId) return;
@@ -270,12 +345,15 @@ export const QuestionUploadDialog = ({
         setProgress(5);
 
         let text = '';
-        if (isPdfFile(file)) {
+        if (isTextFile(file)) {
+            text = await file.text();
+            setProgress(70);
+        } else if (isPdfFile(file)) {
             text = await performPdfOcr(file, setProgress);
         } else if (isImageFile(file)) {
             text = await performImageOcr(file, setProgress);
         } else {
-            throw new Error('Unsupported file type. Please upload a PDF or image file.');
+            throw new Error('Unsupported file type. Please upload a PDF, image, or TXT file.');
         }
 
         if (!text.trim()) {
@@ -301,46 +379,7 @@ export const QuestionUploadDialog = ({
             model: aiModel,
             apiKeys
         });
-        const drafts = (response || [])
-            .filter((item): item is ExtractedQuestion & { summary: string } =>
-                Boolean(
-                    item.question &&
-                    item.question.trim().length > 0 &&
-                    item.summary &&
-                    item.summary.trim().length > 0
-                )
-            )
-            .map((item) => {
-                const primaryCandidate = item.primaryTopicId !== undefined && item.primaryTopicId !== null
-                    ? Number(item.primaryTopicId)
-                    : null;
-                const primaryTopicId = Number.isInteger(primaryCandidate) ? primaryCandidate : null;
-
-                const secondaryTopicIds = Array.isArray(item.secondaryTopicIds)
-                    ? Array.from(
-                        new Set(
-                            item.secondaryTopicIds
-                                .map((value) => Number(value))
-                                .filter((value) => Number.isInteger(value) && value !== primaryTopicId)
-                        )
-                    )
-                    : [];
-
-                return {
-                    id: item.id ?? generateId(),
-                    question: item.question.trim(),
-                    instructions: item.instructions?.trim() ?? '',
-                    difficulty: item.difficulty && ['easy', 'medium', 'hard'].includes(item.difficulty)
-                        ? (item.difficulty as QuestionDifficulty)
-                        : 'medium',
-                    answer: item.answer ?? '',
-                    type: item.type && ['MCQ', 'SA', 'LA'].includes(item.type) ? (item.type as QuestionType) : 'SA',
-                    summary: item.summary.trim(),
-                    primaryTopicId,
-                    secondaryTopicIds,
-                    include: item.include !== false
-                };
-            });
+        const drafts = mapExtractedToDraftQuestions(response || []);
 
         if (drafts.length === 0) {
             throw new Error('No questions could be extracted from the provided text.');
@@ -362,6 +401,12 @@ export const QuestionUploadDialog = ({
         setLastFileName(file.name);
         try {
             const text = await performOcr(file);
+            if (onExtractInBackground && courseId) {
+                const apiKeys = await apiKeyStorage.buildApiKeysForModel(aiModel);
+                onExtractInBackground({ text, courseId, model: aiModel, apiKeys });
+                onClose();
+                return;
+            }
             await handleExtractQuestions(text);
         } catch (err: any) {
             console.error('Question extraction failed', err);
@@ -375,7 +420,7 @@ export const QuestionUploadDialog = ({
                 description: message
             });
         }
-    }, [handleExtractQuestions, performOcr, toast]);
+    }, [courseId, handleExtractQuestions, performOcr, toast, onExtractInBackground, onClose, aiModel]);
 
     const handleFileChange = useCallback(
         (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -514,7 +559,10 @@ export const QuestionUploadDialog = ({
             type: draft.type,
             summary: draft.summary.trim(),
             primaryTopicId: draft.primaryTopicId ?? undefined,
-            secondaryTopicIds: draft.secondaryTopicIds
+            secondaryTopicIds: draft.secondaryTopicIds,
+            ...(draft.type === 'MCQ' && draft.choices && draft.choices.length >= 2 && {
+                choices: draft.choices.filter((c) => c.text.trim().length > 0)
+            })
         }));
 
         if (payloadQuestions.length === 0) {
@@ -617,10 +665,10 @@ export const QuestionUploadDialog = ({
                     <div>
                         <DialogTitle>Upload Questions</DialogTitle>
                         <DialogDescription>
-                            Upload a PDF or image containing questions for{' '}
+                            Upload a PDF, image, or TXT file containing questions for{' '}
                             <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
                             {' '}
-                            We&apos;ll extract them with OCR and AI so you can review before saving.
+                            We&apos;ll extract them with OCR (or use text as-is for TXT) and AI so you can review before saving.
                         </DialogDescription>
                     </div>
                 </DialogHeader>
@@ -789,13 +837,13 @@ export const QuestionUploadDialog = ({
                                 >
                                     <UploadCloud className="h-10 w-10 text-muted-foreground" />
                                     <div className="space-y-1">
-                                        <p className="text-sm font-medium">Drop PDF or image file here</p>
-                                        <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG and other common formats.</p>
+                                        <p className="text-sm font-medium">Drop PDF, image, or TXT file here</p>
+                                        <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG, TXT and other common formats.</p>
                                     </div>
                                     <input
                                         id="question-upload"
                                         type="file"
-                                        accept=".pdf,image/*"
+                                        accept=".pdf,image/*,.txt,text/plain"
                                         className="hidden"
                                         onChange={handleFileChange}
                                         disabled={processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving'}
@@ -977,15 +1025,18 @@ export const QuestionUploadDialog = ({
                                                             </SelectContent>
                                                         </Select>
                                                     </div>
+                                                </div>
+                                                {draft.type === 'MCQ' && (
                                                     <div className="space-y-2">
-                                                        <Label>Answer (optional)</Label>
-                                                        <Textarea
-                                                            rows={2}
-                                                            value={draft.answer ?? ''}
-                                                            onChange={(event) => updateDraft(draft.id, { answer: event.target.value })}
+                                                        <MCQChoicesField
+                                                            choices={draft.choices ?? [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }]}
+                                                            onChoicesChange={(newChoices) => updateDraft(draft.id, { choices: newChoices })}
+                                                            answer={draft.answer ?? ''}
+                                                            onAnswerChange={(letter) => updateDraft(draft.id, { answer: letter || null })}
+                                                            idPrefix={`upload-draft-${draft.id}`}
                                                         />
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
