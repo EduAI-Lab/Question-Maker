@@ -256,23 +256,33 @@ Please ensure the questions are appropriate for the course level and cover the k
         rawContentPreview: typeof rawContent === "string" ? rawContent.slice(0, 150) + (rawContent.length > 150 ? "..." : "") : String(rawContent).slice(0, 150),
       });
 
-      // Parse the response
+      // Parse the response (EduAI may return string JSON or already-parsed array/object)
+      const rawPayload = response?.content ?? response?.message ?? response;
       let parsedResponse;
-      try {
-        parsedResponse = JSON.parse(
-          response.content || response.message || response
-        );
-      } catch (parseError) {
-        // If parsing fails, try to extract JSON from the response
-        const jsonMatch = (
-          response.content ||
-          response.message ||
-          response
-        ).match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-        if (jsonMatch) {
-          parsedResponse = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error("Could not parse response from EduAI");
+      if (rawPayload !== null && typeof rawPayload === "object") {
+        // Already an object or array – use as-is to avoid JSON.parse(non-string) throwing (e.g. "array" / .match errors)
+        parsedResponse = rawPayload;
+        console.log(`${DEBUG_PREFIX} generateQuestions using pre-parsed response`, {
+          isArray: Array.isArray(rawPayload),
+          keys: Array.isArray(rawPayload) ? "array" : Object.keys(rawPayload || {}),
+        });
+      } else {
+        try {
+          const str = typeof rawPayload === "string" ? rawPayload : String(rawPayload);
+          parsedResponse = JSON.parse(str);
+        } catch (parseError) {
+          const str = typeof rawPayload === "string" ? rawPayload : String(rawPayload);
+          const jsonMatch = str.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+          if (jsonMatch) {
+            parsedResponse = JSON.parse(jsonMatch[0]);
+          } else {
+            console.error(`${DEBUG_PREFIX} generateQuestions JSON parse failed`, {
+              parseError: parseError?.message,
+              rawType: typeof rawPayload,
+              rawPreview: str?.slice?.(0, 300),
+            });
+            throw new Error("Could not parse response from EduAI");
+          }
         }
       }
 
@@ -388,18 +398,25 @@ Please ensure the questions are appropriate for the course level and cover the k
         let answer = null;
 
         if (questionType === "MCQ") {
-          // Validate and normalize choices
-          if (Array.isArray(question.choices) && question.choices.length > 0) {
-            choices = question.choices
+          // Normalize choices: accept array of {letter, text} or object like { "A": "text", "B": "text" }
+          let rawChoices = question.choices;
+          if (rawChoices !== null && typeof rawChoices === "object" && !Array.isArray(rawChoices)) {
+            rawChoices = Object.entries(rawChoices).map(([letter, text]) => ({
+              letter: String(letter).trim().toUpperCase() || null,
+              text: typeof text === "string" ? text.trim() : String(text || ""),
+            })).filter((c) => c.letter && c.text);
+          }
+          if (Array.isArray(rawChoices) && rawChoices.length > 0) {
+            choices = rawChoices
               .map((choice) => {
                 if (typeof choice === "object" && choice !== null) {
-                  const letter = typeof choice.letter === "string" 
-                    ? choice.letter.toUpperCase().trim() 
+                  const letter = typeof choice.letter === "string"
+                    ? choice.letter.toUpperCase().trim()
                     : null;
-                  const text = typeof choice.text === "string" 
-                    ? choice.text.trim() 
+                  const text = typeof choice.text === "string"
+                    ? choice.text.trim()
                     : "";
-                  
+
                   if (letter && text) {
                     return { letter, text };
                   }
