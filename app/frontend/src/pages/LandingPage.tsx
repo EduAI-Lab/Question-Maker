@@ -15,7 +15,8 @@ import { questionService } from '../services/questionService';
 import { courseService } from '../services/courseService';
 import assessmentService from '../services/assessmentService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
-import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
+import { QuestionUploadDialog, mapExtractedToDraftQuestions } from '../components/question-bank/QuestionUploadDialog';
+import { ToastAction } from '../components/ui/toast';
 import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
 import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
@@ -45,6 +46,8 @@ export const LandingPage = () => {
   const [assessmentsError, setAssessmentsError] = useState<string | null>(null);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  /** Draft questions from background OCR extraction; when set, opening upload modal shows review step. */
+  const [pendingExtractionDrafts, setPendingExtractionDrafts] = useState<ReturnType<typeof mapExtractedToDraftQuestions> | null>(null);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
@@ -320,6 +323,66 @@ export const LandingPage = () => {
     setPresetVariant(null);
     setIsUploadOpen(false);
   };
+
+  const handleExtractInBackground = useCallback(
+    (params: { text: string; courseId: number; model: string; apiKeys: Record<string, unknown> }) => {
+      setIsUploadOpen(false);
+
+      const processingToast = toast({
+        title: 'Extraction in progress',
+        description: 'Your upload is being processed. Feel free to navigate the site—we’ll notify you when it’s ready.',
+      });
+      const dismissProcessing = () => {
+        try {
+          processingToast.dismiss();
+        } catch (_) {}
+      };
+      const processingTimer = window.setTimeout(dismissProcessing, 8000);
+
+      questionService
+        .extractQuestionsFromText({
+          text: params.text,
+          courseId: params.courseId,
+          model: params.model,
+          apiKeys: params.apiKeys,
+        })
+        .then((response) => {
+          window.clearTimeout(processingTimer);
+          dismissProcessing();
+          const drafts = mapExtractedToDraftQuestions(response || []);
+          if (drafts.length === 0) {
+            toast({
+              variant: 'destructive',
+              title: 'No questions extracted',
+              description: 'The content could not be parsed into questions. Try adjusting the file or try again.',
+            });
+            return;
+          }
+          setPendingExtractionDrafts(drafts);
+          toast({
+            title: 'Your extraction is ready',
+            description: `${drafts.length} question${drafts.length === 1 ? '' : 's'} extracted. Open the upload dialog to review and save.`,
+            action: (
+              <ToastAction altText="Open and review" onClick={() => setIsUploadOpen(true)}>
+                Review questions
+              </ToastAction>
+            ),
+            duration: Number.POSITIVE_INFINITY,
+          });
+        })
+        .catch((err: any) => {
+          window.clearTimeout(processingTimer);
+          dismissProcessing();
+          const message = err?.response?.data?.error || err?.message || 'Extraction failed.';
+          toast({
+            variant: 'destructive',
+            title: 'Extraction failed',
+            description: message,
+          });
+        });
+    },
+    [toast]
+  );
 
   const handleCloseDetail = () => {
     setSelectedVariant(null);
@@ -688,12 +751,17 @@ export const LandingPage = () => {
 
       <QuestionUploadDialog
         open={isUploadOpen}
-        onClose={() => setIsUploadOpen(false)}
+        onClose={() => {
+          setIsUploadOpen(false);
+          setPendingExtractionDrafts(null);
+        }}
         courseId={selectedCourse?.id ?? null}
         courseName={selectedCourse?.name}
         topics={selectedCourse ? (topicsByCourse[selectedCourse.id] ?? []) : []}
         onEnsureTopics={loadTopicsForCourse}
         onQuestionsSaved={handleQuestionsUploaded}
+        onExtractInBackground={handleExtractInBackground}
+        initialDraftQuestions={pendingExtractionDrafts}
       />
 
       <AddQuestionDialog
