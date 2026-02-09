@@ -6,6 +6,12 @@ export type QuestionType = 'MCQ' | 'SA' | 'LA';
 export type ReasoningLevel = 'factual' | 'analytical' | 'application';
 export type AssessmentType = 'Assignment' | 'Lab' | 'Quiz' | 'Mid' | 'Final';
 
+// MCQ Choice interface
+export interface MCQChoice {
+    letter: string; // "A", "B", "C", "D", etc.
+    text: string;
+}
+
 // Question Metadata (matches backend Question_Metadata schema)
 export interface QuestionMetadata {
     id: number;
@@ -33,6 +39,7 @@ export interface QuestionVariant {
     secondaryTopicsId: number[] | null;
     referenceId: number | null;
     answer: string | null;
+    choices?: MCQChoice[] | null; // For MCQ questions only
     isAiGenerated?: boolean; // Indicates if this variant was generated using AI
     isDraft?: boolean; // Indicates if this variant is a draft and needs review
     createdAt?: string;
@@ -150,6 +157,8 @@ export interface ExtractedQuestion {
     type: QuestionType;
     primaryTopicId: number | null;
     secondaryTopicIds: number[];
+    /** MCQ options: only present for type === 'MCQ'. */
+    choices?: MCQChoice[] | null;
 }
 
 export interface QuestionVariantEntry {

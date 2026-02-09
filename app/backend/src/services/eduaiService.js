@@ -5,6 +5,9 @@
 import axios from "axios";
 import { config } from "../config/settings.js";
 
+// Debug prefix for EduAI troubleshooting (grep for this to see all EduAI logs)
+const DEBUG_PREFIX = "[EduAI]";
+
 class EduAIService {
   constructor() {
     this.baseURL = config.eduaiApiUrl;
@@ -37,6 +40,7 @@ class EduAIService {
       );
     }
 
+    let chatStartMs;
     try {
       const requestPayload = {
         messages: params.messages || [],
@@ -46,15 +50,17 @@ class EduAIService {
         streaming: params.streaming || false,
       };
 
-      console.log("EduAI Request:", {
+      // Allow caller to override (e.g. extraction needs longer than default 60s)
+      const timeoutMs = params.timeoutMs != null && params.timeoutMs > 0 ? params.timeoutMs : 60000;
+      chatStartMs = Date.now();
+      console.log(`${DEBUG_PREFIX} chat request starting`, {
         url: `${this.baseURL}/api/chat`,
-        payload: requestPayload,
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": this.apiKey
-            ? this.apiKey.substring(0, 8) + "..."
-            : "none",
-        },
+        timeoutMs,
+        model: requestPayload.model,
+        courseCode: requestPayload.courseCode,
+        messageCount: (requestPayload.messages || []).length,
+        systemPromptLength: (requestPayload.messages || []).find((m) => m.role === "system")?.content?.length ?? 0,
+        userPromptLength: (requestPayload.messages || []).find((m) => m.role === "user")?.content?.length ?? 0,
       });
 
       const response = await axios.post(
@@ -65,11 +71,28 @@ class EduAIService {
             "Content-Type": "application/json",
             "x-api-key": this.apiKey,
           },
-          timeout: 60000, // 60 second timeout
+          timeout: timeoutMs,
         }
       );
 
-      return response.data;
+      const elapsedMs = Date.now() - chatStartMs;
+      const responseData = response.data;
+      const responseKeys = responseData && typeof responseData === "object" ? Object.keys(responseData) : [];
+      const contentPreview =
+        responseData?.content != null
+          ? String(responseData.content).slice(0, 200)
+          : responseData?.message != null
+            ? String(responseData.message).slice(0, 200)
+            : "(no content/message)";
+      console.log(`${DEBUG_PREFIX} chat response received`, {
+        elapsedMs,
+        status: response.status,
+        responseKeys,
+        contentLength: responseData?.content?.length ?? responseData?.message?.length ?? "n/a",
+        contentPreview: contentPreview.length > 100 ? contentPreview + "..." : contentPreview,
+      });
+
+      return responseData;
     } catch (error) {
       if (error.response) {
         // API returned an error response
@@ -87,8 +110,19 @@ class EduAIService {
         });
         throw new Error(`EduAI API error (${statusCode}): ${errorMessage}`);
       } else if (error.request) {
-        // Request was made but no response received
-        console.error("EduAI Request Error:", {
+        // Request was made but no response received – log enough to tell real timeout from other failures
+        const elapsedMs = typeof chatStartMs === "number" ? Date.now() - chatStartMs : null;
+        console.error(`${DEBUG_PREFIX} chat request failed (no response)`, {
+          code: error.code,
+          message: error.message,
+          elapsedMs,
+          configuredTimeoutMs: error.config?.timeout,
+          isECONNABORTED: error.code === "ECONNABORTED",
+          messageIncludesTimeout: (error.message || "").toLowerCase().includes("timeout"),
+          url: error.config?.url,
+          baseURL: error.config?.baseURL,
+        });
+        console.error("EduAI Request Error (full):", {
           request: error.request,
           message: error.message,
           code: error.code,
@@ -100,9 +134,10 @@ class EduAIService {
         });
         
         // Provide more specific error messages based on error code
+        const configuredTimeoutSec = error.config?.timeout != null ? Math.round(error.config.timeout / 1000) : 60;
         let errorMessage = "EduAI API request failed: No response received";
         if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-          errorMessage = "EduAI API request timed out after 60 seconds. The server may be slow or overloaded. Please try again.";
+          errorMessage = `EduAI API request timed out after ${configuredTimeoutSec} seconds. The server may be slow or overloaded. Please try again.`;
         } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
           errorMessage = `EduAI API server is unreachable. Please check your network connection and verify the EduAI service URL (${this.baseURL}) is correct.`;
         } else if (error.code === 'ECONNRESET') {
@@ -146,22 +181,30 @@ Requirements:
 - Reasoning distribution: Factual: ${reasoningDistribution.factual}%, Analytical: ${reasoningDistribution.analytical}%, Application: ${reasoningDistribution.application}%
 - Each question should be relevant to the course material
 - For each question, you MUST generate a correct answer based on the question content
-- Format each question as a JSON object with these exact fields:
+
+Format each question as a JSON object with these exact fields:
   {
-    "content": "The complete question text",
+    "content": "The question text only (for MCQ: do NOT include choices in content)",
     "description": "Brief summary (<= 15 words) that does not simply repeat the question text",
     "difficulty": "easy/medium/hard",
     "reasoning_level": "factual/analytical/application",
     "type": "MCQ/SA/LA",
-    "answer": "The correct answer to the question (required for all question types)",
+    "answer": "The correct answer (see guidelines below)",
     "primary_topic_id": number | null,
-    "secondary_topic_ids": number[]
+    "secondary_topic_ids": number[],
+    "choices": [{"letter": "A", "text": "Option A"}, ...]  // REQUIRED for MCQ questions only
   }
 
+IMPORTANT FOR MCQ QUESTIONS:
+- "content" must contain ONLY the question text, without any choices. Do NOT put options inside content.
+- "choices" is REQUIRED: you MUST include a "choices" array with at least 2 items (typically 4). Each item: {"letter": "A", "text": "the option text"}.
+- Each choice must have a unique letter (A, B, C, D, E, etc.). Never omit "choices" for MCQ.
+- "answer" must be the single letter of the correct choice (e.g., "B").
+
 Answer Guidelines:
-- For MCQ questions: Provide the correct option letter (A, B, C, D, etc.) or the full correct answer text
-- For SA (Short Answer) questions: Provide a concise, accurate answer (1-3 sentences)
-- For LA (Long Answer) questions: Provide a comprehensive, detailed answer that fully addresses the question
+- For MCQ questions: "answer" must be the letter of the correct choice (e.g., "A", "B", "C", "D")
+- For SA (Short Answer) questions: Provide a concise, accurate answer (1-3 sentences) in the "answer" field
+- For LA (Long Answer) questions: Provide a comprehensive, detailed answer that fully addresses the question in the "answer" field
 - The answer must be accurate and directly address the question content
 - Do not leave answers as null or empty - always generate a valid answer
 
@@ -175,7 +218,7 @@ If you are unable to generate the requested question(s) for any reason (e.g., in
 }
 
 IMPORTANT: 
-- If you can generate the question(s), return ONLY a valid JSON array of question objects. No other text.
+- If you can generate the question(s), return ONLY a valid JSON array of question objects. Do NOT wrap the array in an object (e.g. do not use {"questions": [...]}). Return the array directly, e.g. [{...}, {...}]. No other text, no markdown, no code fence.
 - If you cannot generate the question(s), return ONLY the error object above. No other text.`;
 
     const userPrompt = `Generate questions about: ${prompt}
@@ -183,6 +226,16 @@ IMPORTANT:
 Please ensure the questions are appropriate for the course level and cover the key concepts comprehensively.`;
 
     try {
+      const genStartMs = Date.now();
+      console.log(`${DEBUG_PREFIX} generateQuestions calling chat`, {
+        courseCode,
+        model,
+        numQuestions,
+        systemPromptLength: systemPrompt.length,
+        userPromptLength: userPrompt.length,
+      });
+
+      // Extraction/generation can take longer than default 60s (large prompts, multiple questions)
       const response = await this.chat({
         messages: [
           { role: "system", content: systemPrompt },
@@ -192,25 +245,48 @@ Please ensure the questions are appropriate for the course level and cover the k
         apiKeys,
         courseCode,
         streaming: false,
+        timeoutMs: 180000, // 3 minutes for question generation/extraction
       });
 
-      // Parse the response
+      const genElapsedMs = Date.now() - genStartMs;
+      const rawContent = response?.content ?? response?.message ?? response;
+      const rawType = rawContent == null ? "null" : typeof rawContent;
+      const rawLength = typeof rawContent === "string" ? rawContent.length : "n/a";
+      console.log(`${DEBUG_PREFIX} generateQuestions chat returned`, {
+        genElapsedMs,
+        responseKeys: response && typeof response === "object" ? Object.keys(response) : [],
+        rawContentType: rawType,
+        rawContentLength: rawLength,
+        rawContentPreview: typeof rawContent === "string" ? rawContent.slice(0, 150) + (rawContent.length > 150 ? "..." : "") : String(rawContent).slice(0, 150),
+      });
+
+      // Parse the response (EduAI may return string JSON or already-parsed array/object)
+      const rawPayload = response?.content ?? response?.message ?? response;
       let parsedResponse;
-      try {
-        parsedResponse = JSON.parse(
-          response.content || response.message || response
-        );
-      } catch (parseError) {
-        // If parsing fails, try to extract JSON from the response
-        const jsonMatch = (
-          response.content ||
-          response.message ||
-          response
-        ).match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-        if (jsonMatch) {
-          parsedResponse = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error("Could not parse response from EduAI");
+      if (rawPayload !== null && typeof rawPayload === "object") {
+        // Already an object or array – use as-is to avoid JSON.parse(non-string) throwing (e.g. "array" / .match errors)
+        parsedResponse = rawPayload;
+        console.log(`${DEBUG_PREFIX} generateQuestions using pre-parsed response`, {
+          isArray: Array.isArray(rawPayload),
+          keys: Array.isArray(rawPayload) ? "array" : Object.keys(rawPayload || {}),
+        });
+      } else {
+        try {
+          const str = typeof rawPayload === "string" ? rawPayload : String(rawPayload);
+          parsedResponse = JSON.parse(str);
+        } catch (parseError) {
+          const str = typeof rawPayload === "string" ? rawPayload : String(rawPayload);
+          const jsonMatch = str.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+          if (jsonMatch) {
+            parsedResponse = JSON.parse(jsonMatch[0]);
+          } else {
+            console.error(`${DEBUG_PREFIX} generateQuestions JSON parse failed`, {
+              parseError: parseError?.message,
+              rawType: typeof rawPayload,
+              rawPreview: str?.slice?.(0, 300),
+            });
+            throw new Error("Could not parse response from EduAI");
+          }
         }
       }
 
@@ -220,12 +296,26 @@ Please ensure the questions are appropriate for the course level and cover the k
         throw new Error(errorReason);
       }
 
-      // Validate that we have an array of questions
-      if (!Array.isArray(parsedResponse)) {
-        throw new Error("EduAI response is not an array of questions");
+      // Accept raw array or unwrap from common wrapper keys (EduAI/LLM may return { questions: [...] } or { data: [...] })
+      let questions = null;
+      if (Array.isArray(parsedResponse)) {
+        questions = parsedResponse;
+      } else if (parsedResponse && typeof parsedResponse === 'object') {
+        questions =
+          parsedResponse.questions ??
+          parsedResponse.data ??
+          parsedResponse.results ??
+          (() => {
+            const firstArray = Object.values(parsedResponse).find((v) => Array.isArray(v));
+            return firstArray ?? null;
+          })();
       }
 
-      const questions = parsedResponse;
+      if (!Array.isArray(questions)) {
+        throw new Error(
+          "EduAI response is not an array of questions. Expected a JSON array of question objects (or an object with a 'questions' array)."
+        );
+      }
 
       // Filter and validate each question
       const validQuestions = questions.filter(
@@ -243,8 +333,36 @@ Please ensure the questions are appropriate for the course level and cover the k
         throw new Error("No valid questions found in EduAI response");
       }
 
-      const normalizedQuestions = validQuestions.map((question) => {
-        const content = question.content.trim();
+      /** Parse MCQ choices from content when model embeds "A) ... B) ..." in content. Returns { questionText, choices }. */
+      const parseChoicesFromContent = (text) => {
+        if (!text || typeof text !== "string") return { questionText: text || "", choices: [] };
+        const lines = text.split("\n");
+        const choices = [];
+        const questionLines = [];
+        const choicePattern = /^([A-Za-z])\)\s*(.+)$/;
+        let foundChoices = false;
+        for (const line of lines) {
+          const trimmed = line.trim();
+          const match = trimmed.match(choicePattern);
+          if (match) {
+            foundChoices = true;
+            choices.push({ letter: match[1].toUpperCase(), text: match[2].trim() });
+          } else if (trimmed && !foundChoices) {
+            questionLines.push(line);
+          }
+        }
+        const questionText = questionLines.join("\n").trim() || text;
+        return { questionText, choices };
+      };
+
+      const normalizedQuestions = validQuestions.map((question, index) => {
+        console.log(`${DEBUG_PREFIX} raw question ${index + 1}`, {
+          type: question.type,
+          choicesLength: Array.isArray(question.choices) ? question.choices.length : "not array",
+          contentLength: question.content?.length ?? 0,
+        });
+
+        let content = question.content.trim();
 
         const description =
           typeof question.description === "string" &&
@@ -270,32 +388,115 @@ Please ensure the questions are appropriate for the course level and cover the k
             )
           : [];
 
-        const answer =
-          typeof question.answer === "string" && question.answer.trim().length > 0
-            ? question.answer.trim()
-            : null;
+        const questionType =
+          typeof question.type === "string" &&
+          question.type.toUpperCase().trim() === "SA"
+            ? "SA"
+            : typeof question.type === "string" &&
+              question.type.toUpperCase().trim() === "LA"
+              ? "LA"
+              : "MCQ";
+
+        // Handle choices for MCQ questions
+        let choices = null;
+        let answer = null;
+
+        if (questionType === "MCQ") {
+          // Normalize choices: accept array of {letter, text} or object like { "A": "text", "B": "text" }
+          let rawChoices = question.choices;
+          if (rawChoices !== null && typeof rawChoices === "object" && !Array.isArray(rawChoices)) {
+            rawChoices = Object.entries(rawChoices).map(([letter, text]) => ({
+              letter: String(letter).trim().toUpperCase() || null,
+              text: typeof text === "string" ? text.trim() : String(text || ""),
+            })).filter((c) => c.letter && c.text);
+          }
+          if (Array.isArray(rawChoices) && rawChoices.length > 0) {
+            choices = rawChoices
+              .map((choice) => {
+                if (typeof choice === "object" && choice !== null) {
+                  const letter = typeof choice.letter === "string"
+                    ? choice.letter.toUpperCase().trim()
+                    : null;
+                  const text = typeof choice.text === "string"
+                    ? choice.text.trim()
+                    : "";
+
+                  if (letter && text) {
+                    return { letter, text };
+                  }
+                }
+                return null;
+              })
+              .filter((choice) => choice !== null);
+
+            // Ensure unique letters
+            const seenLetters = new Set();
+            choices = choices.filter((choice) => {
+              if (seenLetters.has(choice.letter)) {
+                return false;
+              }
+              seenLetters.add(choice.letter);
+              return true;
+            });
+          }
+
+          // Fallback 1: model may omit "choices" or embed them in content (e.g. "Question?\nA) ...\nB) ...")
+          if ((!choices || choices.length === 0) && content) {
+            const parsed = parseChoicesFromContent(content);
+            if (parsed.choices.length >= 2) {
+              content = parsed.questionText;
+              choices = parsed.choices;
+              console.log(`${DEBUG_PREFIX} MCQ choices parsed from content`, { count: choices.length });
+            }
+          }
+
+          // Fallback 2: model returned MCQ but no choices – use placeholders so user can edit
+          if (!choices || choices.length === 0) {
+            choices = [
+              { letter: "A", text: "Option A" },
+              { letter: "B", text: "Option B" },
+              { letter: "C", text: "Option C" },
+              { letter: "D", text: "Option D" },
+            ];
+            console.log(`${DEBUG_PREFIX} MCQ had no choices; using placeholders`);
+          }
+
+          // Normalize answer to just the letter for MCQ
+          if (typeof question.answer === "string" && question.answer.trim().length > 0) {
+            const answerText = question.answer.trim();
+            // Extract letter from formats like "B", "B)", "B) Option B", etc.
+            const letterMatch = answerText.match(/^([A-Za-z])/);
+            answer = letterMatch ? letterMatch[1].toUpperCase() : answerText;
+          }
+        } else {
+          // For SA/LA, keep full answer text
+          answer =
+            typeof question.answer === "string" && question.answer.trim().length > 0
+              ? question.answer.trim()
+              : null;
+        }
 
         return {
           content,
           description,
           difficulty: question.difficulty,
           reasoning_level: question.reasoning_level,
-          type:
-            typeof question.type === "string" &&
-            question.type.toUpperCase().trim() === "SA"
-              ? "SA"
-              : typeof question.type === "string" &&
-                question.type.toUpperCase().trim() === "LA"
-                ? "LA"
-                : "MCQ",
+          type: questionType,
           answer,
+          choices, // Will be null for SA/LA, array for MCQ
           primary_topic_id: primaryTopicId,
           secondary_topic_ids: secondaryTopicIds,
         };
       });
 
+      console.log(`${DEBUG_PREFIX} generateQuestions success`, { count: normalizedQuestions.length });
       return normalizedQuestions;
     } catch (error) {
+      console.error(`${DEBUG_PREFIX} generateQuestions failed`, {
+        message: error.message,
+        name: error.name,
+        code: error?.code,
+      });
       throw new Error(`EduAI question generation failed: ${error.message}`);
     }
   }

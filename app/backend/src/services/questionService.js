@@ -31,6 +31,69 @@ const normalizeSecondaryTopics = (value) => {
   return [];
 };
 
+/**
+ * Validates and normalizes MCQ choices array.
+ * Returns normalized choices array or null if invalid.
+ */
+const validateMCQChoices = (choices, questionType) => {
+  // Only validate for MCQ questions
+  if (questionType !== 'MCQ') {
+    return null;
+  }
+
+  if (!Array.isArray(choices) || choices.length === 0) {
+    return null;
+  }
+
+  const normalized = choices
+    .map((choice) => {
+      if (typeof choice === 'object' && choice !== null) {
+        const letter = typeof choice.letter === 'string' 
+          ? choice.letter.toUpperCase().trim() 
+          : null;
+        const text = typeof choice.text === 'string' 
+          ? choice.text.trim() 
+          : '';
+        
+        if (letter && text && /^[A-Z]$/.test(letter)) {
+          return { letter, text };
+        }
+      }
+      return null;
+    })
+    .filter((choice) => choice !== null);
+
+  // Ensure at least 2 choices and unique letters
+  if (normalized.length < 2) {
+    return null;
+  }
+
+  const seenLetters = new Set();
+  const uniqueChoices = normalized.filter((choice) => {
+    if (seenLetters.has(choice.letter)) {
+      return false;
+    }
+    seenLetters.add(choice.letter);
+    return true;
+  });
+
+  return uniqueChoices.length >= 2 ? uniqueChoices : null;
+};
+
+/**
+ * Extracts just the letter from answer text for MCQ questions.
+ * Handles formats like: "B", "B)", "B) Option B", etc.
+ */
+const extractAnswerLetter = (answer) => {
+  if (!answer || typeof answer !== 'string') {
+    return null;
+  }
+
+  const trimmed = answer.trim();
+  const match = trimmed.match(/^([A-Za-z])/);
+  return match ? match[1].toUpperCase() : trimmed;
+};
+
 /** Builds a short question description from available text fields so metadata looks tidy. */
 const generateMetadataDescription = (questionText, summary, instructions) => {
   const candidate = [summary, instructions, questionText].find(
@@ -131,7 +194,7 @@ export const getQuestionsByUser = async (userId, options = {}) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'isAiGenerated', 'isDraft', 'createdAt', 'updatedAt'],
+          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'choices', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'isAiGenerated', 'isDraft', 'createdAt', 'updatedAt'],
           include: [
             {
               model: Assessments,
@@ -175,7 +238,7 @@ export const getQuestionById = async (questionId, userId) => {
         {
           model: Variants,
           as: 'variants',
-          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'isAiGenerated', 'isDraft', 'createdAt', 'updatedAt'],
+          attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'answer', 'choices', 'assessmentId', 'secondaryTopicsId', 'referenceId', 'isAiGenerated', 'isDraft', 'createdAt', 'updatedAt'],
           include: [
             {
               model: Assessments,
@@ -490,11 +553,32 @@ export const saveExtractedQuestions = async (userId, payload) => {
         questionOrder: createdAssessment ? { [createdAssessment.id]: orderCounter } : {}
       }, { transaction });
 
+      // Handle choices for MCQ questions
+      let choices = null;
+      let answer = item.answer;
+      
+      if (questionType === 'MCQ') {
+        // Validate choices if provided
+        if (item.choices) {
+          choices = validateMCQChoices(item.choices, questionType);
+        }
+        
+        // Normalize answer to just letter for MCQ
+        if (typeof answer === 'string' && answer.trim()) {
+          answer = extractAnswerLetter(answer) || answer.trim();
+        }
+      } else if (typeof answer === 'string' && answer.trim()) {
+        answer = answer.trim();
+      } else {
+        answer = null;
+      }
+
       const variant = await Variants.create({
         questionMetadataId: metadata.id,
         questionText,
         difficulty: ['easy', 'medium', 'hard'].includes(difficulty) ? difficulty : 'medium',
-        answer: typeof item.answer === 'string' && item.answer.trim() ? item.answer.trim() : null,
+        answer,
+        choices,
         assessmentId: createdAssessment ? createdAssessment.id : null,
         secondaryTopicsId: secondaryTopics,
         referenceId: null,
@@ -681,6 +765,29 @@ export const createVariant = async (questionId, variantData, userId) => {
       ? variantData.reasoningLevel
       : 'factual';
 
+    // Handle choices for MCQ questions
+    let choices = null;
+    let answer = variantData.answer;
+    
+    if (question.type === 'MCQ') {
+      if (variantData.choices !== undefined) {
+        choices = validateMCQChoices(variantData.choices, question.type);
+        // If choices are provided but invalid, throw error
+        if (variantData.choices !== null && choices === null) {
+          throw new Error('Invalid choices format for MCQ. Choices must be an array of objects with letter and text properties.');
+        }
+      }
+      
+      // Normalize answer to just letter for MCQ
+      if (typeof answer === 'string' && answer.trim()) {
+        answer = extractAnswerLetter(answer) || answer.trim();
+      }
+    } else if (typeof answer === 'string' && answer.trim()) {
+      answer = answer.trim();
+    } else {
+      answer = null;
+    }
+
     const variant = await Variants.create({
       questionMetadataId: questionId,
       questionText: variantData.questionText,
@@ -688,7 +795,8 @@ export const createVariant = async (questionId, variantData, userId) => {
       reasoningLevel,
       assessmentId: variantData.assessmentId || null,
       secondaryTopicsId: secondaryTopics,
-      answer: variantData.answer || null,
+      answer,
+      choices,
       referenceId: variantData.referenceId || null,
       isAiGenerated: variantData.isAiGenerated !== undefined ? Boolean(variantData.isAiGenerated) : false,
       isDraft: variantData.isDraft !== undefined ? Boolean(variantData.isDraft) : true
@@ -724,6 +832,27 @@ export const updateVariant = async (variantId, variantData, userId) => {
       throw new Error('Variant not found');
     }
 
+    // Handle choices and answer normalization for MCQ
+    let normalizedChoices = variantData.choices;
+    let normalizedAnswer = variantData.answer;
+    
+    if (variant.questionMetadata && variant.questionMetadata.type === 'MCQ') {
+      if (variantData.choices !== undefined) {
+        normalizedChoices = validateMCQChoices(variantData.choices, 'MCQ');
+        // If choices are provided but invalid, throw error
+        if (variantData.choices !== null && normalizedChoices === null) {
+          throw new Error('Invalid choices format for MCQ. Choices must be an array of objects with letter and text properties.');
+        }
+      }
+      
+      // Normalize answer to just letter for MCQ
+      if (variantData.answer !== undefined && typeof variantData.answer === 'string' && variantData.answer.trim()) {
+        normalizedAnswer = extractAnswerLetter(variantData.answer) || variantData.answer.trim();
+      }
+    } else if (variantData.answer !== undefined && typeof variantData.answer === 'string' && variantData.answer.trim()) {
+      normalizedAnswer = variantData.answer.trim();
+    }
+
     const normalizedData = {
       ...variantData,
       ...(variantData.secondaryTopicsId !== undefined && {
@@ -734,6 +863,12 @@ export const updateVariant = async (variantId, variantData, userId) => {
       }),
       ...(variantData.isDraft !== undefined && {
         isDraft: Boolean(variantData.isDraft)
+      }),
+      ...(normalizedChoices !== undefined && {
+        choices: normalizedChoices
+      }),
+      ...(normalizedAnswer !== undefined && {
+        answer: normalizedAnswer
       })
     };
 

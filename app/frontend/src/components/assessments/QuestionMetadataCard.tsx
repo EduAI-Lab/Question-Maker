@@ -16,6 +16,7 @@ interface QuestionMetadataCardProps {
   onAddVariant: () => void;
   topicsById: Record<number, Topic>;
   onToggleReview?: (variantId: number, nextDraft: boolean) => void;
+  onViewQuestion?: (question: Question, variantId?: number) => void;
   selectedVariantId?: number;
   onVariantChange?: (questionId: number, variantId: number) => void;
 }
@@ -59,6 +60,7 @@ export const QuestionMetadataCard = ({
   onAddVariant,
   topicsById,
   onToggleReview,
+  onViewQuestion,
   selectedVariantId,
   onVariantChange
 }: QuestionMetadataCardProps) => {
@@ -158,7 +160,20 @@ export const QuestionMetadataCard = ({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {onToggleReview && activeVariant && activeVariant.isDraft !== undefined && (
+              {onViewQuestion ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewQuestion(question, activeVariant?.id);
+                  }}
+                  className="text-xs"
+                >
+                  View Question
+                </Button>
+              ) : onToggleReview && activeVariant && activeVariant.isDraft !== undefined ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -171,7 +186,7 @@ export const QuestionMetadataCard = ({
                 >
                   {activeVariant.isDraft ? 'Mark Reviewed' : 'Mark Draft'}
                 </Button>
-              )}
+              ) : null}
               <Button
                 type="button"
                 variant="default"
@@ -229,9 +244,36 @@ export const QuestionMetadataCard = ({
 };
 
 const VariantContent = ({ variant }: { variant: QuestionVariant }) => {
+  const hasChoices = variant.choices && Array.isArray(variant.choices) && variant.choices.length > 0;
+
   return (
     <div className="space-y-2">
       <p className="text-sm text-gray-900">{variant.questionText}</p>
+      {hasChoices && variant.choices && (
+        <div className="mt-2 space-y-1.5">
+          {variant.choices.map((choice, index) => {
+            const isCorrect = variant.answer && choice.letter === variant.answer.trim().toUpperCase();
+            return (
+              <div
+                key={index}
+                className={`text-xs flex items-start gap-2 p-2 rounded ${
+                  isCorrect ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-200'
+                }`}
+              >
+                <span className={`font-semibold shrink-0 ${isCorrect ? 'text-emerald-700' : 'text-gray-600'}`}>
+                  {choice.letter})
+                </span>
+                <span className={isCorrect ? 'text-emerald-900 font-medium' : 'text-gray-700'}>
+                  {choice.text}
+                </span>
+                {isCorrect && (
+                  <span className="ml-auto text-xs font-semibold text-emerald-700">✓</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div className="flex flex-wrap gap-2">
         <span
           className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${getDifficultyColor(
@@ -258,12 +300,6 @@ const VariantContent = ({ variant }: { variant: QuestionVariant }) => {
               {variant.assessment.name} ({variant.assessment.semester})
             </span>
           </p>
-        </div>
-      )}
-      {variant.answer && (
-        <div className="mt-2 pt-2 border-t border-gray-100">
-          <p className="text-xs font-medium text-muted-foreground mb-1">Answer:</p>
-          <p className="text-xs text-gray-700">{variant.answer}</p>
         </div>
       )}
     </div>
