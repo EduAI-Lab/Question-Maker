@@ -50,7 +50,8 @@ class EduAIService {
         streaming: params.streaming || false,
       };
 
-      const timeoutMs = 60000;
+      // Allow caller to override (e.g. extraction needs longer than default 60s)
+      const timeoutMs = params.timeoutMs != null && params.timeoutMs > 0 ? params.timeoutMs : 60000;
       chatStartMs = Date.now();
       console.log(`${DEBUG_PREFIX} chat request starting`, {
         url: `${this.baseURL}/api/chat`,
@@ -133,9 +134,10 @@ class EduAIService {
         });
         
         // Provide more specific error messages based on error code
+        const configuredTimeoutSec = error.config?.timeout != null ? Math.round(error.config.timeout / 1000) : 60;
         let errorMessage = "EduAI API request failed: No response received";
         if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-          errorMessage = "EduAI API request timed out after 60 seconds. The server may be slow or overloaded. Please try again.";
+          errorMessage = `EduAI API request timed out after ${configuredTimeoutSec} seconds. The server may be slow or overloaded. Please try again.`;
         } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
           errorMessage = `EduAI API server is unreachable. Please check your network connection and verify the EduAI service URL (${this.baseURL}) is correct.`;
         } else if (error.code === 'ECONNRESET') {
@@ -233,6 +235,7 @@ Please ensure the questions are appropriate for the course level and cover the k
         userPromptLength: userPrompt.length,
       });
 
+      // Extraction/generation can take longer than default 60s (large prompts, multiple questions)
       const response = await this.chat({
         messages: [
           { role: "system", content: systemPrompt },
@@ -242,6 +245,7 @@ Please ensure the questions are appropriate for the course level and cover the k
         apiKeys,
         courseCode,
         streaming: false,
+        timeoutMs: 180000, // 3 minutes for question generation/extraction
       });
 
       const genElapsedMs = Date.now() - genStartMs;

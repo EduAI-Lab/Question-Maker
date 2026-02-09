@@ -157,6 +157,8 @@ export interface ExtractedQuestion {
     type: QuestionType;
     primaryTopicId: number | null;
     secondaryTopicIds: number[];
+    /** MCQ options: only present for type === 'MCQ'. */
+    choices?: MCQChoice[] | null;
 }
 
 export interface QuestionVariantEntry {

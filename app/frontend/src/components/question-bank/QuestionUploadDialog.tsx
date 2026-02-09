@@ -1,5 +1,5 @@
 /**
- * Dialog for uploading PDF/image files, running OCR, and extracting questions via EduAI.
+ * Dialog for uploading PDF, image, or TXT files; runs OCR for PDF/image or uses text as-is for TXT, then extracts questions via EduAI.
  * Manages draft review, topic selection, optional assessment creation, and save flows.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -30,7 +30,8 @@ import { useToast } from '../ui/use-toast';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 
-import { ExtractedQuestion, Question, QuestionDifficulty, QuestionType } from '../../types/question';
+import { ExtractedQuestion, MCQChoice, Question, QuestionDifficulty, QuestionType } from '../../types/question';
+import { MCQChoicesField } from '../questions/MCQChoicesField';
 import { Topic } from '../../types/topic';
 import { questionService } from '../../services/questionService';
 import { eduaiService, EduAIModelOption } from '../../services/eduaiService';
@@ -96,6 +97,9 @@ const isPdfFile = (file: File) =>
 const isImageFile = (file: File) =>
     file.type.startsWith('image/') ||
     /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(file.name);
+
+const isTextFile = (file: File) =>
+    file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
 
 export const QuestionUploadDialog = ({
     open,
@@ -270,12 +274,15 @@ export const QuestionUploadDialog = ({
         setProgress(5);
 
         let text = '';
-        if (isPdfFile(file)) {
+        if (isTextFile(file)) {
+            text = await file.text();
+            setProgress(70);
+        } else if (isPdfFile(file)) {
             text = await performPdfOcr(file, setProgress);
         } else if (isImageFile(file)) {
             text = await performImageOcr(file, setProgress);
         } else {
-            throw new Error('Unsupported file type. Please upload a PDF or image file.');
+            throw new Error('Unsupported file type. Please upload a PDF, image, or TXT file.');
         }
 
         if (!text.trim()) {
@@ -326,6 +333,17 @@ export const QuestionUploadDialog = ({
                     )
                     : [];
 
+                const isMCQ = item.type === 'MCQ';
+                const defaultChoices: MCQChoice[] = [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }];
+                const normalizedChoices: MCQChoice[] | null =
+                    isMCQ && Array.isArray(item.choices) && item.choices.length >= 2
+                        ? item.choices.map((c: { letter?: string; text?: string }) => ({
+                            letter: typeof c.letter === 'string' ? c.letter.trim().toUpperCase() || 'A' : 'A',
+                            text: typeof c.text === 'string' ? c.text.trim() : String(c.text ?? '')
+                          })).filter((c: MCQChoice) => c.text.length > 0)
+                        : null;
+                const choices: MCQChoice[] | null = isMCQ ? (normalizedChoices && normalizedChoices.length >= 2 ? normalizedChoices : defaultChoices) : null;
+
                 return {
                     id: item.id ?? generateId(),
                     question: item.question.trim(),
@@ -338,6 +356,7 @@ export const QuestionUploadDialog = ({
                     summary: item.summary.trim(),
                     primaryTopicId,
                     secondaryTopicIds,
+                    choices,
                     include: item.include !== false
                 };
             });
@@ -514,7 +533,10 @@ export const QuestionUploadDialog = ({
             type: draft.type,
             summary: draft.summary.trim(),
             primaryTopicId: draft.primaryTopicId ?? undefined,
-            secondaryTopicIds: draft.secondaryTopicIds
+            secondaryTopicIds: draft.secondaryTopicIds,
+            ...(draft.type === 'MCQ' && draft.choices && draft.choices.length >= 2 && {
+                choices: draft.choices.filter((c) => c.text.trim().length > 0)
+            })
         }));
 
         if (payloadQuestions.length === 0) {
@@ -617,10 +639,10 @@ export const QuestionUploadDialog = ({
                     <div>
                         <DialogTitle>Upload Questions</DialogTitle>
                         <DialogDescription>
-                            Upload a PDF or image containing questions for{' '}
+                            Upload a PDF, image, or TXT file containing questions for{' '}
                             <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
                             {' '}
-                            We&apos;ll extract them with OCR and AI so you can review before saving.
+                            We&apos;ll extract them with OCR (or use text as-is for TXT) and AI so you can review before saving.
                         </DialogDescription>
                     </div>
                 </DialogHeader>
@@ -789,13 +811,13 @@ export const QuestionUploadDialog = ({
                                 >
                                     <UploadCloud className="h-10 w-10 text-muted-foreground" />
                                     <div className="space-y-1">
-                                        <p className="text-sm font-medium">Drop PDF or image file here</p>
-                                        <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG and other common formats.</p>
+                                        <p className="text-sm font-medium">Drop PDF, image, or TXT file here</p>
+                                        <p className="text-xs text-muted-foreground">We support PDF, PNG, JPG, TXT and other common formats.</p>
                                     </div>
                                     <input
                                         id="question-upload"
                                         type="file"
-                                        accept=".pdf,image/*"
+                                        accept=".pdf,image/*,.txt,text/plain"
                                         className="hidden"
                                         onChange={handleFileChange}
                                         disabled={processingStage === 'ocr' || processingStage === 'extracting' || processingStage === 'saving'}
@@ -986,6 +1008,17 @@ export const QuestionUploadDialog = ({
                                                         />
                                                     </div>
                                                 </div>
+                                                {draft.type === 'MCQ' && (
+                                                    <div className="space-y-2">
+                                                        <MCQChoicesField
+                                                            choices={draft.choices ?? [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }]}
+                                                            onChoicesChange={(newChoices) => updateDraft(draft.id, { choices: newChoices })}
+                                                            answer={draft.answer ?? ''}
+                                                            onAnswerChange={(letter) => updateDraft(draft.id, { answer: letter || null })}
+                                                            idPrefix={`upload-draft-${draft.id}`}
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
