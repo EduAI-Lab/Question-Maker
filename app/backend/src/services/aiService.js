@@ -273,15 +273,41 @@ const sanitizeEduAIQuestion = (question) => {
       )
     : [];
 
+  // Preserve MCQ choices (array of { letter, text }) for OCR upload flow
+  let choices = null;
+  if (type === "MCQ" && Array.isArray(question?.choices) && question.choices.length > 0) {
+    choices = question.choices
+      .filter(
+        (c) =>
+          c &&
+          typeof c === "object" &&
+          typeof c.letter === "string" &&
+          typeof c.text === "string"
+      )
+      .map((c) => ({
+        letter: String(c.letter).trim().toUpperCase() || "A",
+        text: String(c.text).trim(),
+      }))
+      .filter((c) => c.text.length > 0);
+    if (choices.length < 2) choices = null;
+  }
+
+  // Preserve answer (letter for MCQ, full text for SA/LA)
+  const answer =
+    typeof question?.answer === "string" && question.answer.trim().length > 0
+      ? question.answer.trim()
+      : null;
+
   return {
     summary: summarySource,
     question: content,
     instructions: undefined,
     difficulty,
-    answer: null,
+    answer,
     type,
     primaryTopicId,
     secondaryTopicIds,
+    choices,
   };
 };
 

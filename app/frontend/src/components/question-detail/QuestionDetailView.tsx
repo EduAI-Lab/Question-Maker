@@ -6,11 +6,31 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { X, Copy, Trash2, ArrowLeft, Sparkles, FileEdit } from 'lucide-react';
-import { QuestionVariantEntry } from '../../types/question';
+import { Label } from '../ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue
+} from '../ui/select';
+import { Textarea } from '../ui/textarea';
+import { X, Copy, Trash2, ArrowLeft, Sparkles, FileEdit, Pencil } from 'lucide-react';
+import { QuestionVariantEntry, MCQChoice, QuestionType, QuestionDifficulty } from '../../types/question';
+import { Topic } from '../../types/topic';
+import { MCQChoicesField } from '../questions/MCQChoicesField';
 import { questionService } from '../../services/questionService';
+import { courseService } from '../../services/courseService';
 import { assessmentService } from '../../services/assessmentService';
 import { useToast } from '../ui/use-toast';
+
+const QUESTION_TYPES: QuestionType[] = ['MCQ', 'SA', 'LA'];
+const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+    MCQ: 'Multiple Choice',
+    SA: 'Short Answer',
+    LA: 'Long Answer'
+};
+const DIFFICULTIES: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
 
 const DetailItem = ({
     label,
@@ -31,9 +51,9 @@ const DetailItem = ({
                 className={`rounded-lg border border-gray-200 bg-gray-50 p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 ${spanFull ? 'sm:col-span-2' : ''}`}
             >
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-                <p className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
+                <div className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
                     {value}
-                </p>
+                </div>
                 <p className="mt-3 text-xs font-medium text-blue-600">View all variants</p>
             </button>
         ) : (
@@ -41,9 +61,9 @@ const DetailItem = ({
                 className={`rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-sm ${spanFull ? 'sm:col-span-2' : ''}`}
             >
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-                <p className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
+                <div className="mt-2 text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
                     {value}
-                </p>
+                </div>
             </div>
         )}
     </>
@@ -56,7 +76,25 @@ interface QuestionDetailViewProps {
     onCreateVariant: (entry: QuestionVariantEntry) => void;
     onDeleteVariant: (entry: QuestionVariantEntry) => void;
     onSelectVariant: (entry: QuestionVariantEntry) => void;
-    onUpdateVariant?: (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => void;
+    onUpdateVariant?: (
+        variantId: number,
+        updates: {
+            isAiGenerated?: boolean;
+            isDraft?: boolean;
+            difficulty?: QuestionDifficulty;
+            choices?: MCQChoice[] | null;
+            answer?: string | null;
+        }
+    ) => void;
+    onUpdateQuestionMetadata?: (
+        questionId: number,
+        updates: {
+            description?: string | null;
+            primaryTopicId?: number;
+            type?: QuestionType;
+            primaryTopicName?: string;
+        }
+    ) => void;
 }
 
 export const QuestionDetailView = ({
@@ -66,13 +104,51 @@ export const QuestionDetailView = ({
     onCreateVariant,
     onDeleteVariant,
     onSelectVariant,
-    onUpdateVariant
+    onUpdateVariant,
+    onUpdateQuestionMetadata
 }: QuestionDetailViewProps) => {
     const navigate = useNavigate();
     const [viewMode, setViewMode] = useState<'detail' | 'variants'>('detail');
     const [isToggling, setIsToggling] = useState(false);
     const [isTogglingDraft, setIsTogglingDraft] = useState(false);
+    const [editingChoices, setEditingChoices] = useState(false);
+    const [editChoices, setEditChoices] = useState<MCQChoice[]>([]);
+    const [editAnswer, setEditAnswer] = useState('');
+    const [editingMetadata, setEditingMetadata] = useState(false);
+    const [editDescription, setEditDescription] = useState('');
+    const [editPrimaryTopicId, setEditPrimaryTopicId] = useState<string>('');
+    const [editType, setEditType] = useState<QuestionType>('MCQ');
+    const [editDifficulty, setEditDifficulty] = useState<QuestionDifficulty>('medium');
+    const [topics, setTopics] = useState<Topic[]>([]);
+    const [topicsLoading, setTopicsLoading] = useState(false);
+    const [savingMetadata, setSavingMetadata] = useState(false);
     const { toast } = useToast();
+
+    useEffect(() => {
+        if (!entry.courseId) return;
+        let cancelled = false;
+        setTopicsLoading(true);
+        courseService
+            .getCourseTopics(entry.courseId)
+            .then((list) => {
+                if (!cancelled) setTopics(list);
+            })
+            .finally(() => {
+                if (!cancelled) setTopicsLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [entry.courseId]);
+
+    useEffect(() => {
+        if (editingMetadata) {
+            setEditDescription(entry.questionDescription ?? '');
+            setEditPrimaryTopicId(entry.primaryTopicId != null ? String(entry.primaryTopicId) : '');
+            setEditType(entry.questionType);
+            setEditDifficulty((entry.variant.difficulty as QuestionDifficulty) ?? 'medium');
+        }
+    }, [editingMetadata, entry.questionDescription, entry.primaryTopicId, entry.questionType, entry.variant.difficulty]);
     const { variant } = entry;
     const primaryTopicLabel = entry.primaryTopicName ?? `Topic ${entry.primaryTopicId}`;
     const secondaryTopicsDisplay =
@@ -326,19 +402,151 @@ export const QuestionDetailView = ({
                     ) : (
                     <div className="space-y-10">
                         <section>
-                            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Synopsis
-                            </h3>
-                            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <DetailItem
-                                    label="Question synopsis"
-                                    value={entry.questionDescription || '—'}
-                                    spanFull
-                                    onClick={handleViewAllVariants}
-                                />
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Synopsis
+                                </h3>
+                                {!editingMetadata && onUpdateQuestionMetadata && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-xs"
+                                        onClick={() => setEditingMetadata(true)}
+                                    >
+                                        <Pencil className="h-3.5 w-3.5 mr-1" />
+                                        Edit metadata
+                                    </Button>
+                                )}
                             </div>
+                            {editingMetadata ? (
+                                <div className="mt-3 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="detail-description">Question synopsis</Label>
+                                        <Textarea
+                                            id="detail-description"
+                                            value={editDescription}
+                                            onChange={(e) => setEditDescription(e.target.value)}
+                                            placeholder="Short description"
+                                            rows={2}
+                                            className="resize-none"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Primary topic</Label>
+                                        <Select
+                                            value={editPrimaryTopicId || undefined}
+                                            onValueChange={setEditPrimaryTopicId}
+                                            disabled={topicsLoading || topics.length === 0}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder={topicsLoading ? 'Loading…' : topics.length === 0 ? 'No topics' : 'Select topic'} />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {topics.map((t) => (
+                                                    <SelectItem key={t.id} value={String(t.id)}>
+                                                        {t.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label>Question type</Label>
+                                            <Select value={editType} onValueChange={(v) => setEditType(v as QuestionType)}>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {QUESTION_TYPES.map((t) => (
+                                                        <SelectItem key={t} value={t}>
+                                                            {QUESTION_TYPE_LABELS[t]}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Difficulty</Label>
+                                            <Select value={editDifficulty} onValueChange={(v) => setEditDifficulty(v as QuestionDifficulty)}>
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {DIFFICULTIES.map((d) => (
+                                                        <SelectItem key={d} value={d}>
+                                                            {d.charAt(0).toUpperCase() + d.slice(1)}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2 pt-2">
+                                        <Button
+                                            size="sm"
+                                            disabled={savingMetadata || !editPrimaryTopicId}
+                                            onClick={async () => {
+                                                const primaryId = parseInt(editPrimaryTopicId, 10);
+                                                if (Number.isNaN(primaryId)) return;
+                                                setSavingMetadata(true);
+                                                try {
+                                                    await questionService.updateQuestion(entry.questionId, {
+                                                        description: editDescription || undefined,
+                                                        primaryTopicId: primaryId,
+                                                        type: editType,
+                                                        courseId: entry.courseId
+                                                    });
+                                                    await questionService.updateVariant(entry.variant.id, {
+                                                        difficulty: editDifficulty
+                                                    });
+                                                    const primaryTopicName = topics.find((t) => t.id === primaryId)?.name;
+                                                    onUpdateQuestionMetadata?.(entry.questionId, {
+                                                        description: editDescription || null,
+                                                        primaryTopicId: primaryId,
+                                                        type: editType,
+                                                        primaryTopicName
+                                                    });
+                                                    onUpdateVariant?.(entry.variant.id, { difficulty: editDifficulty });
+                                                    setEditingMetadata(false);
+                                                    toast({ title: 'Metadata saved', description: 'Question metadata and difficulty updated.' });
+                                                } catch (err: unknown) {
+                                                    toast({
+                                                        variant: 'destructive',
+                                                        title: 'Failed to save',
+                                                        description: err instanceof Error ? err.message : 'Could not update metadata.'
+                                                    });
+                                                } finally {
+                                                    setSavingMetadata(false);
+                                                }
+                                            }}
+                                        >
+                                            {savingMetadata ? 'Saving…' : 'Save'}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={savingMetadata}
+                                            onClick={() => setEditingMetadata(false)}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <DetailItem
+                                        label="Question synopsis"
+                                        value={entry.questionDescription || '—'}
+                                        spanFull
+                                        onClick={handleViewAllVariants}
+                                    />
+                                </div>
+                            )}
                         </section>
 
+                        {!editingMetadata && (
+                            <>
                         <section>
                             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 Topic coverage
@@ -380,6 +588,8 @@ export const QuestionDetailView = ({
                                 />
                             </div>
                         </section>
+                            </>
+                        )}
 
                         <section>
                             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -405,14 +615,145 @@ export const QuestionDetailView = ({
                             </div>
                         </section>
 
-                        {variant.answer && (
+                        {entry.questionType === 'MCQ' && (editingChoices ? (
+                            <section>
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                                    Edit choices
+                                </h3>
+                                <MCQChoicesField
+                                    choices={editChoices}
+                                    answer={editAnswer}
+                                    onChoicesChange={setEditChoices}
+                                    onAnswerChange={setEditAnswer}
+                                    idPrefix="detail-mcq"
+                                />
+                                <div className="mt-3 flex gap-2">
+                                    <Button
+                                        size="sm"
+                                        onClick={async () => {
+                                            try {
+                                                const validChoices = editChoices.filter((c) => c.text.trim().length > 0);
+                                                await questionService.updateVariant(variant.id, {
+                                                    choices: validChoices,
+                                                    answer: editAnswer
+                                                });
+                                                const updatedVariant = { ...entry.variant, choices: validChoices, answer: editAnswer };
+                                                const updatedEntry: QuestionVariantEntry = {
+                                                    ...entry,
+                                                    variant: updatedVariant
+                                                };
+                                                onSelectVariant(updatedEntry);
+                                                onUpdateVariant?.(variant.id, { choices: validChoices, answer: editAnswer });
+                                                setEditingChoices(false);
+                                                toast({ title: 'Choices saved', description: 'Variant choices and correct answer updated.' });
+                                            } catch (err: any) {
+                                                toast({ variant: 'destructive', title: 'Failed to save choices', description: err?.message });
+                                            }
+                                        }}
+                                    >
+                                        Save choices
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => setEditingChoices(false)}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </section>
+                        ) : variant.choices && variant.choices.length > 0 ? (
+                            <section>
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        Choices
+                                    </h3>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-xs"
+                                        onClick={() => {
+                                            setEditChoices(variant.choices!.map((c) => ({ ...c })));
+                                            setEditAnswer(variant.answer?.trim().toUpperCase().charAt(0) ?? '');
+                                            setEditingChoices(true);
+                                        }}
+                                    >
+                                        Edit choices
+                                    </Button>
+                                </div>
+                                <div className="mt-3 space-y-2">
+                                    {variant.choices.map((choice, index) => {
+                                        const isCorrect = variant.answer && choice.letter === variant.answer.trim().toUpperCase();
+                                        return (
+                                            <div
+                                                key={index}
+                                                className={`rounded-lg border p-4 shadow-sm ${
+                                                    isCorrect
+                                                        ? 'border-emerald-300 bg-emerald-50'
+                                                        : 'border-gray-200 bg-gray-50'
+                                                }`}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <span
+                                                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                                                            isCorrect
+                                                                ? 'bg-emerald-500 text-white'
+                                                                : 'bg-gray-200 text-gray-700'
+                                                        }`}
+                                                    >
+                                                        {choice.letter}
+                                                    </span>
+                                                    <p className="flex-1 text-sm font-medium text-gray-900 leading-relaxed">
+                                                        {choice.text}
+                                                    </p>
+                                                    {isCorrect && (
+                                                        <span className="text-xs font-semibold text-emerald-700">
+                                                            Correct
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </section>
+                        ) : (
                             <section>
                                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                    Answer
+                                    Choices
+                                </h3>
+                                <p className="mt-2 text-sm text-muted-foreground">No choices defined.</p>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-2"
+                                    onClick={() => {
+                                        setEditChoices([
+                                            { letter: 'A', text: '' },
+                                            { letter: 'B', text: '' },
+                                            { letter: 'C', text: '' },
+                                            { letter: 'D', text: '' }
+                                        ]);
+                                        setEditAnswer('');
+                                        setEditingChoices(true);
+                                    }}
+                                >
+                                    Add choices
+                                </Button>
+                            </section>
+                        ))}
+
+                        {variant.answer && !(entry.questionType === 'MCQ' && editingChoices) && (
+                            <section>
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    {entry.questionType === 'MCQ' ? 'Correct Answer' : 'Answer'}
                                 </h3>
                                 <div className="mt-3 rounded-lg border border-gray-200 bg-emerald-50/60 p-5 shadow-sm">
                                     <p className="text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-line">
-                                        {variant.answer}
+                                        {entry.questionType === 'MCQ' && variant.choices && variant.choices.length > 0
+                                            ? (() => {
+                                                const letter = variant.answer.trim().toUpperCase().charAt(0);
+                                                const choice = variant.choices.find((c) => c.letter === letter);
+                                                return choice ? `${choice.letter}) ${choice.text}` : `Option ${variant.answer.toUpperCase()}`;
+                                            })()
+                                            : variant.answer
+                                        }
                                     </p>
                                 </div>
                             </section>

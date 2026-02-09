@@ -8,14 +8,15 @@ import { TopNavigation } from '../components/navigation/TopNavigation';
 import { QuestionBank } from '../components/question-bank/QuestionBank';
 import { AssessmentSection } from '../components/assessments/AssessmentSection';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { Course, Question, Assessment, QuestionVariantEntry, AssessmentGenerationParams } from '../types/question';
+import { Course, Question, Assessment, QuestionVariantEntry, AssessmentGenerationParams, MCQChoice } from '../types/question';
 import { Topic } from '../types/topic';
 import { useCourses } from '../hooks/useCourses';
 import { questionService } from '../services/questionService';
 import { courseService } from '../services/courseService';
 import assessmentService from '../services/assessmentService';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
-import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
+import { QuestionUploadDialog, mapExtractedToDraftQuestions } from '../components/question-bank/QuestionUploadDialog';
+import { ToastAction } from '../components/ui/toast';
 import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
 import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
@@ -45,6 +46,8 @@ export const LandingPage = () => {
   const [assessmentsError, setAssessmentsError] = useState<string | null>(null);
   const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  /** Draft questions from background OCR extraction; when set, opening upload modal shows review step. */
+  const [pendingExtractionDrafts, setPendingExtractionDrafts] = useState<ReturnType<typeof mapExtractedToDraftQuestions> | null>(null);
   const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
   const [topicsByCourse, setTopicsByCourse] = useState<Record<number, Topic[]>>({});
   const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
@@ -218,22 +221,70 @@ export const LandingPage = () => {
     setSelectedVariant(entry);
   };
 
-  const handleUpdateVariant = (variantId: number, updates: { isAiGenerated?: boolean; isDraft?: boolean }) => {
+  const handleUpdateVariant = (
+    variantId: number,
+    updates: {
+      isAiGenerated?: boolean;
+      isDraft?: boolean;
+      difficulty?: import('../types/question').QuestionDifficulty;
+      choices?: MCQChoice[] | null;
+      answer?: string | null;
+    }
+  ) => {
     setQuestions((prev) =>
       prev.map((question) => {
-        const variantIndex = question.variants?.findIndex(v => v.id === variantId);
+        const variantIndex = question.variants?.findIndex((v) => v.id === variantId);
         if (variantIndex !== undefined && variantIndex >= 0 && question.variants) {
           const updatedVariants = [...question.variants];
           updatedVariants[variantIndex] = {
             ...updatedVariants[variantIndex],
             ...(updates.isAiGenerated !== undefined && { isAiGenerated: updates.isAiGenerated }),
-            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft })
+            ...(updates.isDraft !== undefined && { isDraft: updates.isDraft }),
+            ...(updates.difficulty !== undefined && { difficulty: updates.difficulty }),
+            ...(updates.choices !== undefined && { choices: updates.choices }),
+            ...(updates.answer !== undefined && { answer: updates.answer })
           };
           return { ...question, variants: updatedVariants };
         }
         return question;
       })
     );
+  };
+
+  const handleUpdateQuestionMetadata = (
+    questionId: number,
+    updates: {
+      description?: string | null;
+      primaryTopicId?: number;
+      type?: import('../types/question').QuestionType;
+      primaryTopicName?: string;
+    }
+  ) => {
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === questionId
+          ? {
+              ...q,
+              ...(updates.description !== undefined && { description: updates.description }),
+              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+              ...(updates.type !== undefined && { type: updates.type })
+            }
+          : q
+      )
+    );
+    if (selectedVariant?.questionId === questionId) {
+      setSelectedVariant((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
+              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+              ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
+              ...(updates.type !== undefined && { questionType: updates.type })
+            }
+          : prev
+      );
+    }
   };
 
 
@@ -272,6 +323,66 @@ export const LandingPage = () => {
     setPresetVariant(null);
     setIsUploadOpen(false);
   };
+
+  const handleExtractInBackground = useCallback(
+    (params: { text: string; courseId: number; model: string; apiKeys: Record<string, unknown> }) => {
+      setIsUploadOpen(false);
+
+      const processingToast = toast({
+        title: 'Extraction in progress',
+        description: 'Your upload is being processed. Feel free to navigate the site—we’ll notify you when it’s ready.',
+      });
+      const dismissProcessing = () => {
+        try {
+          processingToast.dismiss();
+        } catch (_) {}
+      };
+      const processingTimer = window.setTimeout(dismissProcessing, 8000);
+
+      questionService
+        .extractQuestionsFromText({
+          text: params.text,
+          courseId: params.courseId,
+          model: params.model,
+          apiKeys: params.apiKeys,
+        })
+        .then((response) => {
+          window.clearTimeout(processingTimer);
+          dismissProcessing();
+          const drafts = mapExtractedToDraftQuestions(response || []);
+          if (drafts.length === 0) {
+            toast({
+              variant: 'destructive',
+              title: 'No questions extracted',
+              description: 'The content could not be parsed into questions. Try adjusting the file or try again.',
+            });
+            return;
+          }
+          setPendingExtractionDrafts(drafts);
+          toast({
+            title: 'Your extraction is ready',
+            description: `${drafts.length} question${drafts.length === 1 ? '' : 's'} extracted. Open the upload dialog to review and save.`,
+            action: (
+              <ToastAction altText="Open and review" onClick={() => setIsUploadOpen(true)}>
+                Review questions
+              </ToastAction>
+            ),
+            duration: Number.POSITIVE_INFINITY,
+          });
+        })
+        .catch((err: any) => {
+          window.clearTimeout(processingTimer);
+          dismissProcessing();
+          const message = err?.response?.data?.error || err?.message || 'Extraction failed.';
+          toast({
+            variant: 'destructive',
+            title: 'Extraction failed',
+            description: message,
+          });
+        });
+    },
+    [toast]
+  );
 
   const handleCloseDetail = () => {
     setSelectedVariant(null);
@@ -634,17 +745,23 @@ export const LandingPage = () => {
           onDeleteVariant={handleDeleteVariant}
           onSelectVariant={handleViewVariant}
           onUpdateVariant={handleUpdateVariant}
+          onUpdateQuestionMetadata={handleUpdateQuestionMetadata}
         />
       )}
 
       <QuestionUploadDialog
         open={isUploadOpen}
-        onClose={() => setIsUploadOpen(false)}
+        onClose={() => {
+          setIsUploadOpen(false);
+          setPendingExtractionDrafts(null);
+        }}
         courseId={selectedCourse?.id ?? null}
         courseName={selectedCourse?.name}
         topics={selectedCourse ? (topicsByCourse[selectedCourse.id] ?? []) : []}
         onEnsureTopics={loadTopicsForCourse}
         onQuestionsSaved={handleQuestionsUploaded}
+        onExtractInBackground={handleExtractInBackground}
+        initialDraftQuestions={pendingExtractionDrafts}
       />
 
       <AddQuestionDialog
