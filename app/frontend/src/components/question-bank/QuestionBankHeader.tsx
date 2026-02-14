@@ -27,10 +27,10 @@ export const QuestionBankHeader = ({
       {/* Main Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Question Bank</h2>
-          <p className="text-sm text-gray-600">
+          <h2 className="text-2xl font-bold text-gray-900">
             {courseName ? `Active Course: ${courseName}` : 'Select a course to view questions'}
-          </p>
+          </h2>
+          <p className="text-sm text-gray-600">Question Bank</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
