@@ -3,6 +3,7 @@
  * Shows counts and disables actions when appropriate.
  */
 import { Button } from '../ui/button';
+import { Tooltip } from '../ui/tooltip';
 import { Plus, Upload } from 'lucide-react';
 
 interface QuestionBankHeaderProps {
@@ -33,25 +34,29 @@ export const QuestionBankHeader = ({
           <p className="text-sm text-gray-600">Question Bank</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={onUploadQuestions}
-            className="flex items-center space-x-2"
-            disabled={disableUpload}
-            data-tour-id="upload-questions-btn"
-          >
-            <Upload className="h-4 w-4" />
-            <span>Upload Questions</span>
-          </Button>
-          <Button
-            onClick={onAddQuestion}
-            className="flex items-center space-x-2"
-            disabled={disableAdd}
-            data-tour-id="add-question-btn"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Add Question</span>
-          </Button>
+          <Tooltip content="Upload PDF, image, or TXT to extract questions with OCR and AI" side="bottom">
+            <Button
+              variant="outline"
+              onClick={onUploadQuestions}
+              className="flex items-center space-x-2"
+              disabled={disableUpload}
+              data-tour-id="upload-questions-btn"
+            >
+              <Upload className="h-4 w-4" />
+              <span>Upload Questions</span>
+            </Button>
+          </Tooltip>
+          <Tooltip content="Create a new question manually or with AI assistance" side="bottom">
+            <Button
+              onClick={onAddQuestion}
+              className="flex items-center space-x-2"
+              disabled={disableAdd}
+              data-tour-id="add-question-btn"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Question</span>
+            </Button>
+          </Tooltip>
         </div>
       </div>
 

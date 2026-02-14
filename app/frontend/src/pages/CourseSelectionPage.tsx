@@ -11,6 +11,7 @@ import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog
 import { courseService } from '../services/courseService';
 import { GraduationCap, Plus } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
+import { Tooltip } from '../components/ui/tooltip';
 
 const TEST_COURSE_CODE = 'TEST';
 const TEST_COURSE_NAME = 'Test Course';
@@ -76,26 +77,28 @@ export const CourseSelectionPage = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
           {/* Add new course card */}
-          <Card
-            className="border-2 border-dashed border-muted-foreground/30 bg-muted/30 hover:border-primary hover:bg-muted/50 cursor-pointer transition-colors flex min-h-[140px]"
-            onClick={() => setProfileOpen(true)}
-          >
-            <CardContent className="flex flex-col items-center justify-center flex-1 p-6">
+          <Tooltip content="Add or link a course from EduAI to get started" side="top">
+            <Card
+              className="border-2 border-dashed border-muted-foreground/30 bg-muted/30 hover:border-primary hover:bg-muted/50 cursor-pointer transition-colors flex min-h-[140px]"
+              onClick={() => setProfileOpen(true)}
+            >
+              <CardContent className="flex flex-col items-center justify-center flex-1 p-6">
               <div className="rounded-full bg-muted p-3 mb-2">
                 <Plus className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm font-medium text-muted-foreground">Add new course</p>
             </CardContent>
-          </Card>
+            </Card>
+          </Tooltip>
 
           {/* Available course cards */}
           {courses.map((course) => (
-            <Card
-              key={course.id}
-              className="cursor-pointer transition-shadow hover:shadow-md border bg-card text-card-foreground flex min-h-[140px]"
-              onClick={() => handleSelectCourse(course)}
-            >
-              <CardContent className="flex flex-col flex-1 p-6 justify-center">
+            <Tooltip key={course.id} content={`Open question bank and assessments for ${course.name}`} side="top">
+              <Card
+                className="cursor-pointer transition-shadow hover:shadow-md border bg-card text-card-foreground flex min-h-[140px]"
+                onClick={() => handleSelectCourse(course)}
+              >
+                <CardContent className="flex flex-col flex-1 p-6 justify-center">
                 <div className="flex items-center gap-2 min-w-0">
                   <GraduationCap className="h-5 w-5 text-primary shrink-0" />
                   <span className="font-semibold truncate">{course.name}</span>
@@ -105,7 +108,8 @@ export const CourseSelectionPage = () => {
                 )}
                 <p className="text-xs text-muted-foreground/80 mt-2">Click to open</p>
               </CardContent>
-            </Card>
+              </Card>
+            </Tooltip>
           ))}
         </div>
 

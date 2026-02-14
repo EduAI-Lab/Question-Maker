@@ -11,6 +11,7 @@ import { User, HelpCircle, ArrowLeft } from 'lucide-react';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 import { useGuidedTour } from '../../contexts/GuidedTourContext';
+import { Tooltip } from '../ui/tooltip';
 
 type TopNavigationProps = (
   | {
@@ -65,18 +66,22 @@ export const TopNavigation = (props: TopNavigationProps) => {
         {/* Left: Back button (when on landing) + Logo */}
         <div className="flex items-center space-x-4">
           {showBackButton && onBackClick && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBackClick}
-              className="text-gray-600"
-              aria-label="Back to course selection"
-            >
-              <ArrowLeft className="h-5 w-5 mr-1" />
-              Back
-            </Button>
+            <Tooltip content="Return to course selection" side="bottom">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onBackClick}
+                className="text-gray-600"
+                aria-label="Back to course selection"
+              >
+                <ArrowLeft className="h-5 w-5 mr-1" />
+                Back
+              </Button>
+            </Tooltip>
           )}
-          <div className="text-2xl font-bold text-blue-600">QM</div>
+          <Tooltip content="Question Maker" side="bottom">
+            <div className="text-2xl font-bold text-blue-600 cursor-default">QM</div>
+          </Tooltip>
         </div>
 
         {/* Center: Course Selector and Tabs (only when variant is full) */}
@@ -131,34 +136,40 @@ export const TopNavigation = (props: TopNavigationProps) => {
                             className="z-50"
                         />
                     </div>
-                    <Button
+                    <Tooltip content="Walk through the app with a guided tour" side="bottom">
+                      <Button
                         variant="ghost"
                         size="sm"
                         onClick={handleGuidedTourClick}
-                    >
+                      >
                         Guided tour
-                    </Button>
-                    <Button
+                      </Button>
+                    </Tooltip>
+                    <Tooltip content="Open help and documentation" side="bottom">
+                      <Button
                         variant="ghost"
                         size="icon"
                         className="rounded-full"
                         onClick={() => window.open('/help', '_blank', 'noopener')}
                         aria-label="Open help"
                         data-tour-id="help-button"
-                    >
+                      >
                         <HelpCircle className="h-5 w-5" />
-                    </Button>
+                      </Button>
+                    </Tooltip>
                     <div className="relative">
+                      <Tooltip content="Profile and course settings" side="bottom">
                         <Button
-                            variant="ghost"
-                            size="icon"
-                            className="rounded-full"
-                            onClick={onProfileClick}
-                            data-tour-id="profile-courses-button"
-                            aria-label="Open profile"
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-full"
+                          onClick={onProfileClick}
+                          data-tour-id="profile-courses-button"
+                          aria-label="Open profile"
                         >
-                            <User className="h-6 w-6" />
+                          <User className="h-6 w-6" />
                         </Button>
+                      </Tooltip>
                         {courses.length === 0 && !isLoadingCourses && (
                             <span className="absolute top-0 right-0 flex h-3 w-3">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
