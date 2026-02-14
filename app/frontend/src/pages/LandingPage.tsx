@@ -103,6 +103,21 @@ export const LandingPage = () => {
     }
   }, [selectedCourse]);
 
+  // When navigating from course selection page, select the course from state (once)
+  useEffect(() => {
+    const state = location.state as { courseId?: number } | null;
+    const courseId = state?.courseId;
+    if (courseId == null || courses.length === 0) return;
+    const match = courses.find((c) => c.id === courseId);
+    if (match) {
+      setSelectedCourse(match);
+      setPreferredCourseId(courseId);
+      navigate(location.pathname + location.search, { replace: true, state: {} });
+    }
+    // Intentionally not including navigate/location in deps to run only when state.courseId or courses change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, courses]);
+
   // Update tab based on URL query (e.g., /landing?tab=assessments)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -130,6 +145,17 @@ export const LandingPage = () => {
       return;
     }
 
+    // Highest priority: course we clicked into from course selection page
+    const stateCourseId = (location.state as { courseId?: number } | null)?.courseId;
+    if (stateCourseId != null) {
+      const match = courses.find((c) => c.id === stateCourseId);
+      if (match) {
+        setSelectedCourse(match);
+        setPreferredCourseId(stateCourseId);
+        return;
+      }
+    }
+
     // If current selection is valid, keep it
     if (selectedCourse && courses.some((course) => course.id === selectedCourse.id)) {
       return;
@@ -146,7 +172,7 @@ export const LandingPage = () => {
 
     // Fallback to first course
     setSelectedCourse(courses[0]);
-  }, [courses, preferredCourseId, selectedCourse]);
+  }, [courses, preferredCourseId, selectedCourse, location.state]);
 
   useEffect(() => {
     if (selectedCourse) {
@@ -684,6 +710,8 @@ export const LandingPage = () => {
         courses={courses}
         isLoadingCourses={isCoursesLoading}
         onProfileClick={() => setIsProfileDialogOpen(true)}
+        showBackButton
+        onBackClick={() => navigate('/courses')}
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
