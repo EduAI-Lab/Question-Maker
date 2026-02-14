@@ -2,19 +2,30 @@
  * Course selection page shown after login. User must select a course card to continue to Question Bank / Assessments.
  * Same header as landing; content shows "Your Courses", "Add new course" card, and available course cards.
  */
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { useCourses } from '../hooks/useCourses';
 import { Course } from '../types/question';
-import { useState } from 'react';
 import { ProfileCoursesDialog } from '../components/profile/ProfileCoursesDialog';
+import { courseService } from '../services/courseService';
 import { GraduationCap, Plus } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
+
+const TEST_COURSE_CODE = 'TEST';
+const TEST_COURSE_NAME = 'Test Course';
+
+function isTestCourse(course: Course): boolean {
+  const code = (course.code ?? '').toUpperCase();
+  const name = (course.name ?? '').toLowerCase();
+  return code === TEST_COURSE_CODE || name.includes('test course');
+}
 
 export const CourseSelectionPage = () => {
   const navigate = useNavigate();
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [isStartingTour, setIsStartingTour] = useState(false);
 
   const handleSelectCourse = (course: Course) => {
     navigate('/landing', { state: { courseId: course.id }, replace: true });
@@ -24,6 +35,32 @@ export const CourseSelectionPage = () => {
     setProfileOpen(true);
   };
 
+  const handleGuidedTourClick = useCallback(async () => {
+    if (isStartingTour) return;
+    setIsStartingTour(true);
+    try {
+      let testCourse: Course | undefined = courses.find(isTestCourse);
+      if (!testCourse) {
+        const created = await courseService.createCourse({
+          name: TEST_COURSE_NAME,
+          courseCode: TEST_COURSE_CODE
+        });
+        try {
+          await courseService.createTopic(created.id, 'General');
+        } catch {
+          // ignore topic creation failure
+        }
+        await fetchCourses();
+        testCourse = created;
+      }
+      navigate('/landing', { state: { courseId: testCourse.id, startGuidedTour: true }, replace: true });
+    } catch (err) {
+      console.error('Failed to start guided tour', err);
+    } finally {
+      setIsStartingTour(false);
+    }
+  }, [courses, fetchCourses, navigate, isStartingTour]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <TopNavigation
@@ -31,6 +68,7 @@ export const CourseSelectionPage = () => {
         courses={courses}
         isLoadingCourses={isCoursesLoading}
         onProfileClick={handleProfileClick}
+        onGuidedTourClick={handleGuidedTourClick}
       />
 
       <div className="max-w-4xl mx-auto px-6 py-8">

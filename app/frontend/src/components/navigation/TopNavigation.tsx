@@ -30,6 +30,8 @@ type TopNavigationProps = (
       courses: Course[];
       isLoadingCourses?: boolean;
       onProfileClick?: () => void;
+      /** When set, Guided tour button calls this instead of startTour (e.g. navigate to landing with test course and start tour there). */
+      onGuidedTourClick?: () => void;
     }
 );
 
@@ -42,8 +44,20 @@ export const TopNavigation = (props: TopNavigationProps) => {
   const isFull = props.variant !== 'course-selection';
   const showBackButton = isFull && 'showBackButton' in props && props.showBackButton;
   const onBackClick = isFull && 'onBackClick' in props ? props.onBackClick : undefined;
+  const customGuidedTourHandler =
+    props.variant === 'course-selection' && 'onGuidedTourClick' in props
+      ? (props.onGuidedTourClick as () => void | undefined)
+      : undefined;
   const eduaiStatus = useEduAIStatus();
   const { startTour } = useGuidedTour();
+
+  const handleGuidedTourClick = () => {
+    if (typeof customGuidedTourHandler === 'function') {
+      customGuidedTourHandler();
+    } else {
+      startTour('main');
+    }
+  };
 
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4">
@@ -120,7 +134,7 @@ export const TopNavigation = (props: TopNavigationProps) => {
                     <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => startTour('main')}
+                        onClick={handleGuidedTourClick}
                     >
                         Guided tour
                     </Button>

@@ -103,16 +103,17 @@ export const LandingPage = () => {
     }
   }, [selectedCourse]);
 
-  // When navigating from course selection page, select the course from state (once)
+  // When navigating from course selection page, select the course from state (once); preserve startGuidedTour so the tour can start
   useEffect(() => {
-    const state = location.state as { courseId?: number } | null;
+    const state = location.state as { courseId?: number; startGuidedTour?: boolean } | null;
     const courseId = state?.courseId;
     if (courseId == null || courses.length === 0) return;
     const match = courses.find((c) => c.id === courseId);
     if (match) {
       setSelectedCourse(match);
       setPreferredCourseId(courseId);
-      navigate(location.pathname + location.search, { replace: true, state: {} });
+      const nextState = state?.startGuidedTour ? { startGuidedTour: true } : {};
+      navigate(location.pathname + location.search, { replace: true, state: nextState });
     }
     // Intentionally not including navigate/location in deps to run only when state.courseId or courses change
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,15 +128,18 @@ export const LandingPage = () => {
     }
   }, [location.search]);
 
-  // Keep URL query in sync with selected tab to make refreshes stable
+  // Keep URL query in sync with selected tab to make refreshes stable (preserve location.state e.g. startGuidedTour)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const currentTab = params.get('tab');
     if (currentTab === activeTab) return;
 
     params.set('tab', activeTab);
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  }, [activeTab, location.pathname, location.search, navigate]);
+    navigate(
+      { pathname: location.pathname, search: params.toString() },
+      { replace: true, state: location.state }
+    );
+  }, [activeTab, location.pathname, location.search, location.state, navigate]);
 
   // Choose course based on preference when courses list updates
   useEffect(() => {
@@ -179,6 +183,19 @@ export const LandingPage = () => {
       void loadTopicsForCourse(selectedCourse.id);
     }
   }, [selectedCourse, loadTopicsForCourse]);
+
+  // When arriving from course selection with "start guided tour", run the tour after course is selected
+  useEffect(() => {
+    const state = location.state as { startGuidedTour?: boolean } | null;
+    if (!state?.startGuidedTour || !selectedCourse) return;
+    const path = location.pathname + location.search;
+    const timer = setTimeout(() => {
+      startTour('main');
+      navigate(path, { replace: true, state: {} });
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, selectedCourse]);
 
   const fetchAssessments = useCallback(async () => {
     try {
