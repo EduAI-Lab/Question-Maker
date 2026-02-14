@@ -62,7 +62,7 @@ export const CourseSelectionPage = () => {
   }, [courses, fetchCourses, navigate, isStartingTour]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <TopNavigation
         variant="course-selection"
         courses={courses}
@@ -72,19 +72,19 @@ export const CourseSelectionPage = () => {
       />
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Your Courses</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-6">Your Courses</h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
           {/* Add new course card */}
           <Card
-            className="border-2 border-dashed border-gray-300 bg-gray-50/50 hover:border-primary hover:bg-gray-100/50 cursor-pointer transition-colors"
+            className="border-2 border-dashed border-muted-foreground/30 bg-muted/30 hover:border-primary hover:bg-muted/50 cursor-pointer transition-colors flex min-h-[140px]"
             onClick={() => setProfileOpen(true)}
           >
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <div className="rounded-full bg-gray-200 p-4 mb-3">
-                <Plus className="h-8 w-8 text-gray-600" />
+            <CardContent className="flex flex-col items-center justify-center flex-1 p-6">
+              <div className="rounded-full bg-muted p-3 mb-2">
+                <Plus className="h-6 w-6 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium text-gray-700">Add new course</p>
+              <p className="text-sm font-medium text-muted-foreground">Add new course</p>
             </CardContent>
           </Card>
 
@@ -92,29 +92,25 @@ export const CourseSelectionPage = () => {
           {courses.map((course) => (
             <Card
               key={course.id}
-              className="cursor-pointer transition-shadow hover:shadow-md border border-gray-200 bg-white"
+              className="cursor-pointer transition-shadow hover:shadow-md border bg-card text-card-foreground flex min-h-[140px]"
               onClick={() => handleSelectCourse(course)}
             >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <GraduationCap className="h-5 w-5 text-blue-600 shrink-0" />
-                    <span className="font-semibold text-gray-900 truncate">
-                      {course.name}
-                    </span>
-                  </div>
+              <CardContent className="flex flex-col flex-1 p-6 justify-center">
+                <div className="flex items-center gap-2 min-w-0">
+                  <GraduationCap className="h-5 w-5 text-primary shrink-0" />
+                  <span className="font-semibold truncate">{course.name}</span>
                 </div>
                 {course.code && (
-                  <p className="text-sm text-gray-500 mt-1">{course.code}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{course.code}</p>
                 )}
-                <p className="text-xs text-gray-400 mt-2">Click to open</p>
+                <p className="text-xs text-muted-foreground/80 mt-2">Click to open</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
         {!isCoursesLoading && courses.length === 0 && (
-          <p className="text-sm text-gray-500 mt-4">
+          <p className="text-sm text-muted-foreground mt-4">
             No courses yet. Add a course from your profile to get started.
           </p>
         )}
