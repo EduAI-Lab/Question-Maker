@@ -2,7 +2,7 @@
  * Dialog for creating questions (manual or AI-assisted) and managing initial variants.
  * Handles course/topic selection, validation, assessment linkage, and optional AI generation hooks.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -39,7 +39,8 @@ import { apiKeyStorage } from '../../services/apiKeyStorage';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Tooltip } from '../ui/tooltip';
+import { ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 
 interface AddQuestionDialogProps {
     open: boolean;
@@ -48,6 +49,8 @@ interface AddQuestionDialogProps {
     variants: QuestionVariantEntry[];
     onQuestionCreated: (question: Question) => void;
     presetVariant?: QuestionVariantEntry | null;
+    /** When 0, show a flashing hint on the guided-tour button to draw new users. */
+    totalQuestionsInBank?: number;
 }
 
 type FormState = {
@@ -110,7 +113,8 @@ export const AddQuestionDialog = ({
     courseId,
     variants,
     onQuestionCreated,
-    presetVariant
+    presetVariant,
+    totalQuestionsInBank
 }: AddQuestionDialogProps) => {
     const [form, setForm] = useState<FormState>(defaultForm);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -128,7 +132,57 @@ export const AddQuestionDialog = ({
     const [errorModalOpen, setErrorModalOpen] = useState(false);
     const [errorModalMessage, setErrorModalMessage] = useState<string>('');
     const [advancedOpen, setAdvancedOpen] = useState(false);
+    const [modalTourOpen, setModalTourOpen] = useState(false);
+    const [modalTourStepIndex, setModalTourStepIndex] = useState(0);
     const { toast } = useToast();
+    const showNewUserHint = totalQuestionsInBank === 0;
+
+    const modalTourSteps = useMemo<{ id: string; content: string }[]>(() => [
+        { id: 'aq-form-fields', content: 'To create a question manually, fill out the form on the left.' },
+        { id: 'aq-draft-toggle', content: 'Mark as reviewed.' },
+        { id: 'aq-save', content: 'Save.' },
+        { id: 'aq-eduai-panel', content: 'To create a question with AI, use the panel on the right.' },
+        { id: 'aq-ai-prompt', content: 'Write out your prompt for how you would like your variant.' },
+        { id: 'aq-model-picker', content: 'Select model, difficulty focus and reasoning level.' },
+        { id: 'aq-ai-generate', content: 'Click Generate, then wait 30–60 seconds for your question to be generated.' },
+        { id: 'aq-form-fields', content: 'Review the generated question.' },
+        { id: 'aq-save', content: 'Save.' }
+    ], []);
+
+    const [tourHighlightRect, setTourHighlightRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+    const currentStepId = modalTourSteps[modalTourStepIndex]?.id;
+
+    useLayoutEffect(() => {
+        if (!modalTourOpen || currentStepId == null) {
+            setTourHighlightRect(null);
+            return;
+        }
+        const target = document.querySelector(`[data-tour-id="${currentStepId}"]`) as HTMLElement | null;
+        if (!target) {
+            setTourHighlightRect(null);
+            return;
+        }
+        const updateRect = () => {
+            const rect = target.getBoundingClientRect();
+            setTourHighlightRect({
+                top: rect.top - 4,
+                left: rect.left - 4,
+                width: rect.width + 8,
+                height: rect.height + 8
+            });
+        };
+        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        updateRect();
+        const observer = new ResizeObserver(updateRect);
+        observer.observe(target);
+        window.addEventListener('resize', updateRect);
+        window.addEventListener('scroll', updateRect, true);
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', updateRect);
+            window.removeEventListener('scroll', updateRect, true);
+        };
+    }, [modalTourOpen, currentStepId]);
     const eduaiStatus = useEduAIStatus();
     const selectedGenerationModel = useMemo(
         () => availableModels.find((model) => model.id === form.generationModel),
@@ -152,6 +206,8 @@ export const AddQuestionDialog = ({
             setIsGenerating(false);
             setIsAiGenerated(false);
             setMarkAsReviewed(false);
+            setModalTourOpen(false);
+            setModalTourStepIndex(0);
             return;
         }
 
@@ -811,12 +867,119 @@ export const AddQuestionDialog = ({
         <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
             <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-6xl">
                 <DialogHeader>
-                    <DialogTitle>
-                        {mode === 'new'
-                            ? 'Create New Question'
-                            : `Add Variant: ${presetVariant?.questionDescription ?? 'Question'}`}
-                    </DialogTitle>
+                    <div className="flex items-center justify-between gap-4">
+                        <DialogTitle>
+                            {mode === 'new'
+                                ? 'Create New Question'
+                                : `Add Variant: ${presetVariant?.questionDescription ?? 'Question'}`}
+                        </DialogTitle>
+                        <Tooltip content="Walk through manual and AI workflows" side="left">
+                            <div className="relative flex-shrink-0">
+                                {showNewUserHint && (
+                                    <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
+                                    </span>
+                                )}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9"
+                                    onClick={() => {
+                                        setModalTourStepIndex(0);
+                                        setModalTourOpen(true);
+                                    }}
+                                    aria-label="Open workflow guide"
+                                >
+                                    <HelpCircle className="h-5 w-5" />
+                                </Button>
+                            </div>
+                        </Tooltip>
+                    </div>
                 </DialogHeader>
+
+                {modalTourOpen && (
+                    <>
+                        <div
+                            className="fixed inset-0 z-[100] bg-black/50"
+                            onClick={() => setModalTourOpen(false)}
+                            aria-hidden="true"
+                        />
+                        {tourHighlightRect && (
+                            <div
+                                className="fixed z-[101] rounded-lg border-2 border-blue-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none transition-all duration-200"
+                                style={{
+                                    top: tourHighlightRect.top,
+                                    left: tourHighlightRect.left,
+                                    width: tourHighlightRect.width,
+                                    height: tourHighlightRect.height
+                                }}
+                            />
+                        )}
+                        <div
+                            className="fixed z-[102] w-[320px] max-w-[calc(100vw-2rem)] pointer-events-auto"
+                            style={(() => {
+                                const pad = 12;
+                                const tw = 320;
+                                const th = 160;
+                                if (!tourHighlightRect) {
+                                    return {
+                                        top: window.innerHeight / 2 - th / 2,
+                                        left: Math.max(pad, Math.min(window.innerWidth - tw - pad, window.innerWidth / 2 - tw / 2))
+                                    };
+                                }
+                                const belowTop = tourHighlightRect.top + tourHighlightRect.height + pad;
+                                const aboveBottom = tourHighlightRect.top - pad - th;
+                                const top = belowTop + th <= window.innerHeight - pad ? belowTop : aboveBottom >= pad ? aboveBottom : pad;
+                                const left = Math.max(pad, Math.min(window.innerWidth - tw - pad, tourHighlightRect.left + tourHighlightRect.width / 2 - tw / 2));
+                                return { top, left };
+                            })()}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="rounded-lg border bg-background p-4 shadow-xl">
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                    <p className="text-sm text-foreground leading-relaxed flex-1">
+                                        {modalTourSteps[modalTourStepIndex]?.content}
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-muted-foreground hover:text-foreground shrink-0 -mt-1 -mr-1"
+                                        onClick={() => setModalTourOpen(false)}
+                                    >
+                                        Skip
+                                    </Button>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setModalTourStepIndex((i) => Math.max(0, i - 1))}
+                                        disabled={modalTourStepIndex === 0}
+                                    >
+                                        Back
+                                    </Button>
+                                    {modalTourStepIndex === modalTourSteps.length - 1 ? (
+                                        <Button type="button" size="sm" onClick={() => setModalTourOpen(false)}>
+                                            Done
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={() => setModalTourStepIndex((i) => i + 1)}
+                                        >
+                                            Next
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 <div className="flex gap-6 h-[65vh]">
                     {/* LEFT PANEL: Question Details Form (75% width) */}
@@ -859,30 +1022,31 @@ export const AddQuestionDialog = ({
                                                 </TabsList>
                                             </Tabs>
 
-                                            <div className="space-y-2">
-                                                <Label htmlFor="variant-text">Question Text</Label>
-                                                <Textarea
-                                                    id="variant-text"
-                                                    value={form.variantText}
-                                                    onChange={(event) => handleFieldChange('variantText', event.target.value)}
-                                                    placeholder={form.questionType === 'MCQ' ? "Enter the question text (without choices)" : "Enter the full question text"}
-                                                    rows={6}
-                                                />
-                                            </div>
+                                            <div className="space-y-4" data-tour-id="aq-form-fields">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="variant-text">Question Text</Label>
+                                                    <Textarea
+                                                        id="variant-text"
+                                                        value={form.variantText}
+                                                        onChange={(event) => handleFieldChange('variantText', event.target.value)}
+                                                        placeholder={form.questionType === 'MCQ' ? "Enter the question text (without choices)" : "Enter the full question text"}
+                                                        rows={6}
+                                                    />
+                                                </div>
 
-                                            {form.questionType === 'MCQ' && (
-                                                <MCQChoicesField
-                                                    choices={form.variantChoices ?? defaultForm.variantChoices}
-                                                    answer={form.variantAnswer}
-                                                    onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
-                                                    onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
-                                                    idPrefix="aq-mcq"
-                                                />
-                                            )}
+                                                {form.questionType === 'MCQ' && (
+                                                    <MCQChoicesField
+                                                        choices={form.variantChoices ?? defaultForm.variantChoices}
+                                                        answer={form.variantAnswer}
+                                                        onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
+                                                        onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
+                                                        idPrefix="aq-mcq"
+                                                    />
+                                                )}
 
-                                            <div className="space-y-2">
-                                                <Label htmlFor="primary-topic">Primary Topic</Label>
-                                                <Select
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="primary-topic">Primary Topic</Label>
+                                                    <Select
                                                     value={form.primaryTopicId}
                                                     onValueChange={(value) => handleFieldChange('primaryTopicId', value)}
                                                     disabled={topics.length === 0}
@@ -904,6 +1068,7 @@ export const AddQuestionDialog = ({
                                                         )}
                                                     </SelectContent>
                                                 </Select>
+                                                </div>
                                             </div>
 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1056,33 +1221,35 @@ export const AddQuestionDialog = ({
                                 {mode === 'variant' && (
                                     <>
                                         <div className="space-y-4" data-tour-id="aq-metadata">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="variant-text">Question Text</Label>
-                                                <Textarea
-                                                    id="variant-text"
-                                                    value={form.variantText}
-                                                    onChange={(event) => handleFieldChange('variantText', event.target.value)}
-                                                    placeholder={form.questionType === 'MCQ' ? "Enter the question text" : "Enter the full question text"}
-                                                    rows={6}
-                                                />
+                                            <div className="space-y-4" data-tour-id="aq-form-fields">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="variant-text">Question Text</Label>
+                                                    <Textarea
+                                                        id="variant-text"
+                                                        value={form.variantText}
+                                                        onChange={(event) => handleFieldChange('variantText', event.target.value)}
+                                                        placeholder={form.questionType === 'MCQ' ? "Enter the question text" : "Enter the full question text"}
+                                                        rows={6}
+                                                    />
+                                                </div>
+
+                                                {form.questionType === 'MCQ' && (
+                                                    <MCQChoicesField
+                                                        choices={form.variantChoices ?? defaultForm.variantChoices}
+                                                        answer={form.variantAnswer}
+                                                        onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
+                                                        onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
+                                                        idPrefix="aq-mcq"
+                                                    />
+                                                )}
+
+                                                {presetVariant && (
+                                                    <p className="text-sm text-muted-foreground">
+                                                        <span className="font-medium">Primary topic:</span>{' '}
+                                                        {topics.find((t) => t.id === presetVariant.primaryTopicId)?.name ?? `#${presetVariant.primaryTopicId}`}
+                                                    </p>
+                                                )}
                                             </div>
-
-                                            {form.questionType === 'MCQ' && (
-                                                <MCQChoicesField
-                                                    choices={form.variantChoices ?? defaultForm.variantChoices}
-                                                    answer={form.variantAnswer}
-                                                    onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
-                                                    onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
-                                                    idPrefix="aq-mcq"
-                                                />
-                                            )}
-
-                                            {presetVariant && (
-                                                <p className="text-sm text-muted-foreground">
-                                                    <span className="font-medium">Primary topic:</span>{' '}
-                                                    {topics.find((t) => t.id === presetVariant.primaryTopicId)?.name ?? `#${presetVariant.primaryTopicId}`}
-                                                </p>
-                                            )}
 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 <div className="space-y-2">
@@ -1293,7 +1460,7 @@ export const AddQuestionDialog = ({
                                     )}
 
                                     <div className="space-y-3">
-                                        <div className="space-y-1.5">
+                                        <div className="space-y-1.5" data-tour-id="aq-ai-prompt">
                                             <Label htmlFor="ai-prompt" className="text-xs font-medium">Prompt</Label>
                                             <Textarea
                                                 id="ai-prompt"
@@ -1468,6 +1635,7 @@ export const AddQuestionDialog = ({
                                             disabled={isGenerating}
                                             className="w-full"
                                             size="sm"
+                                            data-tour-id="aq-ai-generate"
                                         >
                                             {isGenerating ? 'Generating...' : 'Generate'}
                                         </Button>

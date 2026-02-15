@@ -820,6 +820,7 @@ export const LandingPage = () => {
         variants={variantEntries}
         onQuestionCreated={handleQuestionCreated}
         presetVariant={presetVariant}
+        totalQuestionsInBank={variantEntries.length}
       />
 
       <ProfileCoursesDialog
