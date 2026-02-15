@@ -139,14 +139,13 @@ export const AddQuestionDialog = ({
 
     const modalTourSteps = useMemo<{ id: string; content: string }[]>(() => [
         { id: 'aq-form-fields', content: 'To create a question manually, fill out the form on the left.' },
-        { id: 'aq-draft-toggle', content: 'Mark as reviewed.' },
-        { id: 'aq-save', content: 'Save.' },
+        { id: 'aq-save-area', content: 'Mark as reviewed, then save.' },
         { id: 'aq-eduai-panel', content: 'To create a question with AI, use the panel on the right.' },
         { id: 'aq-ai-prompt', content: 'Write out your prompt for how you would like your variant.' },
         { id: 'aq-model-picker', content: 'Select model, difficulty focus and reasoning level.' },
         { id: 'aq-ai-generate', content: 'Click Generate, then wait 30–60 seconds for your question to be generated.' },
         { id: 'aq-form-fields', content: 'Review the generated question.' },
-        { id: 'aq-save', content: 'Save.' }
+        { id: 'aq-save-area', content: 'Mark as reviewed, then save.' }
     ], []);
 
     const [tourHighlightRect, setTourHighlightRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -1646,8 +1645,8 @@ export const AddQuestionDialog = ({
                     </div>
                 </div>
 
-                <DialogFooter className="pt-4 flex-col sm:flex-row gap-3">
-                    <div className="flex items-center space-x-2" data-tour-id="aq-draft-toggle">
+                <DialogFooter className="pt-4 flex-col sm:flex-row gap-3" data-tour-id="aq-save-area">
+                    <div className="flex items-center space-x-2">
                         <input
                             type="checkbox"
                             id="mark-as-reviewed"
@@ -1674,7 +1673,6 @@ export const AddQuestionDialog = ({
                                 isSubmitting ||
                                 (mode === 'variant' && !form.baseSelection)
                             }
-                            data-tour-id="aq-save"
                         >
                             {isSubmitting
                                 ? 'Saving...'
