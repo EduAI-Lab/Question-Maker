@@ -34,7 +34,7 @@ export const QuestionBankHeader = ({
           <p className="text-sm text-gray-600">Question Bank</p>
         </div>
         <div className="flex items-center gap-2">
-          <Tooltip content="Upload PDF, image, or TXT to extract questions with OCR and AI" side="bottom">
+          <Tooltip content="Upload a document of your questions to have it added to your question bank" side="bottom">
             <Button
               variant="outline"
               onClick={onUploadQuestions}

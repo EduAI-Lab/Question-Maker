@@ -61,7 +61,7 @@ export const LandingPage = () => {
   const [variantToDelete, setVariantToDelete] = useState<QuestionVariantEntry | null>(null);
   const [isDeletingVariant, setIsDeletingVariant] = useState(false);
   const { toast } = useToast();
-  const { startTour } = useGuidedTour();
+  const { startTour, registerOnTourEnd } = useGuidedTour();
 
   const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
     if (!courseId) {
@@ -184,13 +184,14 @@ export const LandingPage = () => {
     }
   }, [selectedCourse, loadTopicsForCourse]);
 
-  // When arriving from course selection with "start guided tour", run the tour after course is selected
+  // When arriving from course selection with "start guided tour", run the tour and return to course selection when done
   useEffect(() => {
     const state = location.state as { startGuidedTour?: boolean } | null;
     if (!state?.startGuidedTour || !selectedCourse) return;
     const path = location.pathname + location.search;
     const timer = setTimeout(() => {
       startTour('main');
+      registerOnTourEnd(() => navigate('/courses'));
       navigate(path, { replace: true, state: {} });
     }, 300);
     return () => clearTimeout(timer);

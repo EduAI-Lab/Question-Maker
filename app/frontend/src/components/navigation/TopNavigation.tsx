@@ -136,15 +136,23 @@ export const TopNavigation = (props: TopNavigationProps) => {
                             className="z-50"
                         />
                     </div>
-                    <Tooltip content="Walk through the app with a guided tour" side="bottom">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleGuidedTourClick}
-                      >
-                        Guided tour
-                      </Button>
-                    </Tooltip>
+                    <div className="relative">
+                      <Tooltip content="Walk through the app with a guided tour" side="bottom">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleGuidedTourClick}
+                        >
+                          Guided tour
+                        </Button>
+                      </Tooltip>
+                      {courses.length === 0 && !isLoadingCourses && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                        </span>
+                      )}
+                    </div>
                     <Tooltip content="Open help and documentation" side="bottom">
                       <Button
                         variant="ghost"
@@ -157,26 +165,18 @@ export const TopNavigation = (props: TopNavigationProps) => {
                         <HelpCircle className="h-5 w-5" />
                       </Button>
                     </Tooltip>
-                    <div className="relative">
-                      <Tooltip content="Profile and course settings" side="bottom">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="rounded-full"
-                          onClick={onProfileClick}
-                          data-tour-id="profile-courses-button"
-                          aria-label="Open profile"
-                        >
-                          <User className="h-6 w-6" />
-                        </Button>
-                      </Tooltip>
-                        {courses.length === 0 && !isLoadingCourses && (
-                            <span className="absolute top-0 right-0 flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                            </span>
-                        )}
-                    </div>
+                    <Tooltip content="Profile and course settings" side="bottom">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full"
+                        onClick={onProfileClick}
+                        data-tour-id="profile-courses-button"
+                        aria-label="Open profile"
+                      >
+                        <User className="h-6 w-6" />
+                      </Button>
+                    </Tooltip>
                 </div>
             </div>
         </div>
