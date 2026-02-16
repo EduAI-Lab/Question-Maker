@@ -1469,6 +1469,7 @@ export const AssessmentViewPage = () => {
         variants={questionVariantEntries}
         onQuestionCreated={handleQuestionCreated}
         presetVariant={presetVariant}
+        totalQuestionsInBank={questionVariantEntries.length}
       />
       {assessment && (
         <CanvasExportDialog

@@ -205,24 +205,28 @@ export const AssessmentSection = ({
                 </div>
                 <div className="flex gap-2">
                     {onImportFromCanvas && (
-                        <Button
-                            variant="outline"
-                            onClick={onImportFromCanvas}
-                            className="flex items-center space-x-2"
-                        >
-                            <Download className="h-4 w-4" />
-                            <span>Import from Canvas</span>
-                        </Button>
+                        <Tooltip content="Import an assessment from your Canvas course" side="bottom">
+                            <Button
+                                variant="outline"
+                                onClick={onImportFromCanvas}
+                                className="flex items-center space-x-2"
+                            >
+                                <Download className="h-4 w-4" />
+                                <span>Import from Canvas</span>
+                            </Button>
+                        </Tooltip>
                     )}
-                    <Button
-                        onClick={handleOpenCreateModal}
-                        className="flex items-center space-x-2"
-                        disabled={!selectedCourseId || isSavingBlueprint}
-                        data-tour-id="add-assessment-btn"
-                    >
-                        <Plus className="h-4 w-4" />
-                        <span>{isSavingBlueprint ? 'Saving...' : 'Add Assessment'}</span>
-                    </Button>
+                    <Tooltip content="Create a new assessment blueprint" side="bottom">
+                        <Button
+                            onClick={handleOpenCreateModal}
+                            className="flex items-center space-x-2"
+                            disabled={!selectedCourseId || isSavingBlueprint}
+                            data-tour-id="add-assessment-btn"
+                        >
+                            <Plus className="h-4 w-4" />
+                            <span>{isSavingBlueprint ? 'Saving...' : 'Add Assessment'}</span>
+                        </Button>
+                    </Tooltip>
                 </div>
             </div>
 
@@ -264,19 +268,21 @@ export const AssessmentSection = ({
                                         </div>
 
                                         <div className="flex items-center space-x-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    navigate(`/assessments/${assessment.id}`, {
-                                                        state: { fromTab: 'assessments' }
-                                                    })
-                                                }
-                                                className="flex items-center space-x-1"
-                                            >
-                                                <Eye className="h-4 w-4" />
-                                                <span>View</span>
-                                            </Button>
+                                            <Tooltip content="Open assessment to edit sections and questions" side="bottom">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        navigate(`/assessments/${assessment.id}`, {
+                                                            state: { fromTab: 'assessments' }
+                                                        })
+                                                    }
+                                                    className="flex items-center space-x-1"
+                                                >
+                                                    <Eye className="h-4 w-4" />
+                                                    <span>View</span>
+                                                </Button>
+                                            </Tooltip>
 
 
                                             {onExportToCanvas &&

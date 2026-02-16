@@ -39,12 +39,9 @@ router.post('/', authenticateToken, async (req, res, next) => {
       });
     }
 
-    if (!rawDescription || !rawDescription.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Question description is required'
-      });
-    }
+    const description = typeof rawDescription === 'string' && rawDescription.trim()
+      ? rawDescription.trim()
+      : null;
 
     const courseId = Number(rawCourseId);
     if (!Number.isInteger(courseId)) {
@@ -63,7 +60,7 @@ router.post('/', authenticateToken, async (req, res, next) => {
     }
 
     const question = await createQuestion(req.user.id, {
-      description: rawDescription.trim(),
+      description,
       courseId,
       primaryTopicId,
       type,
@@ -142,13 +139,7 @@ router.put('/:id', authenticateToken, async (req, res, next) => {
 
     if (description !== undefined || content !== undefined) {
       const value = (description ?? content ?? '').trim();
-      if (!value) {
-        return res.status(400).json({
-          success: false,
-          error: 'Question description cannot be empty'
-        });
-      }
-      updates.description = value;
+      updates.description = value || null;
     }
 
     if (courseId !== undefined || classId !== undefined) {
@@ -353,8 +344,9 @@ router.post('/approve', authenticateToken, async (req, res, next) => {
 
     const normalizedQuestions = questions.map((q) => {
       const candidateCourseId = q.courseId ?? q.classId ?? courseId ?? classId;
+      const desc = q.description ?? q.content;
       return {
-        description: q.description ?? q.content,
+        description: typeof desc === 'string' && desc.trim() ? desc.trim() : null,
         courseId: candidateCourseId === '' ? undefined : candidateCourseId,
         primaryTopicId: q.primaryTopicId ?? 1,
         type: q.type,
@@ -363,13 +355,13 @@ router.post('/approve', authenticateToken, async (req, res, next) => {
     });
 
     const invalid = normalizedQuestions.find(
-      (q) => !q.description || q.courseId === undefined || q.courseId === null
+      (q) => q.courseId === undefined || q.courseId === null
     );
 
     if (invalid) {
       return res.status(400).json({
         success: false,
-        error: 'Each question must include description, courseId, and primaryTopicId'
+        error: 'Each question must include courseId and primaryTopicId'
       });
     }
 
