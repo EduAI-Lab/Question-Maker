@@ -61,7 +61,7 @@ export const LandingPage = () => {
   const [variantToDelete, setVariantToDelete] = useState<QuestionVariantEntry | null>(null);
   const [isDeletingVariant, setIsDeletingVariant] = useState(false);
   const { toast } = useToast();
-  const { startTour } = useGuidedTour();
+  const { startTour, registerOnTourEnd } = useGuidedTour();
 
   const loadTopicsForCourse = useCallback(async (courseId: number, options: { force?: boolean } = {}) => {
     if (!courseId) {
@@ -103,6 +103,22 @@ export const LandingPage = () => {
     }
   }, [selectedCourse]);
 
+  // When navigating from course selection page, select the course from state (once); preserve startGuidedTour so the tour can start
+  useEffect(() => {
+    const state = location.state as { courseId?: number; startGuidedTour?: boolean } | null;
+    const courseId = state?.courseId;
+    if (courseId == null || courses.length === 0) return;
+    const match = courses.find((c) => c.id === courseId);
+    if (match) {
+      setSelectedCourse(match);
+      setPreferredCourseId(courseId);
+      const nextState = state?.startGuidedTour ? { startGuidedTour: true } : {};
+      navigate(location.pathname + location.search, { replace: true, state: nextState });
+    }
+    // Intentionally not including navigate/location in deps to run only when state.courseId or courses change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, courses]);
+
   // Update tab based on URL query (e.g., /landing?tab=assessments)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -112,15 +128,18 @@ export const LandingPage = () => {
     }
   }, [location.search]);
 
-  // Keep URL query in sync with selected tab to make refreshes stable
+  // Keep URL query in sync with selected tab to make refreshes stable (preserve location.state e.g. startGuidedTour)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const currentTab = params.get('tab');
     if (currentTab === activeTab) return;
 
     params.set('tab', activeTab);
-    navigate({ pathname: location.pathname, search: params.toString() }, { replace: true });
-  }, [activeTab, location.pathname, location.search, navigate]);
+    navigate(
+      { pathname: location.pathname, search: params.toString() },
+      { replace: true, state: location.state }
+    );
+  }, [activeTab, location.pathname, location.search, location.state, navigate]);
 
   // Choose course based on preference when courses list updates
   useEffect(() => {
@@ -128,6 +147,17 @@ export const LandingPage = () => {
       setSelectedCourse(null);
       setQuestions([]);
       return;
+    }
+
+    // Highest priority: course we clicked into from course selection page
+    const stateCourseId = (location.state as { courseId?: number } | null)?.courseId;
+    if (stateCourseId != null) {
+      const match = courses.find((c) => c.id === stateCourseId);
+      if (match) {
+        setSelectedCourse(match);
+        setPreferredCourseId(stateCourseId);
+        return;
+      }
     }
 
     // If current selection is valid, keep it
@@ -146,13 +176,27 @@ export const LandingPage = () => {
 
     // Fallback to first course
     setSelectedCourse(courses[0]);
-  }, [courses, preferredCourseId, selectedCourse]);
+  }, [courses, preferredCourseId, selectedCourse, location.state]);
 
   useEffect(() => {
     if (selectedCourse) {
       void loadTopicsForCourse(selectedCourse.id);
     }
   }, [selectedCourse, loadTopicsForCourse]);
+
+  // When arriving from course selection with "start guided tour", run the tour and return to course selection when done
+  useEffect(() => {
+    const state = location.state as { startGuidedTour?: boolean } | null;
+    if (!state?.startGuidedTour || !selectedCourse) return;
+    const path = location.pathname + location.search;
+    const timer = setTimeout(() => {
+      startTour('main');
+      registerOnTourEnd(() => navigate('/courses'));
+      navigate(path, { replace: true, state: {} });
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, selectedCourse]);
 
   const fetchAssessments = useCallback(async () => {
     try {
@@ -684,6 +728,8 @@ export const LandingPage = () => {
         courses={courses}
         isLoadingCourses={isCoursesLoading}
         onProfileClick={() => setIsProfileDialogOpen(true)}
+        showBackButton
+        onBackClick={() => navigate('/courses')}
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -774,6 +820,7 @@ export const LandingPage = () => {
         variants={variantEntries}
         onQuestionCreated={handleQuestionCreated}
         presetVariant={presetVariant}
+        totalQuestionsInBank={variantEntries.length}
       />
 
       <ProfileCoursesDialog

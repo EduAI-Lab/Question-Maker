@@ -30,7 +30,7 @@ export const LoginPage = () => {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/landing" replace />;
+    return <Navigate to="/courses" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

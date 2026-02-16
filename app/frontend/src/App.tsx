@@ -7,6 +7,7 @@ import { Toaster } from './components/ui/toaster';
 import { ThemeProvider } from './components/theme-provider';
 import { AuthProvider } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
+import { CourseSelectionPage } from './pages/CourseSelectionPage';
 import { LandingPage } from './pages/LandingPage';
 import { ApiTestPage } from './pages/ApiTestPage';
 import AssessmentViewPage from './pages/AssessmentViewPage';
@@ -22,6 +23,7 @@ function App() {
             <div className="min-h-screen bg-background">
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/courses" element={<CourseSelectionPage />} />
                 <Route path="/landing" element={<LandingPage />} />
                 {process.env.NODE_ENV === 'development' && (
                   <Route path="/api-test" element={<ApiTestPage />} />
