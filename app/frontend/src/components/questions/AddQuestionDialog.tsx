@@ -513,9 +513,15 @@ export const AddQuestionDialog = ({
             return;
         }
 
+        let processingToast: { dismiss: () => void } | null = null;
         try {
             setIsGenerating(true);
             setError(null);
+
+            processingToast = toast({
+                title: mode === 'variant' ? 'Variant generation in progress' : 'Question generation in progress',
+                description: 'Your request is being processed. This may take 30–60 seconds.',
+            });
 
             const difficultyDistribution = (() => {
                 if (form.generationDifficulty === 'balanced') {
@@ -684,8 +690,9 @@ export const AddQuestionDialog = ({
             });
 
             setIsAiGenerated(true);
+            processingToast?.dismiss();
             toast({
-                title: 'Question generated',
+                title: mode === 'variant' ? 'Variant generated' : 'Question generated',
                 description: 'Review the generated text and adjust any details before saving.'
             });
         } catch (generateError: any) {
@@ -705,6 +712,7 @@ export const AddQuestionDialog = ({
             // Store the error message for the modal
             setErrorModalMessage(message);
             
+            processingToast?.dismiss();
             // Show a persistent toast with a click action to view details
             toast({
                 variant: 'destructive',
@@ -721,6 +729,7 @@ export const AddQuestionDialog = ({
                 )
             });
         } finally {
+            processingToast?.dismiss();
             setIsGenerating(false);
         }
     };
