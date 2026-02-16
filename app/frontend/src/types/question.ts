@@ -113,7 +113,7 @@ export interface User {
 export interface Question extends QuestionMetadata {}
 
 export interface QuestionCreate {
-    description: string;
+    description?: string | null;
     courseId: number;
     primaryTopicId: number;
     type: QuestionType;

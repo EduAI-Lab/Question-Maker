@@ -127,9 +127,9 @@ export const createQuestion = async (userId, questionData) => {
       questionOrder = {}
     } = questionData;
 
-    if (!description || !description.trim()) {
-      throw new Error('Question description is required');
-    }
+    const normalizedDescription = typeof description === 'string' && description.trim()
+      ? description.trim()
+      : null;
 
     const parsedCourseId = Number(courseId);
     if (!Number.isInteger(parsedCourseId)) {
@@ -157,7 +157,7 @@ export const createQuestion = async (userId, questionData) => {
       courseId: parsedCourseId,
       primaryTopicId: parsedPrimaryTopicId,
       type: normalizedType,
-      description: description.trim(),
+      description: normalizedDescription,
       questionOrder: questionOrder && typeof questionOrder === 'object' ? questionOrder : {}
     });
 
@@ -280,11 +280,11 @@ export const updateQuestion = async (questionId, userId, updateData) => {
 
     const updates = { ...updateData };
 
-    if (updates.description !== undefined && updates.description !== null) {
-      if (!updates.description.toString().trim()) {
-        throw new Error('Question description cannot be empty');
-      }
-      updates.description = updates.description.toString().trim();
+    if (updates.description !== undefined) {
+      const desc = updates.description;
+      updates.description = typeof desc === 'string' && desc.trim()
+        ? desc.trim()
+        : null;
     }
 
     if (updates.courseId !== undefined) {
@@ -368,7 +368,8 @@ export const createMultipleQuestions = async (userId, questionsData) => {
     const createdQuestions = [];
 
     for (const q of questionsData) {
-      const description = q.description ?? q.content;
+      const rawDesc = q.description ?? q.content;
+      const description = typeof rawDesc === 'string' && rawDesc.trim() ? rawDesc.trim() : null;
       const courseId = Number(q.courseId ?? q.classId);
       const primaryTopicId = Number(q.primaryTopicId ?? 1);
       const type = ['MCQ', 'SA', 'LA'].includes(q.type) ? q.type : 'MCQ';

@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TourId, TourStep } from '../tour/tourTypes';
 import { tourSteps } from '../tour/tourSteps';
@@ -13,6 +13,8 @@ type TourState = {
 type GuidedTourContextValue = {
   startTour: (id: TourId) => void;
   stopTour: () => void;
+  /** Register a callback to run when the tour ends (Done or Skip). Returns unregister function. */
+  registerOnTourEnd: (callback: () => void) => () => void;
   isActive: boolean;
   activeTourId: TourId | null;
 };
@@ -212,6 +214,7 @@ const GuidedTourOverlay = ({
 export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<TourState>({ steps: [], currentIndex: 0, isActive: false });
   const [activeTourId, setActiveTourId] = useState<TourId | null>(null);
+  const onTourEndRef = useRef<(() => void) | null>(null);
 
   const runStepAction = useCallback((step: TourStep | undefined) => {
     if (!step) return;
@@ -221,9 +224,19 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  const registerOnTourEnd = useCallback((callback: () => void) => {
+    onTourEndRef.current = callback;
+    return () => {
+      onTourEndRef.current = null;
+    };
+  }, []);
+
   const stopTour = useCallback(() => {
+    const onEnd = onTourEndRef.current;
+    onTourEndRef.current = null;
     setState({ steps: [], currentIndex: 0, isActive: false });
     setActiveTourId(null);
+    onEnd?.();
   }, []);
 
   const advanceTo = useCallback(
@@ -255,10 +268,11 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
     () => ({
       startTour,
       stopTour,
+      registerOnTourEnd,
       isActive: state.isActive,
       activeTourId
     }),
-    [startTour, stopTour, state.isActive, activeTourId]
+    [startTour, stopTour, registerOnTourEnd, state.isActive, activeTourId]
   );
 
   const step = state.isActive ? state.steps[state.currentIndex] : null;
