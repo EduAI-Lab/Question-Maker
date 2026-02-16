@@ -212,12 +212,23 @@ export const AddQuestionDialog = ({
 
         if (presetVariant) {
             const referenceId = presetVariant.variant.referenceId ?? presetVariant.variant.id;
+            let copiedChoices: MCQChoice[] = defaultForm.variantChoices;
+            if (presetVariant.questionType === 'MCQ' && presetVariant.variant.choices && Array.isArray(presetVariant.variant.choices) && presetVariant.variant.choices.length > 0) {
+                copiedChoices = presetVariant.variant.choices.map(c => ({ ...c }));
+                while (copiedChoices.length < 4) {
+                    const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+                    copiedChoices.push({ letter: letters[copiedChoices.length], text: '' });
+                }
+            }
             setForm({
                 ...defaultForm,
                 baseSelection: `${presetVariant.questionId}:${presetVariant.variant.id}`,
                 variantReferenceId: referenceId ? referenceId.toString() : '',
+                variantText: presetVariant.variant.questionText ?? '',
                 variantDifficulty: presetVariant.variant.difficulty ?? 'medium',
                 variantReasoningLevel: presetVariant.variant.reasoningLevel ?? 'factual',
+                variantAnswer: presetVariant.variant.answer ?? '',
+                variantChoices: copiedChoices,
                 variantSecondaryTopics: presetVariant.variant.secondaryTopicsId || [],
                 variantAssessmentId: presetVariant.variant.assessmentId ? presetVariant.variant.assessmentId.toString() : 'none',
                 generationPrompt: 'Create a variant of this question...'
@@ -481,36 +492,6 @@ export const AddQuestionDialog = ({
         resolvedCourseCodeForDisplay && !isCourseRecognizedByEduAI(resolvedCourseCodeForDisplay)
             ? `EduAI does not recognize course code "${resolvedCourseCodeForDisplay}". Question generation will still run, but results may be less accurate.`
             : null;
-
-    const handleCopyFromVariant = (variantEntry: QuestionVariantEntry) => {
-        // Handle choices for MCQ
-        let copiedChoices: MCQChoice[] = [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }];
-        if (variantEntry.questionType === 'MCQ' && variantEntry.variant.choices && Array.isArray(variantEntry.variant.choices) && variantEntry.variant.choices.length > 0) {
-            copiedChoices = variantEntry.variant.choices.map(c => ({ ...c }));
-            // Ensure at least 4 choices for display
-            while (copiedChoices.length < 4) {
-                const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-                copiedChoices.push({ letter: letters[copiedChoices.length], text: '' });
-            }
-        }
-        const referenceId = variantEntry.variant.referenceId ?? variantEntry.variant.id;
-        setForm((prev) => ({
-            ...prev,
-            baseSelection: `${variantEntry.questionId}:${variantEntry.variant.id}`,
-            variantText: variantEntry.variant.questionText,
-            variantDifficulty: variantEntry.variant.difficulty ?? 'medium',
-            variantReasoningLevel: variantEntry.variant.reasoningLevel ?? 'factual',
-            variantAnswer: variantEntry.variant.answer || '',
-            variantChoices: copiedChoices,
-            variantSecondaryTopics: variantEntry.variant.secondaryTopicsId || [],
-            variantAssessmentId: variantEntry.variant.assessmentId ? variantEntry.variant.assessmentId.toString() : 'none',
-            variantReferenceId: referenceId ? referenceId.toString() : ''
-        }));
-        toast({
-            title: 'Fields copied',
-            description: 'Variant fields have been copied. You can now edit them before saving.'
-        });
-    };
 
     const handleGenerateWithAI = async () => {
         if (!courseId) {
@@ -1397,41 +1378,7 @@ export const AddQuestionDialog = ({
                             <div className="space-y-4">
                                 <h4 className="text-sm font-semibold text-muted-foreground">How to Fill This Form</h4>
 
-                                {/* Option 1: Copy from Base Variant */}
-                                {mode === 'variant' && presetVariant && (
-                                    <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3">
-                                        <div className="flex items-start gap-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 text-blue-500">
-                                                <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                                                <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                                            </svg>
-                                            <div className="flex-1">
-                                                <h5 className="text-sm font-semibold">Copy from Base Variant</h5>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    Auto-fill fields from the base variant
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded border">
-                                                {presetVariant.variant.questionText.slice(0, 100)}
-                                                {presetVariant.variant.questionText.length > 100 ? '...' : ''}
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                onClick={() => handleCopyFromVariant(presetVariant)}
-                                                className="w-full"
-                                                size="sm"
-                                                variant="outline"
-                                            >
-                                                Copy Fields
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Option 2: Generate with EduAI */}
+                                {/* Generate with EduAI */}
                                 <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3" data-tour-id="aq-eduai-panel">
                                     <div className="space-y-2">
                                         <div className="flex items-start gap-2">
