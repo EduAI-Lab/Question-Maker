@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import Tesseract from 'tesseract.js';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker?url';
-import { UploadCloud, FileText, Loader2, Trash2, Copy as CopyIcon, RefreshCcw } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, Trash2, Copy as CopyIcon, RefreshCcw, ChevronDown, ChevronUp } from 'lucide-react';
 
 import {
     Dialog,
@@ -194,6 +194,7 @@ export const QuestionUploadDialog = ({
     const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
     const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
     const [providerApiKey, setProviderApiKey] = useState('');
+    const [uploadSectionCollapsed, setUploadSectionCollapsed] = useState(true);
     const eduaiStatus = useEduAIStatus();
     const selectedModel = useMemo(
         () => availableModels.find((model) => model.id === aiModel),
@@ -660,7 +661,7 @@ export const QuestionUploadDialog = ({
 
     return (
         <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
-            <DialogContent className="max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-6xl sm:max-w-7xl w-[95vw] max-h-[92vh] overflow-y-auto">
                 <DialogHeader>
                     <div>
                         <DialogTitle>Upload Questions</DialogTitle>
@@ -673,15 +674,16 @@ export const QuestionUploadDialog = ({
                     </div>
                 </DialogHeader>
 
-                <div className="space-y-6 py-2">
-                    <Card data-tour-id="upload-assessment-meta">
+                <div className="flex gap-6 py-2 min-h-[70vh]">
+                    {/* Left: Assessment details — narrow, vertical fields */}
+                    <Card data-tour-id="upload-assessment-meta" className="flex-shrink-0 w-[280px]">
                         <CardHeader className="space-y-1">
                             <CardTitle className="text-base font-semibold">Assessment details</CardTitle>
                             <p className="text-xs text-muted-foreground">
                                 A new assessment will be created for these questions.
                             </p>
                         </CardHeader>
-                        <CardContent className="grid gap-4 sm:grid-cols-3">
+                        <CardContent className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="assessment-type">Type</Label>
                                 <Select
@@ -721,6 +723,310 @@ export const QuestionUploadDialog = ({
                         </CardContent>
                     </Card>
 
+                    {/* Right: Upload + Review — majority of space; when drafts exist, upload/model is collapsible */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-6 min-h-0">
+                    {draftQuestions.length > 0 ? (
+                        <>
+                            <div className="flex-shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setUploadSectionCollapsed((c) => !c)}
+                                    className="flex items-center justify-between w-full rounded-lg border bg-card px-4 py-3 text-left text-sm font-medium hover:bg-muted/50 transition-colors"
+                                >
+                                    <span>Upload & model</span>
+                                    {uploadSectionCollapsed ? (
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                    ) : (
+                                        <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                </button>
+                                {!uploadSectionCollapsed && (
+                                    <Card className="mt-2">
+                                        <CardHeader className="space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <CardTitle className="text-base font-semibold">Upload a file</CardTitle>
+                                                <EduAIStatusBadge
+                                                    status={eduaiStatus.status}
+                                                    message={eduaiStatus.message}
+                                                    onRefresh={eduaiStatus.refresh}
+                                                    className="z-50"
+                                                />
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                Questions will be saved to <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
+                                                {' '}Topics are assigned automatically after extraction—you can adjust them in the review step.
+                                            </p>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="space-y-2" data-tour-id="upload-model">
+                                                <Label htmlFor="ai-model-expanded">AI model</Label>
+                                                <Select value={aiModel} onValueChange={setAiModel}>
+                                                    <SelectTrigger id="ai-model-expanded">
+                                                        <SelectValue placeholder="Select a model" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {availableModels.length === 0 ? (
+                                                            <SelectItem value="__no_models" disabled>
+                                                                No models available yet
+                                                            </SelectItem>
+                                                        ) : (
+                                                            <>
+                                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">UBC Hosted</div>
+                                                                {availableModels
+                                                                    .filter((option) => option.provider === 'ollama')
+                                                                    .map((option) => (
+                                                                        <SelectItem key={option.id} value={option.id}>
+                                                                            {option.label}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">External</div>
+                                                                {availableModels
+                                                                    .filter((option) => option.provider !== 'ollama')
+                                                                    .map((option) => (
+                                                                        <SelectItem key={option.id} value={option.id}>
+                                                                            {option.label} ({option.provider})
+                                                                        </SelectItem>
+                                                                    ))}
+                                                            </>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                                {isExternalModel && (
+                                                    <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                                        <span className="font-semibold">Warning:</span> External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {apiKeyStorage.requiresApiKey(aiModel) && (
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="provider-api-key-expanded">
+                                                        {apiKeyStorage.getProviderFromModel(aiModel)?.toUpperCase()} API Key
+                                                    </Label>
+                                                    {providerApiKey ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <Input
+                                                                id="provider-api-key-expanded"
+                                                                type="text"
+                                                                value={`${providerApiKey.substring(0, 8)}${'•'.repeat(Math.max(0, providerApiKey.length - 8))}`}
+                                                                disabled
+                                                                className="flex-1"
+                                                            />
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    const provider = apiKeyStorage.getProviderFromModel(aiModel);
+                                                                    if (provider) {
+                                                                        apiKeyStorage.removeApiKey(provider);
+                                                                        setProviderApiKey('');
+                                                                    }
+                                                                }}
+                                                            >
+                                                                Change
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <Input
+                                                            id="provider-api-key-expanded"
+                                                            type="password"
+                                                            placeholder={`Enter your ${apiKeyStorage.getProviderFromModel(aiModel)?.toUpperCase()} API key`}
+                                                            value={providerApiKey}
+                                                            onChange={(e) => {
+                                                                const value = e.target.value;
+                                                                setProviderApiKey(value);
+                                                                const provider = apiKeyStorage.getProviderFromModel(aiModel);
+                                                                if (provider && value) {
+                                                                    void apiKeyStorage.setApiKey(provider, value);
+                                                                }
+                                                            }}
+                                                        />
+                                                    )}
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Your API key is stored locally in your browser and never sent to our servers.
+                                                    </p>
+                                                </div>
+                                            )}
+                                            {lastFileName && (
+                                                <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+                                                    <FileText className="h-4 w-4 text-muted-foreground" />
+                                                    <span className="truncate">{lastFileName}</span>
+                                                    <Button variant="ghost" size="icon" className="ml-auto" onClick={handleReset}>
+                                                        <RefreshCcw className="h-4 w-4" />
+                                                        <span className="sr-only">Reset</span>
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </div>
+                            <Card data-tour-id="upload-review" className="flex-1 min-h-0 flex flex-col">
+                                <CardHeader className="flex flex-row items-center justify-between flex-shrink-0">
+                                    <CardTitle className="text-base font-semibold">
+                                        Review extracted questions ({draftQuestions.length})
+                                    </CardTitle>
+                                    <div className="flex items-center gap-2" />
+                                </CardHeader>
+                                <CardContent className="flex-1 min-h-0 flex flex-col p-0 px-6 pb-6">
+                                    <ScrollArea className="flex-1 min-h-0 rounded-md border">
+                                        <div className="divide-y p-4 pt-0">
+                                            {draftQuestions.map((draft, index) => (
+                                                <div key={draft.id} className="space-y-4 p-4">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="space-y-1">
+                                                            <p className="text-sm font-semibold">Question {index + 1}</p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Toggle include to skip saving a specific question.
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Button
+                                                                variant={draft.include ? 'secondary' : 'outline'}
+                                                                size="sm"
+                                                                onClick={() => updateDraft(draft.id, { include: !draft.include })}
+                                                            >
+                                                                {draft.include ? 'Included' : 'Excluded'}
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" onClick={() => removeDraft(draft.id)}>
+                                                                <Trash2 className="h-4 w-4" />
+                                                                <span className="sr-only">Remove question</span>
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Question summary</Label>
+                                                        <Input
+                                                            value={draft.summary}
+                                                            placeholder="One sentence describing the question"
+                                                            onChange={(event) => updateDraft(draft.id, { summary: event.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label>Question text</Label>
+                                                        <Textarea
+                                                            rows={3}
+                                                            value={draft.question}
+                                                            onChange={(event) => updateDraft(draft.id, { question: event.target.value })}
+                                                        />
+                                                    </div>
+                                                    <div className="grid gap-4 sm:grid-cols-2">
+                                                        <div className="space-y-2">
+                                                            <Label>Primary topic</Label>
+                                                            <Select
+                                                                value={draft.primaryTopicId !== null ? String(draft.primaryTopicId) : 'none'}
+                                                                onValueChange={(value) => {
+                                                                    if (value === 'none') {
+                                                                        setPrimaryTopicForDraft(draft.id, null);
+                                                                        return;
+                                                                    }
+                                                                    const parsed = Number.parseInt(value, 10);
+                                                                    setPrimaryTopicForDraft(
+                                                                        draft.id,
+                                                                        Number.isNaN(parsed) ? null : parsed
+                                                                    );
+                                                                }}
+                                                                disabled={topics.length === 0}
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder={topics.length === 0 ? 'No topics available' : 'Select topic'} />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="none">Unassigned</SelectItem>
+                                                                    {topics.map((topic) => (
+                                                                        <SelectItem key={topic.id} value={String(topic.id)}>
+                                                                            {topic.name}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label>Secondary topics</Label>
+                                                            {topics.length === 0 ? (
+                                                                <p className="text-xs text-muted-foreground">No topics available. A new topic will be created automatically.</p>
+                                                            ) : (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {topics.map((topic) => (
+                                                                        <label key={topic.id} className="flex items-center gap-1 text-xs">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                className="h-4 w-4"
+                                                                                checked={draft.secondaryTopicIds.includes(topic.id)}
+                                                                                onChange={() => toggleSecondaryTopicForDraft(draft.id, topic.id)}
+                                                                                disabled={draft.primaryTopicId === topic.id}
+                                                                            />
+                                                                            <span>{topic.name}</span>
+                                                                        </label>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid gap-4 sm:grid-cols-3">
+                                                        <div className="space-y-2">
+                                                            <Label>Difficulty</Label>
+                                                            <Select
+                                                                value={draft.difficulty}
+                                                                onValueChange={(value) =>
+                                                                    updateDraft(draft.id, { difficulty: value as QuestionDifficulty })
+                                                                }
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {difficultyOptions.map((difficulty) => (
+                                                                        <SelectItem key={difficulty} value={difficulty}>
+                                                                            {difficulty}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label>Type</Label>
+                                                            <Select
+                                                                value={draft.type}
+                                                                onValueChange={(value) =>
+                                                                    updateDraft(draft.id, { type: value as QuestionType })
+                                                                }
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {questionTypes.map((type) => (
+                                                                        <SelectItem key={type} value={type}>
+                                                                            {questionTypeLabels[type]}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    </div>
+                                                    {draft.type === 'MCQ' && (
+                                                        <div className="space-y-2">
+                                                            <MCQChoicesField
+                                                                choices={draft.choices ?? [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }]}
+                                                                onChoicesChange={(newChoices) => updateDraft(draft.id, { choices: newChoices })}
+                                                                answer={draft.answer ?? ''}
+                                                                onAnswerChange={(letter) => updateDraft(draft.id, { answer: letter || null })}
+                                                                idPrefix={`upload-draft-${draft.id}`}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+                                    <p className="pt-3 text-xs text-muted-foreground flex-shrink-0">
+                                        The AI extraction is a starting point—adjust the question text, instructions, difficulty, or answers before saving.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </>
+                    ) : (
                     <Card>
                         <CardHeader className="space-y-1">
                             <div className="flex items-center justify-between">
@@ -880,173 +1186,8 @@ export const QuestionUploadDialog = ({
                             )}
                         </CardContent>
                     </Card>
-
-                    {draftQuestions.length > 0 && (
-                        <Card data-tour-id="upload-review">
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle className="text-base font-semibold">
-                                    Review extracted questions ({draftQuestions.length})
-                                </CardTitle>
-                                <div className="flex items-center gap-2" />
-                            </CardHeader>
-                            <CardContent>
-                                <ScrollArea className="max-h-[320px] rounded-md border">
-                                    <div className="divide-y">
-                                        {draftQuestions.map((draft, index) => (
-                                            <div key={draft.id} className="space-y-4 p-4">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="space-y-1">
-                                                        <p className="text-sm font-semibold">Question {index + 1}</p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            Toggle include to skip saving a specific question.
-                                                        </p>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button
-                                                            variant={draft.include ? 'secondary' : 'outline'}
-                                                            size="sm"
-                                                            onClick={() => updateDraft(draft.id, { include: !draft.include })}
-                                                        >
-                                                            {draft.include ? 'Included' : 'Excluded'}
-                                                        </Button>
-                                                        <Button variant="ghost" size="icon" onClick={() => removeDraft(draft.id)}>
-                                                            <Trash2 className="h-4 w-4" />
-                                                            <span className="sr-only">Remove question</span>
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Question summary</Label>
-                                                    <Input
-                                                        value={draft.summary}
-                                                        placeholder="One sentence describing the question"
-                                                        onChange={(event) => updateDraft(draft.id, { summary: event.target.value })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Question text</Label>
-                                                    <Textarea
-                                                        rows={3}
-                                                        value={draft.question}
-                                                        onChange={(event) => updateDraft(draft.id, { question: event.target.value })}
-                                                    />
-                                                </div>
-                                                <div className="grid gap-4 sm:grid-cols-2">
-                                                    <div className="space-y-2">
-                                                        <Label>Primary topic</Label>
-                                                        <Select
-                                                            value={draft.primaryTopicId !== null ? String(draft.primaryTopicId) : 'none'}
-                                                            onValueChange={(value) => {
-                                                                if (value === 'none') {
-                                                                    setPrimaryTopicForDraft(draft.id, null);
-                                                                    return;
-                                                                }
-                                                                const parsed = Number.parseInt(value, 10);
-                                                                setPrimaryTopicForDraft(
-                                                                    draft.id,
-                                                                    Number.isNaN(parsed) ? null : parsed
-                                                                );
-                                                            }}
-                                                            disabled={topics.length === 0}
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder={topics.length === 0 ? 'No topics available' : 'Select topic'} />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="none">Unassigned</SelectItem>
-                                                                {topics.map((topic) => (
-                                                                    <SelectItem key={topic.id} value={String(topic.id)}>
-                                                                        {topic.name}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Secondary topics</Label>
-                                                        {topics.length === 0 ? (
-                                                            <p className="text-xs text-muted-foreground">No topics available. A new topic will be created automatically.</p>
-                                                        ) : (
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {topics.map((topic) => (
-                                                                    <label key={topic.id} className="flex items-center gap-1 text-xs">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            className="h-4 w-4"
-                                                                            checked={draft.secondaryTopicIds.includes(topic.id)}
-                                                                            onChange={() => toggleSecondaryTopicForDraft(draft.id, topic.id)}
-                                                                            disabled={draft.primaryTopicId === topic.id}
-                                                                        />
-                                                                        <span>{topic.name}</span>
-                                                                    </label>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="grid gap-4 sm:grid-cols-3">
-                                                    <div className="space-y-2">
-                                                        <Label>Difficulty</Label>
-                                                        <Select
-                                                            value={draft.difficulty}
-                                                            onValueChange={(value) =>
-                                                                updateDraft(draft.id, { difficulty: value as QuestionDifficulty })
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {difficultyOptions.map((difficulty) => (
-                                                                    <SelectItem key={difficulty} value={difficulty}>
-                                                                        {difficulty}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label>Type</Label>
-                                                        <Select
-                                                            value={draft.type}
-                                                            onValueChange={(value) =>
-                                                                updateDraft(draft.id, { type: value as QuestionType })
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {questionTypes.map((type) => (
-                                                                    <SelectItem key={type} value={type}>
-                                                                        {questionTypeLabels[type]}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                </div>
-                                                {draft.type === 'MCQ' && (
-                                                    <div className="space-y-2">
-                                                        <MCQChoicesField
-                                                            choices={draft.choices ?? [{ letter: 'A', text: '' }, { letter: 'B', text: '' }, { letter: 'C', text: '' }, { letter: 'D', text: '' }]}
-                                                            onChoicesChange={(newChoices) => updateDraft(draft.id, { choices: newChoices })}
-                                                            answer={draft.answer ?? ''}
-                                                            onAnswerChange={(letter) => updateDraft(draft.id, { answer: letter || null })}
-                                                            idPrefix={`upload-draft-${draft.id}`}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </ScrollArea>
-                                <p className="pt-3 text-xs text-muted-foreground">
-                                    The AI extraction is a starting point—adjust the question text, instructions, difficulty, or answers before saving.
-                                </p>
-                            </CardContent>
-                        </Card>
                     )}
+                    </div>
                 </div>
 
                 <DialogFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
