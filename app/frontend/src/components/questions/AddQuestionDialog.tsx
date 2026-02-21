@@ -223,6 +223,7 @@ export const AddQuestionDialog = ({
             setForm({
                 ...defaultForm,
                 baseSelection: `${presetVariant.questionId}:${presetVariant.variant.id}`,
+                questionType: presetVariant.questionType,
                 variantReferenceId: referenceId ? referenceId.toString() : '',
                 variantText: presetVariant.variant.questionText ?? '',
                 variantDifficulty: presetVariant.variant.difficulty ?? 'medium',
@@ -1272,6 +1273,19 @@ export const AddQuestionDialog = ({
                                                     </div>
                                                 )}
 
+                                                {mode === 'variant' && form.questionType !== 'MCQ' && (
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="variant-answer-main">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                                                        <Textarea
+                                                            id="variant-answer-main"
+                                                            value={form.variantAnswer}
+                                                            onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
+                                                            placeholder="Provide an answer or leave blank"
+                                                            rows={3}
+                                                        />
+                                                    </div>
+                                                )}
+
                                                 {presetVariant && (
                                                     <p className="text-sm text-muted-foreground">
                                                         <span className="font-medium">Primary topic:</span>{' '}
@@ -1341,18 +1355,6 @@ export const AddQuestionDialog = ({
                                                             className="bg-muted/50"
                                                         />
                                                     </div>
-                                                    {form.questionType !== 'MCQ' && (
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="variant-answer">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                            <Textarea
-                                                                id="variant-answer"
-                                                                value={form.variantAnswer}
-                                                                onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
-                                                                placeholder="Provide an answer or leave blank"
-                                                                rows={3}
-                                                            />
-                                                        </div>
-                                                    )}
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                         <div className="space-y-2">
                                                             <Label htmlFor="variant-assessment">Assessment <span className="text-xs text-muted-foreground">(optional)</span></Label>
