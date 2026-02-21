@@ -64,7 +64,8 @@ export function MCQChoicesField({
   return (
     <div className="space-y-2">
       <Label>
-        {choicesLabel} <span className="text-xs text-muted-foreground">(required for MCQ)</span>
+        {choicesLabel} <span className="text-destructive">*</span>{' '}
+        <span className="text-xs text-muted-foreground">(required for MCQ)</span>
       </Label>
       <div className="space-y-3 border rounded-md p-4 bg-muted/30">
         {safeChoices.map((choice, index) => (

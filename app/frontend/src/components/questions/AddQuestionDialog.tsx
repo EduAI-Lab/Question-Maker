@@ -493,6 +493,42 @@ export const AddQuestionDialog = ({
             ? `EduAI does not recognize course code "${resolvedCourseCodeForDisplay}". Question generation will still run, but results may be less accurate.`
             : null;
 
+    /** Required-field validation for Create Question: missing labels for tooltip and first field id for scroll. */
+    const requiredValidation = useMemo(() => {
+        const missing: { label: string; fieldId: string | null }[] = [];
+        if (!courseId) missing.push({ label: 'Course', fieldId: null });
+        if (!form.variantText.trim()) missing.push({ label: 'Question text', fieldId: 'field-variant-text' });
+        if (mode === 'variant') {
+            if (!form.baseSelection) missing.push({ label: 'Base variant selection', fieldId: null });
+        } else {
+            const primaryTopicNum = parseNumber(form.primaryTopicId);
+            if (!primaryTopicNum) missing.push({ label: 'Primary topic', fieldId: 'field-primary-topic' });
+        }
+        const isMcq = form.questionType === 'MCQ';
+        if (isMcq) {
+            const validChoices = form.variantChoices.filter((c) => c.text.trim().length > 0);
+            if (validChoices.length < 2) missing.push({ label: 'At least 2 MCQ choices with text', fieldId: 'field-mcq-choices' });
+        }
+        const missingLabels = missing.map((m) => m.label);
+        const firstWithField = missing.find((m) => m.fieldId != null);
+        return { missingLabels, firstFieldId: firstWithField?.fieldId ?? null };
+    }, [courseId, form.variantText, form.primaryTopicId, form.baseSelection, form.questionType, form.variantChoices, mode]);
+
+    const isCreateDisabled = isSubmitting || requiredValidation.missingLabels.length > 0;
+    const createButtonTooltip =
+        requiredValidation.missingLabels.length > 0
+            ? `Missing: ${requiredValidation.missingLabels.join(', ')}`
+            : '';
+
+    const handleCreateClick = () => {
+        if (requiredValidation.missingLabels.length > 0 && requiredValidation.firstFieldId) {
+            document.querySelector(`[data-field-id="${requiredValidation.firstFieldId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+        if (requiredValidation.missingLabels.length > 0) return;
+        handleSubmit();
+    };
+
     const handleGenerateWithAI = async () => {
         if (!courseId) {
             setError('Select a course before generating a question.');
@@ -1012,8 +1048,8 @@ export const AddQuestionDialog = ({
                                             </Tabs>
 
                                             <div className="space-y-4" data-tour-id="aq-form-fields">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="variant-text">Question Text</Label>
+                                                <div className="space-y-2" data-field-id="field-variant-text">
+                                                    <Label htmlFor="variant-text">Question Text <span className="text-destructive">*</span></Label>
                                                     <Textarea
                                                         id="variant-text"
                                                         value={form.variantText}
@@ -1024,17 +1060,19 @@ export const AddQuestionDialog = ({
                                                 </div>
 
                                                 {form.questionType === 'MCQ' && (
-                                                    <MCQChoicesField
-                                                        choices={form.variantChoices ?? defaultForm.variantChoices}
-                                                        answer={form.variantAnswer}
-                                                        onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
-                                                        onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
-                                                        idPrefix="aq-mcq"
-                                                    />
+                                                    <div data-field-id="field-mcq-choices">
+                                                        <MCQChoicesField
+                                                            choices={form.variantChoices ?? defaultForm.variantChoices}
+                                                            answer={form.variantAnswer}
+                                                            onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
+                                                            onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
+                                                            idPrefix="aq-mcq"
+                                                        />
+                                                    </div>
                                                 )}
 
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="primary-topic">Primary Topic</Label>
+                                                <div className="space-y-2" data-field-id="field-primary-topic">
+                                                    <Label htmlFor="primary-topic">Primary Topic <span className="text-destructive">*</span></Label>
                                                     <Select
                                                     value={form.primaryTopicId}
                                                     onValueChange={(value) => handleFieldChange('primaryTopicId', value)}
@@ -1211,8 +1249,8 @@ export const AddQuestionDialog = ({
                                     <>
                                         <div className="space-y-4" data-tour-id="aq-metadata">
                                             <div className="space-y-4" data-tour-id="aq-form-fields">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="variant-text">Question Text</Label>
+                                                <div className="space-y-2" data-field-id="field-variant-text">
+                                                    <Label htmlFor="variant-text">Question Text <span className="text-destructive">*</span></Label>
                                                     <Textarea
                                                         id="variant-text"
                                                         value={form.variantText}
@@ -1223,13 +1261,15 @@ export const AddQuestionDialog = ({
                                                 </div>
 
                                                 {form.questionType === 'MCQ' && (
-                                                    <MCQChoicesField
-                                                        choices={form.variantChoices ?? defaultForm.variantChoices}
-                                                        answer={form.variantAnswer}
-                                                        onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
-                                                        onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
-                                                        idPrefix="aq-mcq"
-                                                    />
+                                                    <div data-field-id="field-mcq-choices">
+                                                        <MCQChoicesField
+                                                            choices={form.variantChoices ?? defaultForm.variantChoices}
+                                                            answer={form.variantAnswer}
+                                                            onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
+                                                            onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
+                                                            idPrefix="aq-mcq"
+                                                        />
+                                                    </div>
                                                 )}
 
                                                 {presetVariant && (
@@ -1622,22 +1662,40 @@ export const AddQuestionDialog = ({
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
                             Cancel
                         </Button>
-                        <Button
-                            type="button"
-                            onClick={handleSubmit}
-                            disabled={
-                                isSubmitting ||
-                                (mode === 'variant' && !form.baseSelection)
-                            }
-                        >
-                            {isSubmitting
-                                ? 'Saving...'
-                                : mode === 'new'
-                                    ? markAsReviewed
-                                        ? 'Create Question'
-                                        : 'Create Question (Draft)'
-                                    : 'Add Variant'}
-                        </Button>
+                        {createButtonTooltip ? (
+                            <Tooltip content={createButtonTooltip} side="top" multiline>
+                                <span className="inline-block">
+                                    <Button
+                                        type="button"
+                                        onClick={handleCreateClick}
+                                        disabled={isSubmitting}
+                                        className={isCreateDisabled ? 'bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground cursor-pointer' : ''}
+                                    >
+                                        {isSubmitting
+                                            ? 'Saving...'
+                                            : mode === 'new'
+                                                ? markAsReviewed
+                                                    ? 'Create Question'
+                                                    : 'Create Question (Draft)'
+                                                : 'Add Variant'}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={handleCreateClick}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting
+                                    ? 'Saving...'
+                                    : mode === 'new'
+                                        ? markAsReviewed
+                                            ? 'Create Question'
+                                            : 'Create Question (Draft)'
+                                        : 'Add Variant'}
+                            </Button>
+                        )}
                     </div>
                 </DialogFooter>
             </DialogContent>
