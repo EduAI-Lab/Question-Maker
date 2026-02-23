@@ -60,7 +60,18 @@ import bcrypt from 'bcryptjs';
 const dbModule = await import('../src/config/database.js');
 const schemaModule = await import('../src/schema/index.js');
 const { sequelize } = dbModule;
-const { User, Course, Topics, Question_Metadata, Assessments, Variants } = schemaModule;
+const {
+  User,
+  Course,
+  Topics,
+  Question_Metadata,
+  Assessments,
+  Variants,
+  SectionVariants,
+  AssessmentSections,
+  CanvasIntegration,
+  CanvasCourseMapping
+} = schemaModule;
 
 /**
  * Connects to the database, clears existing records, and inserts the predefined seed dataset.
@@ -77,11 +88,16 @@ const populateDatabase = async () => {
     console.log('Database schema synced.');
 
     // Clear existing data (optional - comment out if you want to keep existing data)
+    // Order matters: clear tables that reference others first (child tables before parent).
     console.log('Clearing existing data...');
+    await SectionVariants.destroy({ where: {} });
     await Variants.destroy({ where: {} });
+    await AssessmentSections.destroy({ where: {} });
     await Question_Metadata.destroy({ where: {} });
     await Assessments.destroy({ where: {} });
     await Topics.destroy({ where: {} });
+    await CanvasCourseMapping.destroy({ where: {} });
+    await CanvasIntegration.destroy({ where: {} });
     await Course.destroy({ where: {} });
     await User.destroy({ where: {} });
     console.log('Existing data cleared.');
@@ -117,6 +133,21 @@ const populateDatabase = async () => {
         name: 'Computer Programming II',
         code: 'COSC 121',
         userId: users[0].id
+      },
+      {
+        name: 'Introduction to Statistics',
+        code: 'Introduction to Statistics',
+        userId: users[0].id
+      },
+      {
+        name: 'Discrete Math',
+        code: 'STUDY3',
+        userId: users[0].id
+      },
+      {
+        name: 'Introduction to Psychology',
+        code: 'STUDY2',
+        userId: users[0].id
       }
     ]);
     console.log(`Created ${courses.length} courses.`);
@@ -138,7 +169,21 @@ const populateDatabase = async () => {
       { name: 'Algorithm Analysis', courseId: courses[1].id },
       { name: 'Testing and Debugging', courseId: courses[1].id },
       { name: 'File I/O and Persistence', courseId: courses[1].id },
-      { name: 'Recursion Patterns', courseId: courses[1].id }
+      { name: 'Recursion Patterns', courseId: courses[1].id },
+
+      // Introduction to Statistics topics
+      { name: 'Probability', courseId: courses[2].id },
+      { name: 'Random Variables', courseId: courses[2].id },
+      { name: 'Expectation', courseId: courses[2].id },
+
+      // Discrete Math topics
+      { name: 'Logic and proofs', courseId: courses[3].id },
+      { name: 'Graph theory', courseId: courses[3].id },
+
+      // Introduction to Psychology topics
+      { name: 'Introduction', courseId: courses[4].id },
+      { name: 'Human brain', courseId: courses[4].id },
+      { name: 'Social learning', courseId: courses[4].id }
     ]);
     console.log(`Created ${topics.length} topics.`);
 
