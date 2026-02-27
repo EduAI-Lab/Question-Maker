@@ -2,7 +2,7 @@
  * Assessment detail page for viewing sections, matching questions, and managing variants.
  * Loads the assessment, fetches related questions, and coordinates section/variant modals.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Layers3, Plus, Upload, AlertTriangle, FileText } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
@@ -426,41 +426,76 @@ export const AssessmentViewPage = () => {
     );
   };
 
-  const handleUpdateQuestionMetadata = (
-    questionId: number,
-    updates: {
-      description?: string | null;
-      primaryTopicId?: number;
-      type?: import('../types/question').QuestionType;
-      primaryTopicName?: string;
-    }
-  ) => {
-    setMatchingQuestions((prev) =>
-      prev.map((q) =>
-        q.id === questionId
-          ? {
-              ...q,
-              ...(updates.description !== undefined && { description: updates.description }),
-              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
-              ...(updates.type !== undefined && { type: updates.type })
-            }
-          : q
-      )
-    );
-    if (selectedVariant?.questionId === questionId) {
-      setSelectedVariant((prev) =>
-        prev
-          ? {
-              ...prev,
-              ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
-              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
-              ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
-              ...(updates.type !== undefined && { questionType: updates.type })
-            }
-          : prev
+  const handleUpdateQuestionMetadata = useCallback(
+    async (
+      questionId: number,
+      updates: {
+        description?: string | null;
+        primaryTopicId?: number;
+        type?: import('../types/question').QuestionType;
+        primaryTopicName?: string;
+      }
+    ) => {
+      setMatchingQuestions((prev) =>
+        prev.map((q) =>
+          q.id === questionId
+            ? {
+                ...q,
+                ...(updates.description !== undefined && { description: updates.description }),
+                ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+                ...(updates.type !== undefined && { type: updates.type })
+              }
+            : q
+        )
       );
-    }
-  };
+      if (selectedVariant?.questionId === questionId) {
+        setSelectedVariant((prev) =>
+          prev
+            ? {
+                ...prev,
+                ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
+                ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+                ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
+                ...(updates.type !== undefined && { questionType: updates.type })
+              }
+            : prev
+        );
+      }
+      try {
+        const fetched = await questionService.getQuestion(questionId);
+        setMatchingQuestions((prev) =>
+          prev.map((q) => (q.id === questionId ? fetched : q))
+        );
+        if (selectedVariant?.questionId === questionId) {
+          const resolveTopicName = (topicId: number) => topicsById[topicId]?.name ?? `Topic ${topicId}`;
+          const variant = fetched.variants?.find((v) => v.id === selectedVariant.variant.id) ?? selectedVariant.variant;
+          const secondaryTopicNames = Array.isArray(variant.secondaryTopicsId)
+            ? (variant.secondaryTopicsId
+                .map((topicId) => resolveTopicName(topicId))
+                .filter(Boolean) as string[])
+            : undefined;
+          setSelectedVariant({
+            questionId: fetched.id,
+            questionDescription: fetched.description ?? null,
+            questionType: fetched.type,
+            primaryTopicId: fetched.primaryTopicId,
+            primaryTopicName: resolveTopicName(fetched.primaryTopicId),
+            courseId: fetched.courseId,
+            courseName: fetched.course?.name,
+            courseCode: fetched.course?.code,
+            secondaryTopicNames:
+              secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+            isAiGenerated: variant.isAiGenerated,
+            isDraft: variant.isDraft,
+            variant
+          });
+        }
+      } catch (err) {
+        console.error('Failed to refetch question after metadata update', err);
+      }
+    },
+    [selectedVariant?.questionId, selectedVariant?.variant.id, topicsById]
+  );
 
   const handleViewVariant = async (entry: QuestionVariantEntry) => {
     setSelectedVariant(entry);

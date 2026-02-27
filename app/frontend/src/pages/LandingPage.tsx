@@ -295,41 +295,74 @@ export const LandingPage = () => {
     );
   };
 
-  const handleUpdateQuestionMetadata = (
-    questionId: number,
-    updates: {
-      description?: string | null;
-      primaryTopicId?: number;
-      type?: import('../types/question').QuestionType;
-      primaryTopicName?: string;
-    }
-  ) => {
-    setQuestions((prev) =>
-      prev.map((q) =>
-        q.id === questionId
-          ? {
-              ...q,
-              ...(updates.description !== undefined && { description: updates.description }),
-              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
-              ...(updates.type !== undefined && { type: updates.type })
-            }
-          : q
-      )
-    );
-    if (selectedVariant?.questionId === questionId) {
-      setSelectedVariant((prev) =>
-        prev
-          ? {
-              ...prev,
-              ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
-              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
-              ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
-              ...(updates.type !== undefined && { questionType: updates.type })
-            }
-          : prev
+  const handleUpdateQuestionMetadata = useCallback(
+    async (
+      questionId: number,
+      updates: {
+        description?: string | null;
+        primaryTopicId?: number;
+        type?: import('../types/question').QuestionType;
+        primaryTopicName?: string;
+      }
+    ) => {
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === questionId
+            ? {
+                ...q,
+                ...(updates.description !== undefined && { description: updates.description }),
+                ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+                ...(updates.type !== undefined && { type: updates.type })
+              }
+            : q
+        )
       );
-    }
-  };
+      if (selectedVariant?.questionId === questionId) {
+        setSelectedVariant((prev) =>
+          prev
+            ? {
+                ...prev,
+                ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
+                ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+                ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
+                ...(updates.type !== undefined && { questionType: updates.type })
+              }
+            : prev
+        );
+      }
+      try {
+        const fetched = await questionService.getQuestion(questionId);
+        setQuestions((prev) =>
+          prev.map((q) => (q.id === questionId ? fetched : q))
+        );
+        if (selectedVariant?.questionId === questionId) {
+          const topics = topicsByCourse[fetched.courseId] ?? [];
+          const topicNameMap = new Map(topics.map((t) => [t.id, t.name]));
+          const variant = fetched.variants?.find((v) => v.id === selectedVariant.variant.id) ?? selectedVariant.variant;
+          const secondaryTopicNames = Array.isArray(variant.secondaryTopicsId)
+            ? variant.secondaryTopicsId.map((id) => topicNameMap.get(id) ?? `Topic ${id}`)
+            : undefined;
+          setSelectedVariant({
+            questionId: fetched.id,
+            questionDescription: fetched.description ?? null,
+            questionType: fetched.type,
+            primaryTopicId: fetched.primaryTopicId,
+            primaryTopicName: topicNameMap.get(fetched.primaryTopicId),
+            courseId: fetched.courseId,
+            courseName: fetched.course?.name,
+            courseCode: fetched.course?.code,
+            secondaryTopicNames: secondaryTopicNames?.length ? secondaryTopicNames : undefined,
+            isAiGenerated: variant.isAiGenerated,
+            isDraft: variant.isDraft,
+            variant
+          });
+        }
+      } catch (err) {
+        console.error('Failed to refetch question after metadata update', err);
+      }
+    },
+    [selectedVariant?.questionId, selectedVariant?.variant.id, topicsByCourse]
+  );
 
 
   const handleQuestionsUploaded = async (createdQuestions: Question[]) => {
@@ -591,13 +624,14 @@ export const LandingPage = () => {
       return;
     }
 
-    const prevSecondary = selectedVariant.secondaryTopicNames?.join('|') ?? '';
-    const nextSecondary = updated.secondaryTopicNames?.join('|') ?? '';
+    const same =
+      updated.questionDescription === selectedVariant.questionDescription &&
+      updated.primaryTopicId === selectedVariant.primaryTopicId &&
+      updated.primaryTopicName === selectedVariant.primaryTopicName &&
+      updated.questionType === selectedVariant.questionType &&
+      (updated.secondaryTopicNames?.join('|') ?? '') === (selectedVariant.secondaryTopicNames?.join('|') ?? '');
 
-    if (
-      updated.primaryTopicName !== selectedVariant.primaryTopicName ||
-      nextSecondary !== prevSecondary
-    ) {
+    if (!same) {
       setSelectedVariant(updated);
     }
   }, [variantEntries, selectedVariant]);
