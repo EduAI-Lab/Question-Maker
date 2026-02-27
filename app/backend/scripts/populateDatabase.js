@@ -136,7 +136,7 @@ const populateDatabase = async () => {
       },
       {
         name: 'Introduction to Statistics',
-        code: 'Introduction to Statistics',
+        code: 'STUDY1',
         userId: users[0].id
       },
       {
@@ -147,6 +147,16 @@ const populateDatabase = async () => {
       {
         name: 'Introduction to Psychology',
         code: 'STUDY2',
+        userId: users[0].id
+      },
+      {
+        name: 'Introduction to Nursing',
+        code: 'STUDY4',
+        userId: users[0].id
+      },
+      {
+        name: 'Scientific Research Methods',
+        code: 'STUDY5',
         userId: users[0].id
       }
     ]);
@@ -162,6 +172,7 @@ const populateDatabase = async () => {
       { name: 'Memory Hierarchy', courseId: courses[0].id },
       { name: 'Parallel Execution Models', courseId: courses[0].id },
       { name: 'Performance Benchmarking', courseId: courses[0].id },
+      { name: 'Other', courseId: courses[0].id },
       
       // COSC 121 topics
       { name: 'Object-Oriented Design', courseId: courses[1].id },
@@ -170,20 +181,36 @@ const populateDatabase = async () => {
       { name: 'Testing and Debugging', courseId: courses[1].id },
       { name: 'File I/O and Persistence', courseId: courses[1].id },
       { name: 'Recursion Patterns', courseId: courses[1].id },
+      { name: 'Other', courseId: courses[1].id },
 
       // Introduction to Statistics topics
       { name: 'Probability', courseId: courses[2].id },
       { name: 'Random Variables', courseId: courses[2].id },
       { name: 'Expectation', courseId: courses[2].id },
+      { name: 'Other', courseId: courses[2].id },
 
       // Discrete Math topics
       { name: 'Logic and proofs', courseId: courses[3].id },
       { name: 'Graph theory', courseId: courses[3].id },
+      { name: 'Other', courseId: courses[3].id },
 
       // Introduction to Psychology topics
       { name: 'Introduction', courseId: courses[4].id },
       { name: 'Human brain', courseId: courses[4].id },
-      { name: 'Social learning', courseId: courses[4].id }
+      { name: 'Social learning', courseId: courses[4].id },
+      { name: 'Other', courseId: courses[4].id },
+
+      // Introduction to Nursing topics
+      { name: 'Determinants of Health & Health‑Equity', courseId: courses[5].id },
+      { name: 'Trauma', courseId: courses[5].id },
+      { name: 'Health promotion', courseId: courses[5].id },
+      { name: 'Other', courseId: courses[5].id },
+
+      // Scientific Research Methods topics
+      { name: 'Research design', courseId: courses[6].id },
+      { name: 'Data collection and analysis', courseId: courses[6].id },
+      { name: 'Ethics in research', courseId: courses[6].id },
+      { name: 'Other', courseId: courses[6].id }
     ]);
     console.log(`Created ${topics.length} topics.`);
 
@@ -243,222 +270,131 @@ const populateDatabase = async () => {
     ]);
     console.log(`Created ${assessments.length} assessments.`);
 
-    // 5. Create Question_Metadata (100 questions)
+    // 5. Create Question_Metadata – 3 real questions per course for all 7 courses
     console.log('Creating question metadata...');
-    
-    // Helper function to generate question order for assessments
+
     const generateQuestionOrder = (questionIndex, totalQuestions) => {
       const order = {};
-      // Distribute questions across assessments
       const assessmentIndex = questionIndex % assessments.length;
       const questionNum = Math.floor(questionIndex / assessments.length) + 1;
       order[assessments[assessmentIndex].id] = questionNum;
-      // Some questions appear in multiple assessments
       if (questionIndex % 3 === 0 && assessmentIndex + 1 < assessments.length) {
         order[assessments[assessmentIndex + 1].id] = questionNum;
       }
       return order;
     };
 
-    // Generate questions for COSC 211 (Machine Architecture) - 50 questions
-    const cosc211Questions = [];
-    const cosc211Topics = topics.slice(0, 6); // First 6 topics are COSC 211
-    const cosc211QuestionTypes = ['MCQ', 'SA', 'LA'];
-    const cosc211Descriptions = [
-      // Instruction Set Architectures (8 questions)
-      'Understanding instruction set architectures',
-      'RISC vs CISC architecture comparison',
-      'Instruction formats and encoding',
-      'Addressing modes in instruction sets',
-      'Instruction set design principles',
-      'Load-store architecture concepts',
-      'Instruction pipelining basics',
-      'Instruction-level parallelism',
-      // Pipeline Design (9 questions)
-      'Pipeline design principles',
-      'Pipeline stages and throughput',
-      'Pipeline hazards identification',
-      'Data forwarding techniques',
-      'Branch prediction strategies',
-      'Pipeline optimization methods',
-      'Superscalar pipeline design',
-      'Out-of-order execution',
-      'Pipeline stall handling',
-      // Cache Coherence (8 questions)
-      'Cache coherence strategies',
-      'MESI protocol implementation',
-      'Cache consistency models',
-      'Snooping vs directory protocols',
-      'Write-back vs write-through caches',
-      'Cache replacement policies',
-      'False sharing prevention',
-      'Cache performance optimization',
-      // Memory Hierarchy (9 questions)
-      'Memory hierarchy design',
-      'Cache memory organization',
-      'Virtual memory concepts',
-      'Page replacement algorithms',
-      'TLB (Translation Lookaside Buffer)',
-      'Memory access patterns',
-      'Cache locality principles',
-      'Memory bandwidth optimization',
-      'Multi-level cache design',
-      // Parallel Execution Models (8 questions)
-      'Parallel execution models',
-      'SIMD vs MIMD architectures',
-      'Vector processing units',
-      'Multithreading concepts',
-      'Symmetric multiprocessing',
-      'Distributed memory systems',
-      'Shared memory architectures',
-      'GPU computing fundamentals',
-      // Performance Benchmarking (8 questions)
-      'Performance benchmarking techniques',
-      'CPU performance metrics',
-      'Cache performance analysis',
-      'Memory bandwidth measurement',
-      'Benchmark suite design',
-      'Performance profiling tools',
-      'Amdahl\'s law application',
-      'Scalability analysis'
+    // 3 real questions per course: { description, type, questionText, answer, topicIndex }
+    // topicIndex = index into this course's topic slice (Instruction Set Architectures=0, Pipeline Design=1, etc.)
+    const QUESTIONS_PER_COURSE = 3;
+    const seedQuestionsByCourse = [
+      // Machine Architecture (COSC 211): Instruction Set Architectures, Pipeline Design, Cache Coherence, Memory Hierarchy, Parallel Execution, Performance Benchmarking, Other
+      [
+        { description: 'RISC vs CISC instruction sets', type: 'SA', topicIndex: 0, questionText: 'What is the main difference between RISC and CISC instruction set architectures? Give one advantage of each.', answer: 'RISC uses a small, fixed set of simple instructions and relies on load-store design; CISC uses complex, variable-length instructions that can perform multiple operations. RISC advantages: simpler pipelining, lower power. CISC advantages: denser code, fewer instructions per program.' },
+        { description: 'Pipeline hazards and forwarding', type: 'LA', topicIndex: 1, questionText: 'Explain pipeline hazards (data and control). How does data forwarding reduce stalls in a pipeline?', answer: 'Data hazards occur when an instruction needs a result not yet written back. Control hazards occur on branches. Data forwarding (bypassing) sends results from later pipeline stages back to earlier stages so dependent instructions can proceed without waiting for write-back, reducing stalls.' },
+        { description: 'TLB and virtual memory', type: 'MCQ', topicIndex: 3, questionText: 'What is the role of the TLB (Translation Lookaside Buffer) in virtual memory?\nA) It stores the full page table\nB) It caches recent virtual-to-physical address translations to speed up memory access\nC) It replaces the page table\nD) It holds swapped-out pages', answer: 'B) It caches recent virtual-to-physical address translations to speed up memory access' }
+      ],
+      // Computer Programming II (COSC 121): Object-Oriented Design, Data Structures, Algorithm Analysis, Testing and Debugging, File I/O, Recursion Patterns, Other
+      [
+        { description: 'Arrays vs linked lists', type: 'SA', topicIndex: 1, questionText: 'Compare arrays and linked lists. When would you choose a linked list over an array?', answer: 'Arrays offer O(1) access by index and contiguous memory; linked lists allow O(1) insert/delete at head and dynamic size without reallocation. Choose a linked list when insertions/deletions are frequent and random access by index is not the main operation.' },
+        { description: 'Recursion and binary search', type: 'SA', topicIndex: 5, questionText: 'Write or describe a recursive implementation of binary search. What is the base case?', answer: 'Base case: when the search range is empty (low > high) return not found, or when the middle element equals the target return its index. Recursive case: compare target to middle; recurse on left or right half accordingly. Time complexity O(log n).' },
+        { description: 'Unit testing and TDD', type: 'MCQ', topicIndex: 3, questionText: 'In test-driven development (TDD), when do you write the unit tests?\nA) After the code is complete\nB) Before writing the implementation code\nC) Only for bug fixes\nD) Only for public methods', answer: 'B) Before writing the implementation code' }
+      ],
+      // Introduction to Statistics (STUDY1): Probability, Random Variables, Expectation, Other
+      [
+        { description: 'Interpreting the p-value', type: 'SA', topicIndex: 0, questionText: 'In hypothesis testing, how do you interpret a p-value of 0.03? Should you reject the null hypothesis at significance level 0.05?', answer: 'The p-value is the probability of observing the sample data (or more extreme) if the null hypothesis is true. A p-value of 0.03 means there is a 3% chance of such a result under the null. At α = 0.05, we reject the null hypothesis because p < α.' },
+        { description: 'Mean vs median for skewed data', type: 'SA', topicIndex: 1, questionText: 'Why might the median be preferred over the mean when describing the center of a skewed distribution?', answer: 'The mean is pulled in the direction of the skew by extreme values; the median is resistant to outliers and better represents the typical value in a skewed distribution.' },
+        { description: 'Central limit theorem', type: 'MCQ', topicIndex: 2, questionText: 'What does the Central Limit Theorem state?\nA) All distributions are normal\nB) The sample mean approaches the population mean as n increases\nC) The sampling distribution of the sample mean approaches a normal distribution as n increases, regardless of the population distribution\nD) Standard deviation decreases with sample size only for normal populations', answer: 'C) The sampling distribution of the sample mean approaches a normal distribution as n increases, regardless of the population distribution' }
+      ],
+      // Discrete Math (STUDY3): Logic and proofs, Graph theory, Other
+      [
+        { description: 'Direct proof and contrapositive', type: 'SA', topicIndex: 0, questionText: 'Prove: If n² is even, then n is even. Use either a direct proof or proof by contrapositive.', answer: 'Proof by contrapositive: Assume n is odd. Then n = 2k + 1 for some integer k. So n² = 4k² + 4k + 1 = 2(2k² + 2k) + 1, which is odd. So if n is odd then n² is odd; equivalently, if n² is even then n is even.' },
+        { description: 'Handshaking lemma', type: 'SA', topicIndex: 1, questionText: 'State the handshaking lemma for a graph. Use it to explain why a graph cannot have an odd number of vertices of odd degree.', answer: 'Handshaking lemma: The sum of all vertex degrees equals twice the number of edges. So the sum of degrees is even. If we had an odd number of odd-degree vertices, the sum of their degrees would be odd, and adding even-degree vertices keeps it odd—contradiction. So the number of odd-degree vertices must be even.' },
+        { description: 'Euler circuit', type: 'MCQ', topicIndex: 1, questionText: 'When does a graph have an Euler circuit?\nA) When it is connected\nB) When every vertex has even degree and the graph is connected\nC) When it has no odd-degree vertices\nD) When it is a complete graph', answer: 'B) When every vertex has even degree and the graph is connected' }
+      ],
+      // Introduction to Psychology (STUDY2): Introduction, Human brain, Social learning, Other
+      [
+        { description: 'Brain structures and function', type: 'SA', topicIndex: 1, questionText: 'Name three major structures of the human brain and briefly state one function of each.', answer: 'E.g. Frontal lobe: executive function, planning, decision-making. Hippocampus: formation of long-term memories. Amygdala: emotion processing, especially fear. (Other valid: cerebellum—motor control; occipital lobe—vision; etc.)' },
+        { description: 'Classical vs operant conditioning', type: 'SA', topicIndex: 0, questionText: 'How does classical conditioning differ from operant conditioning? Give a brief example of each.', answer: 'Classical conditioning pairs a neutral stimulus with an unconditioned stimulus to produce a learned response (e.g. Pavlov’s dog salivating to a bell). Operant conditioning strengthens or weakens behavior by consequences—reinforcement or punishment (e.g. a rat pressing a lever for food).' },
+        { description: 'Bandura and social learning', type: 'MCQ', topicIndex: 2, questionText: 'According to Bandura’s social learning theory, learning can occur through:\nA) Reinforcement only\nB) Observation and imitation of others, without direct reinforcement\nC) Classical conditioning only\nD) Biological maturation only', answer: 'B) Observation and imitation of others, without direct reinforcement' }
+      ],
+      // Introduction to Nursing (STUDY4): Determinants of Health & Health‑Equity, Trauma, Health promotion, Other
+      [
+        { description: 'Clinical assessment and vital signs', type: 'SA', topicIndex: 1, questionText: 'List the main steps of a basic clinical assessment. Why are vital signs (e.g. temperature, pulse, blood pressure) important in this process?', answer: 'Steps typically include: health history, physical examination, vital signs, and documentation. Vital signs provide objective data on current physiological state and help identify instability, response to treatment, or need for escalation.' },
+        { description: 'Patient safety and medication', type: 'SA', topicIndex: 0, questionText: 'Describe at least two principles of patient safety that apply during medication administration.', answer: 'E.g. Right patient, right drug, right dose, right route, right time (five rights); checking allergies; double-checking high-alert medications; clear documentation; patient education about the medication.' },
+        { description: 'Health promotion role', type: 'MCQ', topicIndex: 2, questionText: 'Which best describes the nurse’s role in health promotion?\nA) Only treating acute illness\nB) Educating and supporting patients to adopt healthy behaviors and prevent disease\nC) Prescribing medications only\nD) Replacing the physician in primary care', answer: 'B) Educating and supporting patients to adopt healthy behaviors and prevent disease' }
+      ],
+      // Scientific Research Methods (STUDY5): Research design, Data collection and analysis, Ethics in research, Other
+      [
+        { description: 'Qualitative vs quantitative design', type: 'SA', topicIndex: 0, questionText: 'What is the main difference between qualitative and quantitative research design? When might a researcher choose a qualitative approach?', answer: 'Quantitative research uses numerical data and statistical analysis; qualitative research uses non-numerical data (e.g. interviews, text) and thematic analysis. Choose qualitative when exploring meanings, context, or when little is known and the goal is to generate hypotheses or understand experience in depth.' },
+        { description: 'Informed consent in research', type: 'SA', topicIndex: 2, questionText: 'What must be ensured to obtain valid informed consent from research participants?', answer: 'Participants must be given clear information about the purpose, procedures, risks, benefits, and right to withdraw; they must understand this information and consent voluntarily without coercion; consent should be documented (e.g. signed form) and the process ongoing, not one-time.' },
+        { description: 'Reliability and validity', type: 'MCQ', topicIndex: 1, questionText: 'Why are reliability and validity important in data collection?\nA) They are only important in qualitative research\nB) Reliability ensures consistency of measurement; validity ensures we are measuring what we intend to measure\nC) They are the same concept\nD) They only matter in experiments', answer: 'B) Reliability ensures consistency of measurement; validity ensures we are measuring what we intend to measure' }
+      ]
     ];
 
-    for (let i = 0; i < 50; i++) {
-      const topicIndex = i % cosc211Topics.length;
-      const typeIndex = i % cosc211QuestionTypes.length;
-      cosc211Questions.push({
-        description: cosc211Descriptions[i] || `COSC 211 Question ${i + 1}`,
-        type: cosc211QuestionTypes[typeIndex],
-        courseId: courses[0].id,
-        primaryTopicId: cosc211Topics[topicIndex].id,
-        questionOrder: generateQuestionOrder(i, 50)
-      });
-    }
-
-    // Generate questions for COSC 121 (Computer Programming II) - 50 questions
-    const cosc121Questions = [];
-    const cosc121Topics = topics.slice(6, 12); // Last 6 topics are COSC 121
-    const cosc121QuestionTypes = ['MCQ', 'SA', 'LA'];
-    const cosc121Descriptions = [
-      // Object-Oriented Design (9 questions)
-      'Object-oriented design principles',
-      'Class inheritance and composition',
-      'Polymorphism implementation',
-      'Encapsulation concepts',
-      'Design patterns application',
-      'Interface vs abstract classes',
-      'SOLID principles',
-      'UML class diagrams',
-      'Object relationships',
-      // Data Structures Fundamentals (9 questions)
-      'Data structures fundamentals',
-      'Array vs linked list comparison',
-      'Stack and queue operations',
-      'Binary tree traversal',
-      'Hash table implementation',
-      'Graph representation methods',
-      'Priority queue concepts',
-      'Tree balancing techniques',
-      'Data structure selection criteria',
-      // Algorithm Analysis (8 questions)
-      'Algorithm analysis and complexity',
-      'Big-O notation calculation',
-      'Time vs space complexity trade-offs',
-      'Recursive algorithm analysis',
-      'Sorting algorithm comparison',
-      'Search algorithm efficiency',
-      'Dynamic programming concepts',
-      'Greedy algorithm design',
-      // Testing and Debugging (8 questions)
-      'Testing and debugging strategies',
-      'Unit test design',
-      'Integration testing approaches',
-      'Test-driven development',
-      'Debugging techniques',
-      'Code coverage metrics',
-      'Exception handling patterns',
-      'Assertion usage',
-      // File I/O and Persistence (8 questions)
-      'File I/O and persistence',
-      'File reading and writing',
-      'Serialization concepts',
-      'JSON data handling',
-      'Database connectivity basics',
-      'File format selection',
-      'Error handling in I/O',
-      'Stream processing',
-      // Recursion Patterns (8 questions)
-      'Recursion patterns and implementation',
-      'Recursive vs iterative solutions',
-      'Tail recursion optimization',
-      'Recursive data structures',
-      'Backtracking algorithms',
-      'Divide and conquer patterns',
-      'Recursive tree algorithms',
-      'Memoization techniques'
+    // Topic ranges per course: [startIndex, endIndex) in topics array (matches order in Topics.bulkCreate above)
+    const courseTopicRanges = [
+      [0, 7],   // COSC 211: 6 + Other
+      [7, 14],  // COSC 121: 6 + Other
+      [14, 18], // STUDY1: 3 + Other
+      [18, 21], // STUDY3: 2 + Other
+      [21, 25], // STUDY2: 3 + Other
+      [25, 29], // STUDY4: 3 + Other
+      [29, 33]  // STUDY5: 3 + Other
     ];
 
-    for (let i = 0; i < 50; i++) {
-      const topicIndex = i % cosc121Topics.length;
-      const typeIndex = i % cosc121QuestionTypes.length;
-      cosc121Questions.push({
-        description: cosc121Descriptions[i] || `COSC 121 Question ${i + 1}`,
-        type: cosc121QuestionTypes[typeIndex],
-        courseId: courses[1].id,
-        primaryTopicId: cosc121Topics[topicIndex].id,
-        questionOrder: generateQuestionOrder(i + 50, 50)
-      });
+    const allQuestionMeta = [];
+    let globalQuestionIndex = 0;
+
+    for (let c = 0; c < courses.length; c++) {
+      const [topicStart, topicEnd] = courseTopicRanges[c];
+      const courseTopics = topics.slice(topicStart, topicEnd);
+      const courseQuestions = seedQuestionsByCourse[c];
+
+      for (let i = 0; i < QUESTIONS_PER_COURSE; i++) {
+        const q = courseQuestions[i];
+        const topicIndex = Math.min(q.topicIndex ?? i % courseTopics.length, courseTopics.length - 1);
+        allQuestionMeta.push({
+          description: q.description,
+          type: q.type,
+          courseId: courses[c].id,
+          primaryTopicId: courseTopics[topicIndex].id,
+          questionOrder: generateQuestionOrder(globalQuestionIndex, courses.length * QUESTIONS_PER_COURSE)
+        });
+        globalQuestionIndex++;
+      }
     }
 
-    const questionMetadata = await Question_Metadata.bulkCreate([
-      ...cosc211Questions,
-      ...cosc121Questions
-    ]);
+    const questionMetadata = await Question_Metadata.bulkCreate(allQuestionMeta);
+    const seedQuestionTexts = seedQuestionsByCourse.flat();
     console.log(`Created ${questionMetadata.length} question metadata entries.`);
 
-    // 6. Create Variants (at least 1 per question, some have multiple)
+    // 6. Create Variants (at least 1 per question) using seeded question text and answers when available
     console.log('Creating variants...');
-    
-    // Helper function to generate question text and answer based on question metadata
-    const generateVariant = (qMeta, assessmentId, variantNum = 0) => {
+
+    const generateVariant = (qMeta, assessmentId, variantNum = 0, seedOverride = null) => {
       const difficulties = ['easy', 'medium', 'hard'];
       const reasoningLevels = ['factual', 'analytical', 'application'];
       const difficulty = difficulties[qMeta.id % difficulties.length];
       const reasoningLevel = reasoningLevels[qMeta.id % reasoningLevels.length];
-      
+
       let questionText, answer;
-      
-      if (qMeta.type === 'MCQ') {
-        // Generate MCQ questions
-        const questionTemplates = [
-          `What is the primary concept related to ${qMeta.description.toLowerCase()}?\nA) Option A\nB) Option B\nC) Option C\nD) Option D`,
-          `Which statement best describes ${qMeta.description.toLowerCase()}?\nA) First option\nB) Second option\nC) Third option\nD) Fourth option`,
-          `In the context of ${qMeta.description.toLowerCase()}, which is correct?\nA) Answer A\nB) Answer B\nC) Answer C\nD) Answer D`
-        ];
-        questionText = questionTemplates[variantNum % questionTemplates.length];
-        answer = 'B) Option B'; // Default answer
-      } else if (qMeta.type === 'LA') {
-        // Generate LA (Long Answer) questions
-        const questionTemplates = [
-          `Discuss ${qMeta.description.toLowerCase()} in depth, including key trade-offs, examples, and its impact on system design.`,
-          `Provide a detailed explanation of ${qMeta.description.toLowerCase()}, covering motivations, methodology, and real-world applications.`,
-          `Evaluate ${qMeta.description.toLowerCase()} with supporting arguments, counterpoints, and a concise conclusion.`
-        ];
-        questionText = questionTemplates[variantNum % questionTemplates.length];
-        answer = `Comprehensive answer for ${qMeta.description}. Include context, detailed reasoning, comparative analysis, and practical implications.`;
+      if (seedOverride && seedOverride.questionText && seedOverride.answer) {
+        questionText = seedOverride.questionText;
+        answer = seedOverride.answer;
       } else {
-        // Generate SA (Short Answer) questions
-        const questionTemplates = [
-          `Explain ${qMeta.description.toLowerCase()}.`,
-          `Describe the key concepts of ${qMeta.description.toLowerCase()}.`,
-          `What are the main principles behind ${qMeta.description.toLowerCase()}?`,
-          `How does ${qMeta.description.toLowerCase()} work?`,
-          `Provide an example of ${qMeta.description.toLowerCase()}.`
-        ];
-        questionText = questionTemplates[variantNum % questionTemplates.length];
-        answer = `Sample answer for ${qMeta.description}. This would contain detailed explanation of the concept, including key points, examples, and relevant details.`;
+        if (qMeta.type === 'MCQ') {
+          questionText = `What is the primary concept related to ${qMeta.description.toLowerCase()}?\nA) Option A\nB) Option B\nC) Option C\nD) Option D`;
+          answer = 'B) Option B';
+        } else if (qMeta.type === 'LA') {
+          questionText = `Discuss ${qMeta.description.toLowerCase()} in depth.`;
+          answer = `Answer for ${qMeta.description}.`;
+        } else {
+          questionText = `Explain ${qMeta.description.toLowerCase()}.`;
+          answer = `Sample answer for ${qMeta.description}.`;
+        }
       }
-      
+
       return {
         questionText,
         difficulty,
@@ -469,22 +405,12 @@ const populateDatabase = async () => {
       };
     };
 
-    // Generate variants for all questions
     const variantsToCreate = [];
-    
     for (let i = 0; i < questionMetadata.length; i++) {
       const qMeta = questionMetadata[i];
-      
-      // Each question gets at least 1 variant
-      // Distribute variants across assessments
       const primaryAssessment = assessments[i % assessments.length];
-      variantsToCreate.push(generateVariant(qMeta, primaryAssessment.id, 0));
-      
-      // Some questions get additional variants (about 30% get 2 variants)
-      if (i % 3 === 0 && i < questionMetadata.length - 1) {
-        const secondaryAssessment = assessments[(i + 1) % assessments.length];
-        variantsToCreate.push(generateVariant(qMeta, secondaryAssessment.id, 1));
-      }
+      const seedOverride = seedQuestionTexts[i] || null;
+      variantsToCreate.push(generateVariant(qMeta, primaryAssessment.id, 0, seedOverride));
     }
 
     const variants = await Variants.bulkCreate(variantsToCreate);
