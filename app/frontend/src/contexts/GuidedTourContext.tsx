@@ -15,6 +15,8 @@ type GuidedTourContextValue = {
   stopTour: () => void;
   /** Register a callback to run when the tour ends (Done or Skip). Returns unregister function. */
   registerOnTourEnd: (callback: () => void) => () => void;
+  /** Register a callback to run when Next is clicked on a specific step (e.g. navigate). Overrides default click behavior. Returns unregister function. */
+  registerStepAction: (stepId: string, callback: () => void) => () => void;
   isActive: boolean;
   activeTourId: TourId | null;
 };
@@ -184,7 +186,7 @@ const GuidedTourOverlay = ({
 
   return createPortal(
     <>
-      <div className="fixed inset-0 bg-black/50 z-[10000]" />
+      <div className="fixed inset-0 bg-black/50 z-[10000] pointer-events-none" />
       {position && (
         <div
           className="fixed z-[10001] rounded-lg border-2 border-blue-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none"
@@ -215,10 +217,26 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<TourState>({ steps: [], currentIndex: 0, isActive: false });
   const [activeTourId, setActiveTourId] = useState<TourId | null>(null);
   const onTourEndRef = useRef<(() => void) | null>(null);
+  const stepActionOverridesRef = useRef<Map<string, () => void>>(new Map());
+
+  const registerStepAction = useCallback((stepId: string, callback: () => void) => {
+    stepActionOverridesRef.current.set(stepId, callback);
+    return () => {
+      stepActionOverridesRef.current.delete(stepId);
+    };
+  }, []);
 
   const runStepAction = useCallback((step: TourStep | undefined) => {
     if (!step) return;
-    if (step.id === 'assessment-tab') {
+
+    const override = stepActionOverridesRef.current.get(step.id);
+    if (override) {
+      override();
+      return;
+    }
+
+    // Default: some steps trigger a click to move the user forward (navigate or switch tab).
+    if (step.id === 'course-select' || step.id === 'assessment-tab') {
       const target = getTarget(step);
       target?.click();
     }
@@ -234,6 +252,7 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
   const stopTour = useCallback(() => {
     const onEnd = onTourEndRef.current;
     onTourEndRef.current = null;
+    stepActionOverridesRef.current.clear();
     setState({ steps: [], currentIndex: 0, isActive: false });
     setActiveTourId(null);
     onEnd?.();
@@ -269,10 +288,11 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
       startTour,
       stopTour,
       registerOnTourEnd,
+      registerStepAction,
       isActive: state.isActive,
       activeTourId
     }),
-    [startTour, stopTour, registerOnTourEnd, state.isActive, activeTourId]
+    [startTour, stopTour, registerOnTourEnd, registerStepAction, state.isActive, activeTourId]
   );
 
   const step = state.isActive ? state.steps[state.currentIndex] : null;

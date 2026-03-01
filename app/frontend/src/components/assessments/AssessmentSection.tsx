@@ -278,6 +278,7 @@ export const AssessmentSection = ({
                                                         })
                                                     }
                                                     className="flex items-center space-x-1"
+                                                    data-tour-id="assessment-view-btn"
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                     <span>View</span>

@@ -212,6 +212,15 @@ export const LandingPage = () => {
     }
   }, []);
 
+  /** When starting the tour from landing, go to course-select page first; step 1 Next will return here to this course on questions tab. */
+  const handleGuidedTourClick = useCallback(() => {
+    if (!selectedCourse?.id) return;
+    navigate('/courses', {
+      state: { startGuidedTour: true, returnCourseId: selectedCourse.id, returnTab: 'questions' },
+      replace: true
+    });
+  }, [navigate, selectedCourse?.id]);
+
   useEffect(() => {
     void fetchAssessments();
   }, [fetchAssessments]);
@@ -764,6 +773,7 @@ export const LandingPage = () => {
         onProfileClick={() => setIsProfileDialogOpen(true)}
         showBackButton
         onBackClick={() => navigate('/courses')}
+        onGuidedTourClick={handleGuidedTourClick}
       />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
