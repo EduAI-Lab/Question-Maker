@@ -13,6 +13,7 @@ import { GraduationCap, Plus } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Tooltip } from '../components/ui/tooltip';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
+import { assessmentService } from '../services/assessmentService';
 
 const TEST_COURSE_CODE = 'SANDBOX';
 const TEST_COURSE_NAME = 'Sandbox Course';
@@ -53,6 +54,11 @@ export const CourseSelectionPage = () => {
           await courseService.createTopic(created.id, 'General');
         } catch {
           // ignore topic creation failure
+        }
+        try {
+          await assessmentService.createPracticeExamForCourse(created.id);
+        } catch {
+          // ignore practice exam creation failure
         }
         await fetchCourses();
         testCourse = created;

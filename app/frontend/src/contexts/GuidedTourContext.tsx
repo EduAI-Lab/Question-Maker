@@ -33,8 +33,6 @@ type HighlightPosition = {
 const getTarget = (step: TourStep | undefined) =>
   step ? (document.querySelector(`[data-tour-id="${step.id}"]`) as HTMLElement | null) : null;
 
-const clampToViewport = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
 const Tooltip = ({
   step,
   position,
@@ -52,28 +50,12 @@ const Tooltip = ({
   isFirst: boolean;
   isLast: boolean;
 }) => {
-  const hasTarget = Boolean(position);
-  const padding = 12;
-  let top = hasTarget ? position!.top + position!.height + padding : window.scrollY + 120;
-  let left = hasTarget ? position!.left : window.scrollX + 24;
-
-  if (hasTarget) {
-    if (step.placement === 'top') {
-      top = position!.top - padding;
-    } else if (step.placement === 'left') {
-      left = position!.left - padding;
-    } else if (step.placement === 'right') {
-      left = position!.left + position!.width + padding;
-    }
-  }
-
-  const maxLeft = document.documentElement.scrollWidth - 320;
-  left = clampToViewport(left, 12, maxLeft);
+  const padding = 24; // fixed offset from viewport top and right
 
   return (
     <div
       className="fixed z-[10002] w-[320px] pointer-events-auto"
-      style={{ top, left }}
+      style={{ top: padding, right: padding }}
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
     >
@@ -112,11 +94,6 @@ const Tooltip = ({
             {isLast ? 'Done' : 'Next'}
           </button>
         </div>
-        {!hasTarget && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-            If you don’t see the highlight, open the dialog or section for this step, then hit Next.
-          </p>
-        )}
       </div>
     </div>
   );

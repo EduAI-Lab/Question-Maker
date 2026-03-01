@@ -18,6 +18,7 @@ import { Loader2, LogOut, Plus } from 'lucide-react';
 import { Class } from '../../types/class';
 import { eduaiService, EduAICourseOption, EduAITopicOption } from '../../services/eduaiService';
 import { courseService } from '../../services/courseService';
+import { assessmentService } from '../../services/assessmentService';
 import { useToast } from '../ui/use-toast';
 import { useAuth } from '../../contexts/AuthContext';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
@@ -184,6 +185,12 @@ export const ProfileCoursesDialog = ({
             } catch (topicError) {
                 console.warn('Failed to create default topic for test course', topicError);
                 // Continue even if topic creation fails - users can add topics manually
+            }
+
+            try {
+                await assessmentService.createPracticeExamForCourse(createdCourse.id);
+            } catch (practiceExamError) {
+                console.warn('Failed to create Practice Exam for test course', practiceExamError);
             }
 
             if (onCoursesAdded) {

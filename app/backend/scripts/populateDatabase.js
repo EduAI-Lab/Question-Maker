@@ -268,7 +268,17 @@ const populateDatabase = async () => {
         semester: 'Winter 2025'
       }
     ]);
-    console.log(`Created ${assessments.length} assessments.`);
+
+    // One empty "Practice Exam" per course
+    const practiceExams = await Assessments.bulkCreate(
+      courses.map((c) => ({
+        courseId: c.id,
+        type: 'Quiz',
+        name: 'Practice Exam',
+        semester: 'Fall 2026'
+      }))
+    );
+    console.log(`Created ${assessments.length} assessments and ${practiceExams.length} Practice Exam(s).`);
 
     // 5. Create Question_Metadata – 3 real questions per course for all 7 courses
     console.log('Creating question metadata...');
