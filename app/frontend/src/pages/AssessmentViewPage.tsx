@@ -56,9 +56,7 @@ export const AssessmentViewPage = () => {
   const [isCreatingSection, setIsCreatingSection] = useState(false);
   const [questionSearchError, setQuestionSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
-  const [isSectionNameFilled, setIsSectionNameFilled] = useState(false);
-  const [sectionNameValue, setSectionNameValue] = useState('');
-  const [prefillFromQuestion, setPrefillFromQuestion] = useState<{ sectionName: string; question: Question } | null>(null);
+  const [prefillFromQuestion, setPrefillFromQuestion] = useState<{ question: Question } | null>(null);
   const [isEditAssessmentOpen, setIsEditAssessmentOpen] = useState(false);
   const [pendingSectionDraft, setPendingSectionDraft] =
     useState<AssessmentSectionCreateInput | null>(null);
@@ -174,8 +172,6 @@ export const AssessmentViewPage = () => {
     resetBuilderContext();
     setEditingSection(null);
     setIsBuilderVisible(false);
-    setIsSectionNameFilled(false);
-    setSectionNameValue('');
     setPrefillFromQuestion(null);
   };
 
@@ -561,14 +557,6 @@ export const AssessmentViewPage = () => {
       });
       return;
     }
-    if (!isSectionNameFilled) {
-      toast({
-        title: 'Add a section name first',
-        description: 'Enter a section name before creating a question for it.',
-        variant: 'destructive'
-      });
-      return;
-    }
     setPresetVariant(null);
     setIsAddQuestionOpen(true);
   };
@@ -670,7 +658,7 @@ export const AssessmentViewPage = () => {
       };
 
       const derivedPayload = {
-        name: sectionNameValue.trim(),
+        name: '',
         sectionType: [newQuestion.type].join(', '),
         questionTypes: [newQuestion.type],
         topicFilters: {
@@ -693,7 +681,7 @@ export const AssessmentViewPage = () => {
 
       setPendingSectionDraft(derivedPayload);
       setLastFilters(derivedFilters);
-      setPrefillFromQuestion({ sectionName: sectionNameValue.trim(), question: newQuestion });
+      setPrefillFromQuestion({ question: newQuestion });
       void handleSectionSearch(derivedFilters, derivedPayload, pendingSectionId).then(() => {
         setSelectedQuestionIds((prev) => {
           const next = new Set(prev);
@@ -782,8 +770,6 @@ export const AssessmentViewPage = () => {
   const startCreateSection = () => {
     resetBuilderContext();
     setEditingSection(null);
-    setIsSectionNameFilled(false);
-    setSectionNameValue('');
     setPrefillFromQuestion(null);
     setIsBuilderVisible(true);
     // Scroll to create section card
@@ -829,8 +815,6 @@ export const AssessmentViewPage = () => {
   const handleEditSection = async (section: AssessmentSection) => {
     resetBuilderContext();
     setEditingSection(section);
-    setIsSectionNameFilled(Boolean(section.name?.trim()));
-    setSectionNameValue(section.name ?? '');
     primeSelectionFromSection(section);
     setIsBuilderVisible(true);
     const { filters, payload } = buildDraftFromSection(section);
@@ -865,7 +849,7 @@ export const AssessmentViewPage = () => {
       await refreshSections();
       toast({
         title: 'Section deleted',
-        description: `"${section.name}" has been removed.`
+        description: 'The section has been removed.'
       });
     } catch (_error) {
       toast({
@@ -1257,26 +1241,16 @@ export const AssessmentViewPage = () => {
                         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <CardTitle className="text-lg">
-                              Editing: {section.name || 'Untitled section'}
+                              Editing section
                             </CardTitle>
                             <p className="text-sm text-muted-foreground">
                               Update details and questions, then save below.
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            {isSectionNameFilled ? (
-                              <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
-                                Create New Question
-                              </Button>
-                            ) : (
-                              <Tooltip content="Section name is required" multiline>
-                                <span className="inline-block">
-                                  <Button variant="outline" size="sm" disabled>
-                                    Create New Question
-                                  </Button>
-                                </span>
-                              </Tooltip>
-                            )}
+                            <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
+                              Create New Question
+                            </Button>
                             {(() => {
                               const selectedCount = selectedQuestionIds.size;
                               const canFinalize = Boolean(pendingSectionDraft);
@@ -1332,10 +1306,6 @@ export const AssessmentViewPage = () => {
                               isSearching={isSearchingQuestions}
                               onSearchQuestions={handleSectionSearch}
                               onCancel={handleCancelBuilder}
-                              onSectionNameChange={(name) => {
-                                setIsSectionNameFilled(Boolean(name.trim()));
-                                setSectionNameValue(name);
-                              }}
                               prefillFromQuestion={prefillFromQuestion}
                               blueprint={assessment?.blueprintConfig}
                               availableTopics={availableTopics}
@@ -1390,19 +1360,9 @@ export const AssessmentViewPage = () => {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      {isSectionNameFilled ? (
-                        <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
-                          Create New Question
-                        </Button>
-                      ) : (
-                        <Tooltip content="Section name is required" multiline>
-                          <span className="inline-block">
-                            <Button variant="outline" size="sm" disabled>
-                              Create New Question
-                            </Button>
-                          </span>
-                        </Tooltip>
-                      )}
+                      <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
+                        Create New Question
+                      </Button>
                       {(() => {
                         const selectedCount = selectedQuestionIds.size;
                         const canFinalize = Boolean(pendingSectionDraft);
@@ -1458,10 +1418,6 @@ export const AssessmentViewPage = () => {
                         isSearching={isSearchingQuestions}
                         onSearchQuestions={handleSectionSearch}
                         onCancel={handleCancelBuilder}
-                        onSectionNameChange={(name) => {
-                          setIsSectionNameFilled(Boolean(name.trim()));
-                          setSectionNameValue(name);
-                        }}
                         prefillFromQuestion={prefillFromQuestion}
                         blueprint={assessment.blueprintConfig}
                         availableTopics={availableTopics}
@@ -1581,7 +1537,7 @@ export const AssessmentViewPage = () => {
            deleteAction?.type === 'assessment'
              ? `Delete assessment "${assessment?.name}"?`
              : deleteAction?.type === 'section'
-             ? `Delete section "${(deleteAction.item as AssessmentSection)?.name}"?`
+             ? 'Delete this section?'
              : 'Remove question from section?'
          }
          message={

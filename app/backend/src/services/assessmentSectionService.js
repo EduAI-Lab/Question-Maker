@@ -101,7 +101,7 @@ export const createAssessmentSection = async (assessmentId, userId, payload) => 
 
   const section = await AssessmentSections.create({
     assessmentId: assessment.id,
-    name: payload.name?.trim() || 'Untitled Section',
+    name: payload.name?.trim() || 'Section',
     description: payload.description?.trim() || null,
     sectionType: payload.sectionType || null,
     difficultySettings: payload.difficultySettings || null,

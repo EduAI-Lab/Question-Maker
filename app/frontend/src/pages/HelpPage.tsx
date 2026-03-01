@@ -238,7 +238,7 @@ export const HelpPage = () => {
                         <h3 className="text-lg font-semibold">6.3 Create Sections and Select Questions</h3>
                         <ol className="list-decimal list-inside space-y-1">
                             <li>On an assessment page: Click to add a section (Create Section panel).</li>
-                            <li>Set Section Name, desired question types, topic filters, difficulty and reasoning emphasis.</li>
+                            <li>Set desired question types, topic filters, difficulty and reasoning emphasis.</li>
                             <li>Run search; matching questions/variants are listed based on those filters.</li>
                             <li>Select variants to attach to the section.</li>
                             <li>Save the section; it appears in the assessment page.</li>
