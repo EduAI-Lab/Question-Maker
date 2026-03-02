@@ -15,6 +15,8 @@ type GuidedTourContextValue = {
   stopTour: () => void;
   /** Register a callback to run when the tour ends (Done or Skip). Returns unregister function. */
   registerOnTourEnd: (callback: () => void) => () => void;
+  /** Register a callback to run when Next is clicked on a specific step (e.g. navigate). Overrides default click behavior. Returns unregister function. */
+  registerStepAction: (stepId: string, callback: () => void) => () => void;
   isActive: boolean;
   activeTourId: TourId | null;
 };
@@ -30,8 +32,6 @@ type HighlightPosition = {
 
 const getTarget = (step: TourStep | undefined) =>
   step ? (document.querySelector(`[data-tour-id="${step.id}"]`) as HTMLElement | null) : null;
-
-const clampToViewport = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 const Tooltip = ({
   step,
@@ -50,28 +50,12 @@ const Tooltip = ({
   isFirst: boolean;
   isLast: boolean;
 }) => {
-  const hasTarget = Boolean(position);
-  const padding = 12;
-  let top = hasTarget ? position!.top + position!.height + padding : window.scrollY + 120;
-  let left = hasTarget ? position!.left : window.scrollX + 24;
-
-  if (hasTarget) {
-    if (step.placement === 'top') {
-      top = position!.top - padding;
-    } else if (step.placement === 'left') {
-      left = position!.left - padding;
-    } else if (step.placement === 'right') {
-      left = position!.left + position!.width + padding;
-    }
-  }
-
-  const maxLeft = document.documentElement.scrollWidth - 320;
-  left = clampToViewport(left, 12, maxLeft);
+  const padding = 24; // fixed offset from viewport top and right
 
   return (
     <div
       className="fixed z-[10002] w-[320px] pointer-events-auto"
-      style={{ top, left }}
+      style={{ top: padding, right: padding }}
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
     >
@@ -110,11 +94,6 @@ const Tooltip = ({
             {isLast ? 'Done' : 'Next'}
           </button>
         </div>
-        {!hasTarget && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-            If you don’t see the highlight, open the dialog or section for this step, then hit Next.
-          </p>
-        )}
       </div>
     </div>
   );
@@ -184,7 +163,7 @@ const GuidedTourOverlay = ({
 
   return createPortal(
     <>
-      <div className="fixed inset-0 bg-black/50 z-[10000]" />
+      <div className="fixed inset-0 bg-black/50 z-[10000] pointer-events-none" />
       {position && (
         <div
           className="fixed z-[10001] rounded-lg border-2 border-blue-500 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)] pointer-events-none"
@@ -215,10 +194,26 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
   const [state, setState] = useState<TourState>({ steps: [], currentIndex: 0, isActive: false });
   const [activeTourId, setActiveTourId] = useState<TourId | null>(null);
   const onTourEndRef = useRef<(() => void) | null>(null);
+  const stepActionOverridesRef = useRef<Map<string, () => void>>(new Map());
+
+  const registerStepAction = useCallback((stepId: string, callback: () => void) => {
+    stepActionOverridesRef.current.set(stepId, callback);
+    return () => {
+      stepActionOverridesRef.current.delete(stepId);
+    };
+  }, []);
 
   const runStepAction = useCallback((step: TourStep | undefined) => {
     if (!step) return;
-    if (step.id === 'assessment-tab') {
+
+    const override = stepActionOverridesRef.current.get(step.id);
+    if (override) {
+      override();
+      return;
+    }
+
+    // Default: some steps trigger a click to move the user forward (navigate, switch tab, or open builder).
+    if (step.id === 'course-select' || step.id === 'assessment-tab' || step.id === 'builder-add-section-button') {
       const target = getTarget(step);
       target?.click();
     }
@@ -234,6 +229,7 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
   const stopTour = useCallback(() => {
     const onEnd = onTourEndRef.current;
     onTourEndRef.current = null;
+    stepActionOverridesRef.current.clear();
     setState({ steps: [], currentIndex: 0, isActive: false });
     setActiveTourId(null);
     onEnd?.();
@@ -269,10 +265,11 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
       startTour,
       stopTour,
       registerOnTourEnd,
+      registerStepAction,
       isActive: state.isActive,
       activeTourId
     }),
-    [startTour, stopTour, registerOnTourEnd, state.isActive, activeTourId]
+    [startTour, stopTour, registerOnTourEnd, registerStepAction, state.isActive, activeTourId]
   );
 
   const step = state.isActive ? state.steps[state.currentIndex] : null;

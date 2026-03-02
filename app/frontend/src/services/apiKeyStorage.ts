@@ -139,7 +139,7 @@ export const apiKeyStorage = {
     return !modelId.startsWith('ollama');
   },
 
-  /** Builds the apiKeys payload expected by EduAI based on the chosen model and stored keys. */
+  /** Builds the apiKeys payload expected by the AI service based on the chosen model and stored keys. */
   async buildApiKeysForModel(modelId: string): Promise<Record<string, any>> {
     if (modelId.startsWith('ollama')) {
       return {

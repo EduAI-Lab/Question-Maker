@@ -1,5 +1,5 @@
 /**
- * Frontend wrapper around EduAI endpoints for chat, question generation, course/topics, and model list.
+ * Frontend wrapper around AI service endpoints for chat, question generation, course/topics, and model list.
  * Passes through provider API keys as needed and returns typed results.
  */
 import api from './api';
@@ -139,26 +139,26 @@ export interface EduAITestResponse {
 }
 
 class EduAIService {
-    /** Sends a chat message to EduAI with course context. */
+    /** Sends a chat message to the AI service with course context. */
     async chat(request: EduAIChatRequest): Promise<EduAIChatResponse> {
         const response = await api.post('/api/eduai/chat', request);
         return response.data;
     }
 
-    /** Generates questions via EduAI with the provided course/prompt/model settings. */
+    /** Generates questions via the AI service with the provided course/prompt/model settings. */
     async generateQuestions(request: EduAIQuestionGenerationRequest): Promise<EduAIQuestionGenerationResponse> {
         const response = await api.post('/api/eduai/generate-questions', request);
         return response.data;
     }
 
-    /** Tests configured EduAI credentials by calling the backend validation endpoint. */
+    /** Tests configured AI service credentials by calling the backend validation endpoint. */
     async testApiKey(): Promise<EduAITestResponse> {
         const response = await api.get('/api/eduai/test-api-key');
         return response.data;
     }
 
     /**
-     * Fetch available AI models from EduAI
+     * Fetch available AI models from the AI service
      */
     async listModels(): Promise<EduAIModelOption[]> {
         try {
@@ -176,13 +176,13 @@ class EduAIService {
                     isDefault: model.modelId === 'gpt-oss:120b' // Default to ollama model
                 }));
         } catch (error) {
-            console.error('Failed to fetch AI models from EduAI:', error);
+            console.error('Failed to fetch AI models from the AI service:', error);
             return [];
         }
     }
 
     /**
-     * Retrieve all courses from EduAI via backend proxy.
+     * Retrieve all courses from the AI service via backend proxy.
      * Each unique combination of code, name, term, and year is a separate course.
      */
     async listCourses(): Promise<EduAICourseOption[]> {
@@ -190,7 +190,7 @@ class EduAIService {
             const response = await api.get('/api/eduai/courses');
             const coursesData = response.data.data;
 
-            // Transform EduAI API response to our format
+            // Transform AI service API response to our format
             if (coursesData && Array.isArray(coursesData.courses)) {
                 return coursesData.courses.map((course: any) => ({
                     id: course.id,
@@ -204,7 +204,7 @@ class EduAIService {
 
             return [];
         } catch (error) {
-            console.error('Failed to fetch courses from EduAI:', error);
+            console.error('Failed to fetch courses from the AI service:', error);
             throw error;
         }
     }
@@ -212,7 +212,7 @@ class EduAIService {
     /**
      * Mock: Return topic list for a course.
      * Topics are looked up by course code (e.g., "COSC 211" -> "COSC211")
-     * courseIdOrCode can be either the EduAI course UUID or the course code
+     * courseIdOrCode can be either the AI service course UUID or the course code
      * Replace with live API call when endpoint is available.
      */
     async listCourseTopics(courseIdOrCode: string, courseCode?: string): Promise<EduAITopicOption[]> {
@@ -238,7 +238,7 @@ class EduAIService {
     }
 
     /**
-     * Live: Fetch course topics from EduAI via backend proxy.
+     * Live: Fetch course topics from the AI service via backend proxy.
      */
     async fetchCourseTopics(courseId: string): Promise<any> {
         const response = await api.get(`/api/eduai/courses/${courseId}/topics`);

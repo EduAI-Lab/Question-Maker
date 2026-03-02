@@ -15,7 +15,6 @@ import { Topic } from '../../types/topic';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
-import { Input } from '../../components/ui/input';
 import { Tooltip } from '../../components/ui/tooltip';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import {
@@ -38,8 +37,7 @@ interface CreateSectionPanelProps {
         existingSectionId?: number
     ) => Promise<void>;
     onCancel: () => void;
-    onSectionNameChange?: (name: string) => void;
-    prefillFromQuestion?: { sectionName: string; question: Question } | null;
+    prefillFromQuestion?: { question: Question } | null;
     blueprint?: AssessmentBlueprintConfig | null;
     availableTopics: Topic[];
     defaultPrimaryTopics: number[];
@@ -53,7 +51,6 @@ export const CreateSectionPanel = ({
     isSearching,
     onSearchQuestions,
     onCancel,
-    onSectionNameChange,
     prefillFromQuestion,
     blueprint,
     availableTopics,
@@ -73,7 +70,6 @@ export const CreateSectionPanel = ({
         secondary: secondaryDefaults,
         excluded: excludedDefaults
     } = sanitizedDefaults;
-    const [sectionName, setSectionName] = useState('');
     const [sectionTypeOptions] = useState<QuestionType[]>(QUESTION_TYPES);
     const [selectedTypes, setSelectedTypes] = useState<QuestionType[]>([]);
     const [primaryTopicIds, setPrimaryTopicIds] = useState<number[]>(primaryDefaults);
@@ -139,7 +135,6 @@ export const CreateSectionPanel = ({
     useEffect(() => {
         if (!isEditing || !editingSection) return;
         const topicFilters = extractTopicFiltersFromSection(editingSection);
-        setSectionName(editingSection.name ?? '');
         const typesFromSection = deriveQuestionTypesFromSection(editingSection);
         setSelectedTypes(typesFromSection);
         setPrimaryTopicIds(topicFilters.primaryTopicIds);
@@ -179,7 +174,6 @@ export const CreateSectionPanel = ({
 
     useEffect(() => {
         if (isEditing) return;
-        setSectionName('');
         setSelectedTypes([]);
         setQuestionTarget(10);
         setSelectedReasoning([]);
@@ -188,13 +182,8 @@ export const CreateSectionPanel = ({
     }, [isEditing]);
 
     useEffect(() => {
-        onSectionNameChange?.(sectionName);
-    }, [sectionName, onSectionNameChange]);
-
-    useEffect(() => {
         if (!prefillFromQuestion || isEditing) return;
-        const { sectionName: prefillName, question } = prefillFromQuestion;
-        setSectionName((prev) => prev || prefillName);
+        const { question } = prefillFromQuestion;
         setSelectedTypes([question.type]);
         const firstVariant = question.variants?.[0];
         const difficulty = firstVariant?.difficulty;
@@ -252,17 +241,6 @@ export const CreateSectionPanel = ({
     };
 
     const handleSubmit = async () => {
-        if (!sectionName.trim()) return;
-    const hasRequiredFilters =
-      selectedTypes.length > 0 &&
-      selectedReasoning.length > 0 &&
-      selectedDifficulty.length > 0 &&
-      (primaryTopicIds.length > 0 || secondaryTopicIds.length > 0 || excludedTopicIds.length > 0);
-
-    if (!hasRequiredFilters) {
-      return;
-    }
-
         // Normalize reasoning data - distribute evenly if multiple selected, or use first one
         const reasoningCount = selectedReasoning.length;
         const normalizedReasoningData: ReasoningDataState = {
@@ -284,7 +262,7 @@ export const CreateSectionPanel = ({
         const primaryReasoning = selectedReasoning.length > 0 ? selectedReasoning[0] : 'factual';
 
         const payload: AssessmentSectionCreateInput = {
-            name: sectionName.trim(),
+            name: '',
             sectionType: selectedTypes.join(', '),
             questionTypes: selectedTypes,
             topicFilters: {
@@ -325,20 +303,7 @@ export const CreateSectionPanel = ({
                 <CardTitle>{isEditing ? 'Edit Section' : 'Create Section'}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="section-name">
-                            Section Name <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                            id="section-name"
-                            placeholder="e.g., Multiple Choice Questions"
-                            value={sectionName}
-                            onChange={(event) => setSectionName(event.target.value)}
-                        />
-                    </div>
-                </div>
-                <div className="space-y-2">
+                <div className="space-y-2" data-tour-id="builder-filters">
                     <Label>Question Types</Label>
                     <div className="flex flex-wrap gap-2">
                         {sectionTypeOptions.map((type) => (
@@ -354,7 +319,7 @@ export const CreateSectionPanel = ({
                         ))}
                     </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-4" data-tour-id="builder-topics">
                     <Label>Topics</Label>
                     <div className="space-y-4">
                         <MultiSelectDropdown
@@ -415,18 +380,10 @@ export const CreateSectionPanel = ({
                     </div>
                 </div>
                 {(() => {
-          const hasAnyFilter =
-            selectedTypes.length > 0 &&
-            selectedReasoning.length > 0 &&
-            selectedDifficulty.length > 0 &&
-            (primaryTopicIds.length > 0 || secondaryTopicIds.length > 0 || excludedTopicIds.length > 0);
-
-          const disabled = isSearching || !sectionName.trim() || !hasAnyFilter;
+          const disabled = isSearching;
           const tooltipContent = isSearching
             ? 'Searching for questions...'
-            : !sectionName.trim()
-            ? 'Section name is required'
-            : 'Select Question Type, Reasoning Focus, Difficulty, and at least one topic';
+            : 'Show all questions, or apply filters and search to narrow results';
 
                     if (disabled) {
                         return (
@@ -441,9 +398,11 @@ export const CreateSectionPanel = ({
                     }
 
                     return (
-                        <Button className="w-full" onClick={handleSubmit}>
-                            {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
-                        </Button>
+                        <Tooltip content={tooltipContent} multiline>
+                            <Button className="w-full" onClick={handleSubmit}>
+                                {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
+                            </Button>
+                        </Tooltip>
                     );
                 })()}
             </CardContent>

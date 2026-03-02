@@ -35,7 +35,7 @@ export const SectionCard = ({
       <CardHeader className="flex flex-col gap-3 space-y-0 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col">
           <div className="flex items-center gap-2">
-            <CardTitle className="text-lg">{section.name}</CardTitle>
+            <CardTitle className="text-lg">{section.name || 'Section'}</CardTitle>
             {hasDraftQuestions && (
               <Badge variant="default" className="bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-300 flex items-center gap-1">
                 <AlertTriangle className="h-3 w-3" />
