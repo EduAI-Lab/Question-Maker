@@ -29,7 +29,7 @@ export const HelpPage = () => {
                             <a href="#create-questions" className="text-primary hover:underline">Create Questions</a>
                             <ul className="list-disc list-inside pl-4 text-xs space-y-1">
                                 <li>Manual</li>
-                                <li>EduAI-assisted</li>
+                                <li>AI service–assisted</li>
                             </ul>
                         </li>
                         <li>
@@ -37,7 +37,7 @@ export const HelpPage = () => {
                             <ul className="list-disc list-inside pl-4 text-xs space-y-1">
                                 <li>Manual</li>
                                 <li>Copy Fields</li>
-                                <li>EduAI-assisted</li>
+                                <li>AI service–assisted</li>
                             </ul>
                         </li>
                         <li><a href="#upload" className="text-primary hover:underline">Upload PDF/Image → Extract Questions</a></li>
@@ -67,13 +67,13 @@ export const HelpPage = () => {
 
                 <section id="onboarding" className="space-y-2">
                     <h2 className="text-xl font-semibold">2. Onboarding: Add Courses and Topics</h2>
-                    <p className="text-sm text-muted-foreground">Flow: Top nav profile icon (👤) → “Link courses from EduAI”.</p>
+                    <p className="text-sm text-muted-foreground">Flow: Top nav profile icon (👤) → “Link courses from AI service”.</p>
                     <ol className="list-decimal list-inside space-y-1">
                         <li>Open the profile button in the top-right of the Landing page.</li>
-                        <li>In “Link courses from EduAI”, pick the courses you teach.
+                        <li>In “Link courses from AI service”, pick the courses you teach.
                             <ul className="list-disc list-inside pl-4 space-y-1">
                                 <li>“Already added” badge means it’s already in your library.</li>
-                                <li>Each course imports its topics automatically from EduAI.</li>
+                                <li>Each course imports its topics automatically from the AI service.</li>
                             </ul>
                         </li>
                         <li>Click “Add selected courses”. Courses + topics are created locally.</li>
@@ -111,7 +111,7 @@ export const HelpPage = () => {
                         </ol>
                     </div>
                     <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">3.2 With EduAI</h3>
+                        <h3 className="text-lg font-semibold">3.2 With AI service</h3>
                         <ol className="list-decimal list-inside space-y-1">
                             <li>Click “Add Question”.</li>
                             <li>On right-hand panel enter a prompt (topic/instructions).</li>
@@ -158,7 +158,7 @@ export const HelpPage = () => {
                         </ol>
                     </div>
                     <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">4.3 With EduAI</h3>
+                        <h3 className="text-lg font-semibold">4.3 With AI service</h3>
                         <ol className="list-decimal list-inside space-y-1">
                             <li>Open the question, choose “Create Variant”</li>
                             <li>From the right-hand panel, enter an AI prompt (e.g., “Make it harder and add an edge case”).</li>
@@ -238,7 +238,7 @@ export const HelpPage = () => {
                         <h3 className="text-lg font-semibold">6.3 Create Sections and Select Questions</h3>
                         <ol className="list-decimal list-inside space-y-1">
                             <li>On an assessment page: Click to add a section (Create Section panel).</li>
-                            <li>Set Section Name, desired question types, topic filters, difficulty and reasoning emphasis.</li>
+                            <li>Set desired question types, topic filters, difficulty and reasoning emphasis.</li>
                             <li>Run search; matching questions/variants are listed based on those filters.</li>
                             <li>Select variants to attach to the section.</li>
                             <li>Save the section; it appears in the assessment page.</li>
@@ -315,7 +315,7 @@ export const HelpPage = () => {
                         <li>API keys (External only) are stored locally in your browser, encrypted; never sent to the backend. Use “Change” to swap/remove a key.</li>
                         <li>Model pickers live in:
                             <ul className="list-disc list-inside pl-4 space-y-1">
-                                <li>Add Question / Add Variant dialogs (EduAI generation panel).</li>
+                                <li>Add Question / Add Variant dialogs (AI service generation panel).</li>
                                 <li>Upload Questions dialog (extraction model).</li>
                             </ul>
                         </li>
@@ -335,7 +335,7 @@ export const HelpPage = () => {
                     <ul className="list-disc list-inside space-y-1">
                         <li>Primary topic required for manual questions; add topics via courses if missing.</li>
                         <li>Drafts block exports; mark variants reviewed before exporting.</li>
-                        <li>EduAI course code helps relevance; generation still works without it but may be less accurate.</li>
+                        <li>AI service course code helps relevance; generation still works without it but may be less accurate.</li>
                         <li>Upload save requires at least one included question and filled assessment fields (type/name/semester).</li>
                     </ul>
                 </section>

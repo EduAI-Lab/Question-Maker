@@ -223,6 +223,7 @@ export const AddQuestionDialog = ({
             setForm({
                 ...defaultForm,
                 baseSelection: `${presetVariant.questionId}:${presetVariant.variant.id}`,
+                questionType: presetVariant.questionType,
                 variantReferenceId: referenceId ? referenceId.toString() : '',
                 variantText: presetVariant.variant.questionText ?? '',
                 variantDifficulty: presetVariant.variant.difficulty ?? 'medium',
@@ -305,7 +306,7 @@ export const AddQuestionDialog = ({
                     });
                 }
             } catch (optionsError) {
-                console.error('Failed to load EduAI options', optionsError);
+                console.error('Failed to load AI service options', optionsError);
             }
         };
 
@@ -462,7 +463,7 @@ export const AddQuestionDialog = ({
                         (eduCourse.code && eduCourse.code.toLowerCase() === normalizedName) ||
                         eduCourse.id.toLowerCase() === normalizedName;
                     if (matches) {
-                        console.log('[EduAI] fallback matched by name', { eduCourse, courseDetails });
+                        console.log('[AI service] fallback matched by name', { eduCourse, courseDetails });
                     }
                     return matches;
                 }
@@ -470,7 +471,7 @@ export const AddQuestionDialog = ({
                 if (courseId) {
                     const matchesId = eduCourse.id === courseId.toString();
                     if (matchesId) {
-                        console.log('[EduAI] fallback matched by id', { eduCourse, courseId });
+                        console.log('[AI service] fallback matched by id', { eduCourse, courseId });
                     }
                     return matchesId;
                 }
@@ -479,7 +480,7 @@ export const AddQuestionDialog = ({
             });
 
             if (fallback) {
-                console.log('[EduAI] using fallback course code', fallback);
+                console.log('[AI service] using fallback course code', fallback);
                 code = fallback.code;
             }
         }
@@ -490,8 +491,44 @@ export const AddQuestionDialog = ({
     const resolvedCourseCodeForDisplay = resolveCourseCodeForEduAI();
     const courseWarningMessage =
         resolvedCourseCodeForDisplay && !isCourseRecognizedByEduAI(resolvedCourseCodeForDisplay)
-            ? `EduAI does not recognize course code "${resolvedCourseCodeForDisplay}". Question generation will still run, but results may be less accurate.`
+            ? `AI service does not recognize course code "${resolvedCourseCodeForDisplay}". Question generation will still run, but results may be less accurate.`
             : null;
+
+    /** Required-field validation for Create Question: missing labels for tooltip and first field id for scroll. */
+    const requiredValidation = useMemo(() => {
+        const missing: { label: string; fieldId: string | null }[] = [];
+        if (!courseId) missing.push({ label: 'Course', fieldId: null });
+        if (!form.variantText.trim()) missing.push({ label: 'Question text', fieldId: 'field-variant-text' });
+        if (mode === 'variant') {
+            if (!form.baseSelection) missing.push({ label: 'Base variant selection', fieldId: null });
+        } else {
+            const primaryTopicNum = parseNumber(form.primaryTopicId);
+            if (!primaryTopicNum) missing.push({ label: 'Primary topic', fieldId: 'field-primary-topic' });
+        }
+        const isMcq = form.questionType === 'MCQ';
+        if (isMcq) {
+            const validChoices = form.variantChoices.filter((c) => c.text.trim().length > 0);
+            if (validChoices.length < 2) missing.push({ label: 'At least 2 MCQ choices with text', fieldId: 'field-mcq-choices' });
+        }
+        const missingLabels = missing.map((m) => m.label);
+        const firstWithField = missing.find((m) => m.fieldId != null);
+        return { missingLabels, firstFieldId: firstWithField?.fieldId ?? null };
+    }, [courseId, form.variantText, form.primaryTopicId, form.baseSelection, form.questionType, form.variantChoices, mode]);
+
+    const isCreateDisabled = isSubmitting || requiredValidation.missingLabels.length > 0;
+    const createButtonTooltip =
+        requiredValidation.missingLabels.length > 0
+            ? `Missing: ${requiredValidation.missingLabels.join(', ')}`
+            : '';
+
+    const handleCreateClick = () => {
+        if (requiredValidation.missingLabels.length > 0 && requiredValidation.firstFieldId) {
+            document.querySelector(`[data-field-id="${requiredValidation.firstFieldId}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+        if (requiredValidation.missingLabels.length > 0) return;
+        handleSubmit();
+    };
 
     const handleGenerateWithAI = async () => {
         if (!courseId) {
@@ -503,13 +540,13 @@ export const AddQuestionDialog = ({
 
         if (!courseCode) {
             setError(
-                'EduAI requires a course code. Update the course with a code or ensure the course exists in EduAI.'
+                'AI service requires a course code. Update the course with a code or ensure the course exists in the AI service.'
             );
             return;
         }
 
         if (!form.generationPrompt.trim()) {
-            setError('Enter a topic or prompt before asking EduAI to generate a question.');
+            setError('Enter a topic or prompt before asking the AI service to generate a question.');
             return;
         }
 
@@ -590,7 +627,7 @@ export const AddQuestionDialog = ({
 
             const generated = response?.data?.questions?.[0];
             if (!generated) {
-                throw new Error('EduAI did not return a question. Try a different prompt.');
+                throw new Error('AI service did not return a question. Try a different prompt.');
             }
 
             const inferredType: QuestionType =
@@ -696,7 +733,7 @@ export const AddQuestionDialog = ({
                 description: 'Review the generated text and adjust any details before saving.'
             });
         } catch (generateError: any) {
-            console.error('EduAI generation failed', generateError);
+            console.error('AI service generation failed', generateError);
             // Prioritize AI-provided error reason (from details field) over generic error message
             const aiErrorReason = generateError?.response?.data?.aiErrorReason;
             const details = generateError?.response?.data?.details;
@@ -716,7 +753,7 @@ export const AddQuestionDialog = ({
             // Show a persistent toast with a click action to view details
             toast({
                 variant: 'destructive',
-                title: 'EduAI has thrown an error',
+                title: 'AI service has thrown an error',
                 description: 'Click to see why',
                 duration: Infinity, // Prevent auto-dismissal - user must manually dismiss
                 action: (
@@ -1012,8 +1049,8 @@ export const AddQuestionDialog = ({
                                             </Tabs>
 
                                             <div className="space-y-4" data-tour-id="aq-form-fields">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="variant-text">Question Text</Label>
+                                                <div className="space-y-2" data-field-id="field-variant-text">
+                                                    <Label htmlFor="variant-text">Question Text <span className="text-destructive">*</span></Label>
                                                     <Textarea
                                                         id="variant-text"
                                                         value={form.variantText}
@@ -1024,17 +1061,19 @@ export const AddQuestionDialog = ({
                                                 </div>
 
                                                 {form.questionType === 'MCQ' && (
-                                                    <MCQChoicesField
-                                                        choices={form.variantChoices ?? defaultForm.variantChoices}
-                                                        answer={form.variantAnswer}
-                                                        onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
-                                                        onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
-                                                        idPrefix="aq-mcq"
-                                                    />
+                                                    <div data-field-id="field-mcq-choices">
+                                                        <MCQChoicesField
+                                                            choices={form.variantChoices ?? defaultForm.variantChoices}
+                                                            answer={form.variantAnswer}
+                                                            onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
+                                                            onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
+                                                            idPrefix="aq-mcq"
+                                                        />
+                                                    </div>
                                                 )}
 
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="primary-topic">Primary Topic</Label>
+                                                <div className="space-y-2" data-field-id="field-primary-topic">
+                                                    <Label htmlFor="primary-topic">Primary Topic <span className="text-destructive">*</span></Label>
                                                     <Select
                                                     value={form.primaryTopicId}
                                                     onValueChange={(value) => handleFieldChange('primaryTopicId', value)}
@@ -1211,8 +1250,8 @@ export const AddQuestionDialog = ({
                                     <>
                                         <div className="space-y-4" data-tour-id="aq-metadata">
                                             <div className="space-y-4" data-tour-id="aq-form-fields">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="variant-text">Question Text</Label>
+                                                <div className="space-y-2" data-field-id="field-variant-text">
+                                                    <Label htmlFor="variant-text">Question Text <span className="text-destructive">*</span></Label>
                                                     <Textarea
                                                         id="variant-text"
                                                         value={form.variantText}
@@ -1223,13 +1262,28 @@ export const AddQuestionDialog = ({
                                                 </div>
 
                                                 {form.questionType === 'MCQ' && (
-                                                    <MCQChoicesField
-                                                        choices={form.variantChoices ?? defaultForm.variantChoices}
-                                                        answer={form.variantAnswer}
-                                                        onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
-                                                        onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
-                                                        idPrefix="aq-mcq"
-                                                    />
+                                                    <div data-field-id="field-mcq-choices">
+                                                        <MCQChoicesField
+                                                            choices={form.variantChoices ?? defaultForm.variantChoices}
+                                                            answer={form.variantAnswer}
+                                                            onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
+                                                            onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
+                                                            idPrefix="aq-mcq"
+                                                        />
+                                                    </div>
+                                                )}
+
+                                                {mode === 'variant' && form.questionType !== 'MCQ' && (
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="variant-answer-main">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                                                        <Textarea
+                                                            id="variant-answer-main"
+                                                            value={form.variantAnswer}
+                                                            onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
+                                                            placeholder="Provide an answer or leave blank"
+                                                            rows={3}
+                                                        />
+                                                    </div>
                                                 )}
 
                                                 {presetVariant && (
@@ -1301,18 +1355,6 @@ export const AddQuestionDialog = ({
                                                             className="bg-muted/50"
                                                         />
                                                     </div>
-                                                    {form.questionType !== 'MCQ' && (
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="variant-answer">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                            <Textarea
-                                                                id="variant-answer"
-                                                                value={form.variantAnswer}
-                                                                onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
-                                                                placeholder="Provide an answer or leave blank"
-                                                                rows={3}
-                                                            />
-                                                        </div>
-                                                    )}
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                         <div className="space-y-2">
                                                             <Label htmlFor="variant-assessment">Assessment <span className="text-xs text-muted-foreground">(optional)</span></Label>
@@ -1387,16 +1429,16 @@ export const AddQuestionDialog = ({
                             <div className="space-y-4">
                                 <h4 className="text-sm font-semibold text-muted-foreground">How to Fill This Form</h4>
 
-                                {/* Generate with EduAI */}
+                                {/* Generate with AI service */}
                                 <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3" data-tour-id="aq-eduai-panel">
                                     <div className="space-y-2">
                                         <div className="flex items-start gap-2">
                                             <div className="flex-1">
-                                                <h5 className="text-sm font-semibold">Generate with EduAI</h5>
+                                                <h5 className="text-sm font-semibold">Generate with AI service</h5>
                                                 <p className="text-xs text-muted-foreground mt-1">
                                                     {mode === 'variant'
-                                                        ? 'Let EduAI create a variant based on a prompt'
-                                                        : 'Let EduAI generate a question from a prompt'}
+                                                        ? 'Let the AI service create a variant based on a prompt'
+                                                        : 'Let the AI service generate a question from a prompt'}
                                                 </p>
                                             </div>
                                         </div>
@@ -1556,7 +1598,7 @@ export const AddQuestionDialog = ({
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="balanced" className="text-xs">Let EduAI decide</SelectItem>
+                                                    <SelectItem value="balanced" className="text-xs">Let AI service decide</SelectItem>
                                                     <SelectItem value="easy" className="text-xs">Easy</SelectItem>
                                                     <SelectItem value="medium" className="text-xs">Medium</SelectItem>
                                                     <SelectItem value="hard" className="text-xs">Hard</SelectItem>
@@ -1576,7 +1618,7 @@ export const AddQuestionDialog = ({
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="balanced" className="text-xs">Let EduAI decide</SelectItem>
+                                                    <SelectItem value="balanced" className="text-xs">Let AI service decide</SelectItem>
                                                     <SelectItem value="factual" className="text-xs">Factual</SelectItem>
                                                     <SelectItem value="analytical" className="text-xs">Analytical</SelectItem>
                                                     <SelectItem value="application" className="text-xs">Application</SelectItem>
@@ -1622,22 +1664,40 @@ export const AddQuestionDialog = ({
                         <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
                             Cancel
                         </Button>
-                        <Button
-                            type="button"
-                            onClick={handleSubmit}
-                            disabled={
-                                isSubmitting ||
-                                (mode === 'variant' && !form.baseSelection)
-                            }
-                        >
-                            {isSubmitting
-                                ? 'Saving...'
-                                : mode === 'new'
-                                    ? markAsReviewed
-                                        ? 'Create Question'
-                                        : 'Create Question (Draft)'
-                                    : 'Add Variant'}
-                        </Button>
+                        {createButtonTooltip ? (
+                            <Tooltip content={createButtonTooltip} side="top" multiline>
+                                <span className="inline-block">
+                                    <Button
+                                        type="button"
+                                        onClick={handleCreateClick}
+                                        disabled={isSubmitting}
+                                        className={isCreateDisabled ? 'bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground cursor-pointer' : ''}
+                                    >
+                                        {isSubmitting
+                                            ? 'Saving...'
+                                            : mode === 'new'
+                                                ? markAsReviewed
+                                                    ? 'Create Question'
+                                                    : 'Create Question (Draft)'
+                                                : 'Add Variant'}
+                                    </Button>
+                                </span>
+                            </Tooltip>
+                        ) : (
+                            <Button
+                                type="button"
+                                onClick={handleCreateClick}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting
+                                    ? 'Saving...'
+                                    : mode === 'new'
+                                        ? markAsReviewed
+                                            ? 'Create Question'
+                                            : 'Create Question (Draft)'
+                                        : 'Add Variant'}
+                            </Button>
+                        )}
                     </div>
                 </DialogFooter>
             </DialogContent>

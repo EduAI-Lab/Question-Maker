@@ -2,8 +2,8 @@
  * Course selection page shown after login. User must select a course card to continue to Question Bank / Assessments.
  * Same header as landing; content shows "Your Courses", "Add new course" card, and available course cards.
  */
-import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { useCourses } from '../hooks/useCourses';
 import { Course } from '../types/question';
@@ -12,9 +12,11 @@ import { courseService } from '../services/courseService';
 import { GraduationCap, Plus } from 'lucide-react';
 import { Card, CardContent } from '../components/ui/card';
 import { Tooltip } from '../components/ui/tooltip';
+import { useGuidedTour } from '../contexts/GuidedTourContext';
+import { assessmentService } from '../services/assessmentService';
 
-const TEST_COURSE_CODE = 'TEST';
-const TEST_COURSE_NAME = 'Test Course';
+const TEST_COURSE_CODE = 'SANDBOX';
+const TEST_COURSE_NAME = 'Sandbox Course';
 
 function isTestCourse(course: Course): boolean {
   const code = (course.code ?? '').toUpperCase();
@@ -24,9 +26,11 @@ function isTestCourse(course: Course): boolean {
 
 export const CourseSelectionPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [profileOpen, setProfileOpen] = useState(false);
   const [isStartingTour, setIsStartingTour] = useState(false);
+  const { startTour, registerStepAction } = useGuidedTour();
 
   const handleSelectCourse = (course: Course) => {
     navigate('/landing', { state: { courseId: course.id }, replace: true });
@@ -51,16 +55,38 @@ export const CourseSelectionPage = () => {
         } catch {
           // ignore topic creation failure
         }
+        try {
+          await assessmentService.createPracticeExamForCourse(created.id);
+        } catch {
+          // ignore practice exam creation failure
+        }
         await fetchCourses();
         testCourse = created;
       }
-      navigate('/landing', { state: { courseId: testCourse.id, startGuidedTour: true }, replace: true });
+
+      startTour('main');
     } catch (err) {
       console.error('Failed to start guided tour', err);
     } finally {
       setIsStartingTour(false);
     }
-  }, [courses, fetchCourses, navigate, isStartingTour]);
+  }, [courses, fetchCourses, isStartingTour, startTour]);
+
+  // When arriving from Landing (e.g. user clicked Guided tour on Assessments tab), start the tour here and register step 1 to return to their course on questions tab.
+  useEffect(() => {
+    const state = location.state as { startGuidedTour?: boolean; returnCourseId?: number } | null;
+    if (!state?.startGuidedTour || state.returnCourseId == null) return;
+
+    const returnCourseId = state.returnCourseId;
+    startTour('main');
+    const unregister = registerStepAction('course-select', () => {
+      navigate('/landing?tab=questions', {
+        state: { courseId: returnCourseId },
+        replace: true
+      });
+    });
+    return unregister;
+  }, [location.state, startTour, registerStepAction, navigate]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,7 +103,7 @@ export const CourseSelectionPage = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
           {/* Add new course card */}
-          <Tooltip content="Add or link a course from EduAI to get started" side="top">
+          <Tooltip content="Add or link a course from the AI service to get started" side="top">
             <Card
               className="border-2 border-dashed border-muted-foreground/30 bg-muted/30 hover:border-primary hover:bg-muted/50 cursor-pointer transition-colors flex min-h-[140px]"
               onClick={() => setProfileOpen(true)}
@@ -92,10 +118,11 @@ export const CourseSelectionPage = () => {
           </Tooltip>
 
           {/* Available course cards */}
-          {courses.map((course) => (
+          {courses.map((course, index) => (
             <Tooltip key={course.id} content={`Open question bank and assessments for ${course.name}`} side="top">
               <Card
                 className="cursor-pointer transition-shadow hover:shadow-md border bg-card text-card-foreground flex min-h-[140px]"
+                data-tour-id={index === 0 ? 'course-select' : undefined}
                 onClick={() => handleSelectCourse(course)}
               >
                 <CardContent className="flex flex-col flex-1 p-6 justify-center">

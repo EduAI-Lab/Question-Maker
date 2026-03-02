@@ -2,7 +2,7 @@
  * Assessment detail page for viewing sections, matching questions, and managing variants.
  * Loads the assessment, fetches related questions, and coordinates section/variant modals.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Layers3, Plus, Upload, AlertTriangle, FileText } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
@@ -31,8 +31,9 @@ import { SectionCard } from './assessments/SectionCard';
 import { CreateSectionPanel } from './assessments/CreateSectionPanel';
 import { MatchingQuestionsPanel } from './assessments/MatchingQuestionsPanel';
 import { QuestionSearchFilters, defaultReasoningData } from './assessments/assessmentViewTypes';
-import { questionMatchesFilters, buildDraftFromSection } from './assessments/assessmentViewUtils';
+import { questionMatchesFilters, buildDraftFromSection, getDefaultSectionDraft } from './assessments/assessmentViewUtils';
 import GenerateAssessmentModal from '../components/assessments/GenerateAssessmentModal';
+import { useGuidedTour } from '../contexts/GuidedTourContext';
 
 export const AssessmentViewPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +41,7 @@ export const AssessmentViewPage = () => {
   const location = useLocation();
   const assessmentId = Number(id);
   const { toast } = useToast();
+  const { startTour } = useGuidedTour();
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [sections, setSections] = useState<AssessmentSection[]>([]);
@@ -56,9 +58,7 @@ export const AssessmentViewPage = () => {
   const [isCreatingSection, setIsCreatingSection] = useState(false);
   const [questionSearchError, setQuestionSearchError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
-  const [isSectionNameFilled, setIsSectionNameFilled] = useState(false);
-  const [sectionNameValue, setSectionNameValue] = useState('');
-  const [prefillFromQuestion, setPrefillFromQuestion] = useState<{ sectionName: string; question: Question } | null>(null);
+  const [prefillFromQuestion, setPrefillFromQuestion] = useState<{ question: Question } | null>(null);
   const [isEditAssessmentOpen, setIsEditAssessmentOpen] = useState(false);
   const [pendingSectionDraft, setPendingSectionDraft] =
     useState<AssessmentSectionCreateInput | null>(null);
@@ -122,11 +122,25 @@ export const AssessmentViewPage = () => {
           const variant = link.variant;
           if (!variant) return;
 
-          const text =
+          const questionText =
             variant.questionText?.trim() ||
             variant.questionMetadata?.description?.trim() ||
             '';
-          if (!text) return;
+          if (!questionText) return;
+
+          const parts: string[] = [questionText];
+          const choices = variant.choices && Array.isArray(variant.choices) ? variant.choices : [];
+          if (choices.length > 0) {
+            choices.forEach((c) => {
+              parts.push(`${c.letter}. ${(c.text || '').trim()}`);
+            });
+          }
+          const answer = variant.answer?.trim();
+          if (answer) {
+            parts.push(`Correct answer: ${answer}`);
+          }
+
+          const text = parts.join('\n');
 
           const orderValue =
             link.displayOrder ?? variant.questionMetadata?.questionOrder?.[assessment.id];
@@ -174,8 +188,6 @@ export const AssessmentViewPage = () => {
     resetBuilderContext();
     setEditingSection(null);
     setIsBuilderVisible(false);
-    setIsSectionNameFilled(false);
-    setSectionNameValue('');
     setPrefillFromQuestion(null);
   };
 
@@ -217,6 +229,40 @@ export const AssessmentViewPage = () => {
       resetBuilderContext();
     }
   }, [isBuilderVisible]);
+
+  // When builder opens in create mode with no search yet, show all course questions by default
+  useEffect(() => {
+    if (
+      !isBuilderVisible ||
+      !assessment?.course?.id ||
+      editingSection != null ||
+      hasSearched
+    ) {
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const questions = await questionService.getQuestions({
+          courseId: assessment!.course!.id,
+          limit: 500
+        });
+        if (!cancelled) {
+          setMatchingQuestions(questions);
+          setHasSearched(true);
+          setPendingSectionDraft(getDefaultSectionDraft());
+        }
+      } catch (_err) {
+        if (!cancelled) {
+          setQuestionSearchError('Failed to load questions.');
+        }
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isBuilderVisible, assessment?.course?.id, editingSection, hasSearched]);
 
   const topicsById = useMemo(() => {
     const map: Record<number, Topic> = {};
@@ -426,41 +472,76 @@ export const AssessmentViewPage = () => {
     );
   };
 
-  const handleUpdateQuestionMetadata = (
-    questionId: number,
-    updates: {
-      description?: string | null;
-      primaryTopicId?: number;
-      type?: import('../types/question').QuestionType;
-      primaryTopicName?: string;
-    }
-  ) => {
-    setMatchingQuestions((prev) =>
-      prev.map((q) =>
-        q.id === questionId
-          ? {
-              ...q,
-              ...(updates.description !== undefined && { description: updates.description }),
-              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
-              ...(updates.type !== undefined && { type: updates.type })
-            }
-          : q
-      )
-    );
-    if (selectedVariant?.questionId === questionId) {
-      setSelectedVariant((prev) =>
-        prev
-          ? {
-              ...prev,
-              ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
-              ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
-              ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
-              ...(updates.type !== undefined && { questionType: updates.type })
-            }
-          : prev
+  const handleUpdateQuestionMetadata = useCallback(
+    async (
+      questionId: number,
+      updates: {
+        description?: string | null;
+        primaryTopicId?: number;
+        type?: import('../types/question').QuestionType;
+        primaryTopicName?: string;
+      }
+    ) => {
+      setMatchingQuestions((prev) =>
+        prev.map((q) =>
+          q.id === questionId
+            ? {
+                ...q,
+                ...(updates.description !== undefined && { description: updates.description }),
+                ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+                ...(updates.type !== undefined && { type: updates.type })
+              }
+            : q
+        )
       );
-    }
-  };
+      if (selectedVariant?.questionId === questionId) {
+        setSelectedVariant((prev) =>
+          prev
+            ? {
+                ...prev,
+                ...(updates.description !== undefined && { questionDescription: updates.description ?? null }),
+                ...(updates.primaryTopicId !== undefined && { primaryTopicId: updates.primaryTopicId }),
+                ...(updates.primaryTopicName !== undefined && { primaryTopicName: updates.primaryTopicName }),
+                ...(updates.type !== undefined && { questionType: updates.type })
+              }
+            : prev
+        );
+      }
+      try {
+        const fetched = await questionService.getQuestion(questionId);
+        setMatchingQuestions((prev) =>
+          prev.map((q) => (q.id === questionId ? fetched : q))
+        );
+        if (selectedVariant?.questionId === questionId) {
+          const resolveTopicName = (topicId: number) => topicsById[topicId]?.name ?? `Topic ${topicId}`;
+          const variant = fetched.variants?.find((v) => v.id === selectedVariant.variant.id) ?? selectedVariant.variant;
+          const secondaryTopicNames = Array.isArray(variant.secondaryTopicsId)
+            ? (variant.secondaryTopicsId
+                .map((topicId) => resolveTopicName(topicId))
+                .filter(Boolean) as string[])
+            : undefined;
+          setSelectedVariant({
+            questionId: fetched.id,
+            questionDescription: fetched.description ?? null,
+            questionType: fetched.type,
+            primaryTopicId: fetched.primaryTopicId,
+            primaryTopicName: resolveTopicName(fetched.primaryTopicId),
+            courseId: fetched.courseId,
+            courseName: fetched.course?.name,
+            courseCode: fetched.course?.code,
+            secondaryTopicNames:
+              secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+            isAiGenerated: variant.isAiGenerated,
+            isDraft: variant.isDraft,
+            variant
+          });
+        }
+      } catch (err) {
+        console.error('Failed to refetch question after metadata update', err);
+      }
+    },
+    [selectedVariant?.questionId, selectedVariant?.variant.id, topicsById]
+  );
 
   const handleViewVariant = async (entry: QuestionVariantEntry) => {
     setSelectedVariant(entry);
@@ -522,14 +603,6 @@ export const AssessmentViewPage = () => {
       toast({
         title: 'Select a course first',
         description: 'Unable to create a question without course context.',
-        variant: 'destructive'
-      });
-      return;
-    }
-    if (!isSectionNameFilled) {
-      toast({
-        title: 'Add a section name first',
-        description: 'Enter a section name before creating a question for it.',
         variant: 'destructive'
       });
       return;
@@ -635,7 +708,7 @@ export const AssessmentViewPage = () => {
       };
 
       const derivedPayload = {
-        name: sectionNameValue.trim(),
+        name: '',
         sectionType: [newQuestion.type].join(', '),
         questionTypes: [newQuestion.type],
         topicFilters: {
@@ -658,7 +731,7 @@ export const AssessmentViewPage = () => {
 
       setPendingSectionDraft(derivedPayload);
       setLastFilters(derivedFilters);
-      setPrefillFromQuestion({ sectionName: sectionNameValue.trim(), question: newQuestion });
+      setPrefillFromQuestion({ question: newQuestion });
       void handleSectionSearch(derivedFilters, derivedPayload, pendingSectionId).then(() => {
         setSelectedQuestionIds((prev) => {
           const next = new Set(prev);
@@ -747,8 +820,6 @@ export const AssessmentViewPage = () => {
   const startCreateSection = () => {
     resetBuilderContext();
     setEditingSection(null);
-    setIsSectionNameFilled(false);
-    setSectionNameValue('');
     setPrefillFromQuestion(null);
     setIsBuilderVisible(true);
     // Scroll to create section card
@@ -794,8 +865,6 @@ export const AssessmentViewPage = () => {
   const handleEditSection = async (section: AssessmentSection) => {
     resetBuilderContext();
     setEditingSection(section);
-    setIsSectionNameFilled(Boolean(section.name?.trim()));
-    setSectionNameValue(section.name ?? '');
     primeSelectionFromSection(section);
     setIsBuilderVisible(true);
     const { filters, payload } = buildDraftFromSection(section);
@@ -830,7 +899,7 @@ export const AssessmentViewPage = () => {
       await refreshSections();
       toast({
         title: 'Section deleted',
-        description: `"${section.name}" has been removed.`
+        description: 'The section has been removed.'
       });
     } catch (_error) {
       toast({
@@ -1130,6 +1199,7 @@ export const AssessmentViewPage = () => {
                         size="sm"
                         onClick={() => setIsCanvasExportOpen(true)}
                         className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                        data-tour-id="export-canvas-btn"
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         Export to Canvas
@@ -1163,6 +1233,7 @@ export const AssessmentViewPage = () => {
                             size="sm"
                             disabled
                             className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                            data-tour-id="export-canvas-btn"
                           >
                             <Upload className="mr-2 h-4 w-4" />
                             Export to Canvas
@@ -1200,10 +1271,29 @@ export const AssessmentViewPage = () => {
                     Arrange your assessment by sections. Each section can mix multiple question types.
                   </p>
                 </div>
-                <Button onClick={startCreateSection}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Section
-                </Button>
+                <div className="flex gap-2">
+                  <Tooltip content="Walk through how to build sections and add questions to your assessment" side="bottom">
+                    <div className="relative">
+                      {orderedSections.length === 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
+                        </span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startTour('assessmentBuilder')}
+                      >
+                        Assessment guided tour
+                      </Button>
+                    </div>
+                  </Tooltip>
+                  <Button onClick={startCreateSection} data-tour-id="builder-add-section-button">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Section
+                  </Button>
+                </div>
               </div>
 
               {orderedSections.length === 0 ? (
@@ -1222,26 +1312,16 @@ export const AssessmentViewPage = () => {
                         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <CardTitle className="text-lg">
-                              Editing: {section.name || 'Untitled section'}
+                              Editing section
                             </CardTitle>
                             <p className="text-sm text-muted-foreground">
                               Update details and questions, then save below.
                             </p>
                           </div>
                           <div className="flex gap-2">
-                            {isSectionNameFilled ? (
-                              <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
-                                Create New Question
-                              </Button>
-                            ) : (
-                              <Tooltip content="Section name is required" multiline>
-                                <span className="inline-block">
-                                  <Button variant="outline" size="sm" disabled>
-                                    Create New Question
-                                  </Button>
-                                </span>
-                              </Tooltip>
-                            )}
+                            <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
+                              Create New Question
+                            </Button>
                             {(() => {
                               const selectedCount = selectedQuestionIds.size;
                               const canFinalize = Boolean(pendingSectionDraft);
@@ -1266,6 +1346,7 @@ export const AssessmentViewPage = () => {
                                     <span className="inline-block">
                                       <Button
                                         size="sm"
+                                        data-tour-id="builder-save-section"
                                         disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
                                         onClick={handleFinalizeSection}
                                       >
@@ -1276,13 +1357,14 @@ export const AssessmentViewPage = () => {
                                 );
                               }
                               return (
-                                <Button
-                                  size="sm"
-                                  disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
-                                  onClick={handleFinalizeSection}
-                                >
-                                  {isCreatingSection ? 'Adding...' : 'Save to Section'}
-                                </Button>
+<Button
+                                size="sm"
+                                data-tour-id="builder-save-section"
+                                disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                onClick={handleFinalizeSection}
+                              >
+                                {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                              </Button>
                               );
                             })()}
                             <Button variant="ghost" size="sm" onClick={handleCancelBuilder}>
@@ -1297,10 +1379,6 @@ export const AssessmentViewPage = () => {
                               isSearching={isSearchingQuestions}
                               onSearchQuestions={handleSectionSearch}
                               onCancel={handleCancelBuilder}
-                              onSectionNameChange={(name) => {
-                                setIsSectionNameFilled(Boolean(name.trim()));
-                                setSectionNameValue(name);
-                              }}
                               prefillFromQuestion={prefillFromQuestion}
                               blueprint={assessment?.blueprintConfig}
                               availableTopics={availableTopics}
@@ -1355,19 +1433,9 @@ export const AssessmentViewPage = () => {
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      {isSectionNameFilled ? (
-                        <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
-                          Create New Question
-                        </Button>
-                      ) : (
-                        <Tooltip content="Section name is required" multiline>
-                          <span className="inline-block">
-                            <Button variant="outline" size="sm" disabled>
-                              Create New Question
-                            </Button>
-                          </span>
-                        </Tooltip>
-                      )}
+                      <Button variant="outline" size="sm" onClick={handleCreateNewQuestion}>
+                        Create New Question
+                      </Button>
                       {(() => {
                         const selectedCount = selectedQuestionIds.size;
                         const canFinalize = Boolean(pendingSectionDraft);
@@ -1390,25 +1458,27 @@ export const AssessmentViewPage = () => {
                           return (
                             <Tooltip content={disabledReason} multiline>
                               <span className="inline-block">
-                                <Button
-                                  size="sm"
-                                  disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
-                                  onClick={handleFinalizeSection}
-                                >
-                                  {isCreatingSection ? 'Adding...' : 'Save to Section'}
-                                </Button>
+<Button
+                                size="sm"
+                                data-tour-id="builder-save-section"
+                                disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                onClick={handleFinalizeSection}
+                              >
+                                {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                              </Button>
                               </span>
                             </Tooltip>
                           );
                         }
                         return (
-                          <Button
-                            size="sm"
-                            disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
-                            onClick={handleFinalizeSection}
-                          >
-                            {isCreatingSection ? 'Adding...' : 'Save to Section'}
-                          </Button>
+<Button
+                                size="sm"
+                                data-tour-id="builder-save-section"
+                                disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                onClick={handleFinalizeSection}
+                              >
+                                {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                              </Button>
                         );
                       })()}
                       <Button variant="ghost" size="sm" onClick={handleCancelBuilder}>
@@ -1423,10 +1493,6 @@ export const AssessmentViewPage = () => {
                         isSearching={isSearchingQuestions}
                         onSearchQuestions={handleSectionSearch}
                         onCancel={handleCancelBuilder}
-                        onSectionNameChange={(name) => {
-                          setIsSectionNameFilled(Boolean(name.trim()));
-                          setSectionNameValue(name);
-                        }}
                         prefillFromQuestion={prefillFromQuestion}
                         blueprint={assessment.blueprintConfig}
                         availableTopics={availableTopics}
@@ -1546,7 +1612,7 @@ export const AssessmentViewPage = () => {
            deleteAction?.type === 'assessment'
              ? `Delete assessment "${assessment?.name}"?`
              : deleteAction?.type === 'section'
-             ? `Delete section "${(deleteAction.item as AssessmentSection)?.name}"?`
+             ? 'Delete this section?'
              : 'Remove question from section?'
          }
          message={

@@ -7,7 +7,6 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tooltip } from '../ui/tooltip';
 import { courseService } from '../../services/courseService';
@@ -38,7 +37,6 @@ export const GenerateAssessmentModal = ({
   const isEdit = mode === 'edit';
   const [assessmentName, setAssessmentName] = React.useState(initialValues?.name ?? '');
   const [assessmentType, setAssessmentType] = React.useState<AssessmentType>(initialValues?.type ?? 'Assignment');
-  const [assessmentDescription, setAssessmentDescription] = React.useState(initialValues?.description ?? '');
   const [assessmentSemester, setAssessmentSemester] = React.useState(() => {
     if (initialValues?.semester) return initialValues.semester;
     const now = new Date();
@@ -76,7 +74,6 @@ export const GenerateAssessmentModal = ({
   const canGenerate =
     courseId > 0 &&
     assessmentName.trim().length > 0 &&
-    assessmentDescription.trim().length > 0 &&
     assessmentSemester.trim().length > 0 &&
     primaryTopicIds.length > 0;
 
@@ -85,7 +82,6 @@ export const GenerateAssessmentModal = ({
       const reasons: string[] = [];
       if (courseId <= 0) reasons.push('course');
       if (assessmentName.trim().length === 0) reasons.push('name');
-      if (assessmentDescription.trim().length === 0) reasons.push('description');
       if (assessmentSemester.trim().length === 0) reasons.push('semester');
       if (primaryTopicIds.length === 0) reasons.push('at least one primary topic');
       
@@ -134,7 +130,7 @@ export const GenerateAssessmentModal = ({
       courseId,
       name: assessmentName.trim(),
       type: assessmentType,
-      description: assessmentDescription.trim(),
+      description: '',
       semester: assessmentSemester.trim(),
       primaryTopicIds,
       secondaryTopicIds,
@@ -192,16 +188,6 @@ export const GenerateAssessmentModal = ({
                 value={assessmentSemester}
                 onChange={(e) => setAssessmentSemester(e.target.value)}
                 placeholder="e.g. Fall 2024"
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="assessmentDescription">Description</Label>
-              <Textarea
-                id="assessmentDescription"
-                value={assessmentDescription}
-                onChange={(e) => setAssessmentDescription(e.target.value)}
-                placeholder="What should this assessment cover?"
-                rows={3}
               />
             </div>
           </div>
