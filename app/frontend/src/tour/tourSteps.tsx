@@ -44,5 +44,48 @@ export const tourSteps: TourConfig = {
       content: 'Edit assessments and export.',
       placement: 'bottom'
     }
+  ],
+  assessmentBuilder: [
+    {
+      id: 'builder-add-section-button',
+      title: 'Build with sections',
+      content:
+        'Assessments are built one section at a time so you can stay organized by grouping related questions.',
+      placement: 'bottom'
+    },
+    {
+      id: 'builder-filters',
+      title: 'Apply filters',
+      content:
+        'Choose question types, topics, reasoning focus, and difficulty to narrow down questions for this section.',
+      placement: 'right'
+    },
+    {
+      id: 'builder-topics',
+      title: 'Primary, secondary, and excluded topics',
+      content:
+        'Primary topics are the main focus, secondary topics add breadth, and excluded topics are intentionally left out of this section.',
+      placement: 'right'
+    },
+    {
+      id: 'builder-matching-questions',
+      title: 'Review filtered questions',
+      content:
+        'Here you can view matching questions, open their details, and create new variants when needed.',
+      placement: 'left'
+    },
+    {
+      id: 'builder-save-section',
+      title: 'Save questions to the section',
+      content: 'Select as many questions as you like, then use this button to save them into the section.',
+      placement: 'left'
+    },
+    {
+      id: 'export-canvas-btn',
+      title: 'Export only reviewed questions',
+      content:
+        'Only when all questions are reviewed can the assessment be exported to Canvas. Clear drafts before exporting.',
+      placement: 'bottom'
+    }
   ]
 };

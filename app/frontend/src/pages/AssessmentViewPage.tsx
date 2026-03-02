@@ -33,6 +33,7 @@ import { MatchingQuestionsPanel } from './assessments/MatchingQuestionsPanel';
 import { QuestionSearchFilters, defaultReasoningData } from './assessments/assessmentViewTypes';
 import { questionMatchesFilters, buildDraftFromSection } from './assessments/assessmentViewUtils';
 import GenerateAssessmentModal from '../components/assessments/GenerateAssessmentModal';
+import { useGuidedTour } from '../contexts/GuidedTourContext';
 
 export const AssessmentViewPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,6 +41,7 @@ export const AssessmentViewPage = () => {
   const location = useLocation();
   const assessmentId = Number(id);
   const { toast } = useToast();
+  const { startTour } = useGuidedTour();
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [sections, setSections] = useState<AssessmentSection[]>([]);
@@ -1149,6 +1151,7 @@ export const AssessmentViewPage = () => {
                         size="sm"
                         onClick={() => setIsCanvasExportOpen(true)}
                         className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                        data-tour-id="export-canvas-btn"
                       >
                         <Upload className="mr-2 h-4 w-4" />
                         Export to Canvas
@@ -1182,6 +1185,7 @@ export const AssessmentViewPage = () => {
                             size="sm"
                             disabled
                             className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                            data-tour-id="export-canvas-btn"
                           >
                             <Upload className="mr-2 h-4 w-4" />
                             Export to Canvas
@@ -1219,10 +1223,27 @@ export const AssessmentViewPage = () => {
                     Arrange your assessment by sections. Each section can mix multiple question types.
                   </p>
                 </div>
-                <Button onClick={startCreateSection}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Section
-                </Button>
+                <div className="flex gap-2">
+                  <div className="relative">
+                    {orderedSections.length === 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
+                      </span>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => startTour('assessmentBuilder')}
+                    >
+                      Assessment guided tour
+                    </Button>
+                  </div>
+                  <Button onClick={startCreateSection} data-tour-id="builder-add-section-button">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Section
+                  </Button>
+                </div>
               </div>
 
               {orderedSections.length === 0 ? (
@@ -1275,6 +1296,7 @@ export const AssessmentViewPage = () => {
                                     <span className="inline-block">
                                       <Button
                                         size="sm"
+                                        data-tour-id="builder-save-section"
                                         disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
                                         onClick={handleFinalizeSection}
                                       >
@@ -1285,13 +1307,14 @@ export const AssessmentViewPage = () => {
                                 );
                               }
                               return (
-                                <Button
-                                  size="sm"
-                                  disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
-                                  onClick={handleFinalizeSection}
-                                >
-                                  {isCreatingSection ? 'Adding...' : 'Save to Section'}
-                                </Button>
+<Button
+                                size="sm"
+                                data-tour-id="builder-save-section"
+                                disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                onClick={handleFinalizeSection}
+                              >
+                                {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                              </Button>
                               );
                             })()}
                             <Button variant="ghost" size="sm" onClick={handleCancelBuilder}>
@@ -1385,25 +1408,27 @@ export const AssessmentViewPage = () => {
                           return (
                             <Tooltip content={disabledReason} multiline>
                               <span className="inline-block">
-                                <Button
-                                  size="sm"
-                                  disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
-                                  onClick={handleFinalizeSection}
-                                >
-                                  {isCreatingSection ? 'Adding...' : 'Save to Section'}
-                                </Button>
+<Button
+                                size="sm"
+                                data-tour-id="builder-save-section"
+                                disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                onClick={handleFinalizeSection}
+                              >
+                                {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                              </Button>
                               </span>
                             </Tooltip>
                           );
                         }
                         return (
-                          <Button
-                            size="sm"
-                            disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
-                            onClick={handleFinalizeSection}
-                          >
-                            {isCreatingSection ? 'Adding...' : 'Save to Section'}
-                          </Button>
+<Button
+                                size="sm"
+                                data-tour-id="builder-save-section"
+                                disabled={selectedCount === 0 || !canFinalize || isCreatingSection}
+                                onClick={handleFinalizeSection}
+                              >
+                                {isCreatingSection ? 'Adding...' : 'Save to Section'}
+                              </Button>
                         );
                       })()}
                       <Button variant="ghost" size="sm" onClick={handleCancelBuilder}>

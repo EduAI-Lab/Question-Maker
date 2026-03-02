@@ -212,8 +212,8 @@ export const GuidedTourProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    // Default: some steps trigger a click to move the user forward (navigate or switch tab).
-    if (step.id === 'course-select' || step.id === 'assessment-tab') {
+    // Default: some steps trigger a click to move the user forward (navigate, switch tab, or open builder).
+    if (step.id === 'course-select' || step.id === 'assessment-tab' || step.id === 'builder-add-section-button') {
       const target = getTarget(step);
       target?.click();
     }

@@ -313,7 +313,7 @@ export const CreateSectionPanel = ({
                 <CardTitle>{isEditing ? 'Edit Section' : 'Create Section'}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
-                <div className="space-y-2">
+                <div className="space-y-2" data-tour-id="builder-filters">
                     <Label>Question Types</Label>
                     <div className="flex flex-wrap gap-2">
                         {sectionTypeOptions.map((type) => (
@@ -329,7 +329,7 @@ export const CreateSectionPanel = ({
                         ))}
                     </div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-4" data-tour-id="builder-topics">
                     <Label>Topics</Label>
                     <div className="space-y-4">
                         <MultiSelectDropdown
