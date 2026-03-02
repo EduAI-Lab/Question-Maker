@@ -69,7 +69,7 @@ export const getSectionsForAssessment = async (assessmentId, userId) => {
           {
             model: Variants,
             as: 'variant',
-            attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'questionMetadataId', 'isAiGenerated', 'isDraft'],
+            attributes: ['id', 'questionText', 'difficulty', 'reasoningLevel', 'questionMetadataId', 'isAiGenerated', 'isDraft', 'answer', 'choices'],
             include: [
               {
                 model: Question_Metadata,

@@ -713,11 +713,25 @@ export const LandingPage = () => {
           const variant = link.variant;
           if (!variant) return;
 
-          const text =
+          const questionText =
             variant.questionText?.trim() ||
             variant.questionMetadata?.description?.trim() ||
             '';
-          if (!text) return;
+          if (!questionText) return;
+
+          const parts: string[] = [questionText];
+          const choices = variant.choices && Array.isArray(variant.choices) ? variant.choices : [];
+          if (choices.length > 0) {
+            choices.forEach((c) => {
+              parts.push(`${c.letter}. ${(c.text || '').trim()}`);
+            });
+          }
+          const answer = variant.answer?.trim();
+          if (answer) {
+            parts.push(`Correct answer: ${answer}`);
+          }
+
+          const text = parts.join('\n');
 
           const orderValue =
             link.displayOrder ??
