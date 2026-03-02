@@ -64,7 +64,7 @@ export const tourSteps: TourConfig = {
       id: 'builder-topics',
       title: 'Primary, secondary, and excluded topics',
       content:
-        'Primary topics are the main focus, secondary topics add breadth, and excluded topics are intentionally left out of this section.',
+        'Primary topics are the main focus of the question, secondary topics demonstrate a secondary focus of the question , and excluded topics are questions that are to be left out.',
       placement: 'right'
     },
     {
