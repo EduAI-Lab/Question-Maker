@@ -1224,21 +1224,23 @@ export const AssessmentViewPage = () => {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <div className="relative">
-                    {orderedSections.length === 0 && (
-                      <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
-                      </span>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => startTour('assessmentBuilder')}
-                    >
-                      Assessment guided tour
-                    </Button>
-                  </div>
+                  <Tooltip content="Walk through how to build sections and add questions to your assessment" side="bottom">
+                    <div className="relative">
+                      {orderedSections.length === 0 && (
+                        <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500" />
+                        </span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startTour('assessmentBuilder')}
+                      >
+                        Assessment guided tour
+                      </Button>
+                    </div>
+                  </Tooltip>
                   <Button onClick={startCreateSection} data-tour-id="builder-add-section-button">
                     <Plus className="mr-2 h-4 w-4" />
                     Add Section
