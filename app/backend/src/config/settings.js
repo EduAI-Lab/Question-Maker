@@ -49,6 +49,11 @@ export const config = {
   // EduAI API Configuration
   eduaiApiUrl: process.env.EDUAI_API_URL || 'https://eduai.ok.ubc.ca',
   eduaiApiKey: process.env.EDUAI_API_KEY || '',
+  /** Comma-separated course codes or IDs to hide from the course list (e.g. EDUAI_IGNORED_COURSE_CODES=STUDY1,STUDY2). */
+  eduaiIgnoredCourseCodes: (process.env.EDUAI_IGNORED_COURSE_CODES || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   
   // AI Settings
   defaultNumQuestions: parseInt(process.env.DEFAULT_NUM_QUESTIONS) || 15,

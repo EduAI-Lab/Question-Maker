@@ -501,7 +501,7 @@ Please ensure the questions are appropriate for the course level and cover the k
     }
   }
 
-  /** Lists EduAI-managed courses for onboarding flows. */
+  /** Lists EduAI-managed courses for onboarding flows. Excludes courses in config.eduaiIgnoredCourseCodes. */
   async listCourses() {
     if (!this.isConfigured()) {
       throw new Error(
@@ -520,7 +520,28 @@ Please ensure the questions are appropriate for the course level and cover the k
         timeout: 60000, // 60 second timeout
       });
 
-      return response.data;
+      const data = response.data;
+      const ignored = (config.eduaiIgnoredCourseCodes || []).map((c) =>
+        String(c).replace(/\s+/g, "").toLowerCase()
+      );
+      if (ignored.length === 0) {
+        return data;
+      }
+
+      const normalize = (v) => (v == null ? "" : String(v).replace(/\s+/g, "").toLowerCase());
+      const filterCourse = (course) => {
+        const code = normalize(course.code);
+        const id = normalize(course.id);
+        return !ignored.some((k) => code === k || id === k);
+      };
+
+      if (Array.isArray(data)) {
+        return data.filter(filterCourse);
+      }
+      if (data && Array.isArray(data.courses)) {
+        return { ...data, courses: data.courses.filter(filterCourse) };
+      }
+      return data;
     } catch (error) {
       if (error.response) {
         const errorMessage =

@@ -118,7 +118,7 @@ export const MatchingQuestionsPanel = ({
   };
 
   return (
-    <Card className="border border-gray-200">
+    <Card className="border border-gray-200" data-tour-id="builder-matching-questions">
       <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Matching Questions</CardTitle>

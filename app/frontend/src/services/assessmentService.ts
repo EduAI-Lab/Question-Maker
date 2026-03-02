@@ -39,6 +39,28 @@ export const assessmentService = {
     return response.data.data || [];
   },
 
+  /** Creates an empty "Practice Exam" assessment for a course (e.g. sandbox or new course). */
+  async createPracticeExamForCourse(courseId: number): Promise<Assessment> {
+    const payload: AssessmentGenerationParams = {
+      courseId,
+      name: 'Practice Exam',
+      type: 'Quiz',
+      description: '',
+      semester: 'Fall 2024',
+      primaryTopicIds: [],
+      secondaryTopicIds: [],
+      excludedTopicIds: [],
+      difficultyDistribution: { easy: 0, medium: 0, hard: 0 },
+      reasoningDistribution: { factual: 0, analytical: 0, application: 0 },
+      reasoningData: {
+        factual: { total: 0, easyBoundary: 0, hardBoundary: 0 },
+        analytical: { total: 0, easyBoundary: 0, hardBoundary: 0 },
+        application: { total: 0, easyBoundary: 0, hardBoundary: 0 }
+      }
+    };
+    return this.createAssessment(payload);
+  },
+
   /** Creates an assessment with blueprint configuration derived from generation params. */
   async createAssessment(payload: AssessmentGenerationParams): Promise<Assessment> {
     const response = await api.post('/api/assessments', {

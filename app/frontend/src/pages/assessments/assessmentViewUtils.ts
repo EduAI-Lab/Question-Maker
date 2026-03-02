@@ -171,6 +171,27 @@ export const buildDraftFromSection = (
   return { filters, payload };
 };
 
+/** Minimal section draft so "Save to Section" is enabled with only questions selected (no filters required). */
+export const getDefaultSectionDraft = (): AssessmentSectionCreateInput => {
+  const reasoningData = defaultReasoningData();
+  return {
+    name: '',
+    sectionType: '',
+    questionTypes: [],
+    topicFilters: {
+      primaryTopicIds: [],
+      secondaryTopicIds: [],
+      excludedTopicIds: []
+    },
+    metadata: {},
+    reasoningData,
+    difficultySettings: {
+      easyBoundary: reasoningData.factual.easyBoundary,
+      hardBoundary: reasoningData.factual.hardBoundary
+    }
+  };
+};
+
 const collectSecondaryTopicIds = (question: Question): number[] => {
   return Array.from(
     new Set(

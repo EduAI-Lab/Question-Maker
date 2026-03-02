@@ -10,6 +10,6 @@ export type TourStep = {
   placement?: TourPlacement;
 };
 
-export type TourId = 'main';
+export type TourId = 'main' | 'assessmentBuilder';
 
 export type TourConfig = Record<TourId, TourStep[]>;
