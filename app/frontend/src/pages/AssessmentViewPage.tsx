@@ -31,7 +31,7 @@ import { SectionCard } from './assessments/SectionCard';
 import { CreateSectionPanel } from './assessments/CreateSectionPanel';
 import { MatchingQuestionsPanel } from './assessments/MatchingQuestionsPanel';
 import { QuestionSearchFilters, defaultReasoningData } from './assessments/assessmentViewTypes';
-import { questionMatchesFilters, buildDraftFromSection } from './assessments/assessmentViewUtils';
+import { questionMatchesFilters, buildDraftFromSection, getDefaultSectionDraft } from './assessments/assessmentViewUtils';
 import GenerateAssessmentModal from '../components/assessments/GenerateAssessmentModal';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 
@@ -215,6 +215,40 @@ export const AssessmentViewPage = () => {
       resetBuilderContext();
     }
   }, [isBuilderVisible]);
+
+  // When builder opens in create mode with no search yet, show all course questions by default
+  useEffect(() => {
+    if (
+      !isBuilderVisible ||
+      !assessment?.course?.id ||
+      editingSection != null ||
+      hasSearched
+    ) {
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const questions = await questionService.getQuestions({
+          courseId: assessment!.course!.id,
+          limit: 500
+        });
+        if (!cancelled) {
+          setMatchingQuestions(questions);
+          setHasSearched(true);
+          setPendingSectionDraft(getDefaultSectionDraft());
+        }
+      } catch (_err) {
+        if (!cancelled) {
+          setQuestionSearchError('Failed to load questions.');
+        }
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isBuilderVisible, assessment?.course?.id, editingSection, hasSearched]);
 
   const topicsById = useMemo(() => {
     const map: Record<number, Topic> = {};

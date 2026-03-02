@@ -241,16 +241,6 @@ export const CreateSectionPanel = ({
     };
 
     const handleSubmit = async () => {
-    const hasRequiredFilters =
-      selectedTypes.length > 0 &&
-      selectedReasoning.length > 0 &&
-      selectedDifficulty.length > 0 &&
-      (primaryTopicIds.length > 0 || secondaryTopicIds.length > 0 || excludedTopicIds.length > 0);
-
-    if (!hasRequiredFilters) {
-      return;
-    }
-
         // Normalize reasoning data - distribute evenly if multiple selected, or use first one
         const reasoningCount = selectedReasoning.length;
         const normalizedReasoningData: ReasoningDataState = {
@@ -390,16 +380,10 @@ export const CreateSectionPanel = ({
                     </div>
                 </div>
                 {(() => {
-          const hasAnyFilter =
-            selectedTypes.length > 0 &&
-            selectedReasoning.length > 0 &&
-            selectedDifficulty.length > 0 &&
-            (primaryTopicIds.length > 0 || secondaryTopicIds.length > 0 || excludedTopicIds.length > 0);
-
-          const disabled = isSearching || !hasAnyFilter;
+          const disabled = isSearching;
           const tooltipContent = isSearching
             ? 'Searching for questions...'
-            : 'Select Question Type, Reasoning Focus, Difficulty, and at least one topic';
+            : 'Show all questions, or apply filters and search to narrow results';
 
                     if (disabled) {
                         return (
@@ -414,9 +398,11 @@ export const CreateSectionPanel = ({
                     }
 
                     return (
-                        <Button className="w-full" onClick={handleSubmit}>
-                            {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
-                        </Button>
+                        <Tooltip content={tooltipContent} multiline>
+                            <Button className="w-full" onClick={handleSubmit}>
+                                {isSearching ? 'Searching...' : isEditing ? 'Update Search' : 'Search Questions'}
+                            </Button>
+                        </Tooltip>
                     );
                 })()}
             </CardContent>

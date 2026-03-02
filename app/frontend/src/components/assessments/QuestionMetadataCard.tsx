@@ -160,7 +160,7 @@ export const QuestionMetadataCard = ({
               )}
             </div>
             <div className="flex items-center gap-2">
-              {onViewQuestion ? (
+              {onViewQuestion && (
                 <Button
                   type="button"
                   variant="outline"
@@ -173,7 +173,8 @@ export const QuestionMetadataCard = ({
                 >
                   View Question
                 </Button>
-              ) : onToggleReview && activeVariant && activeVariant.isDraft !== undefined ? (
+              )}
+              {onToggleReview && activeVariant && activeVariant.isDraft !== undefined && (
                 <Button
                   type="button"
                   variant="outline"
@@ -186,7 +187,7 @@ export const QuestionMetadataCard = ({
                 >
                   {activeVariant.isDraft ? 'Mark Reviewed' : 'Mark Draft'}
                 </Button>
-              ) : null}
+              )}
               <Button
                 type="button"
                 variant="default"
