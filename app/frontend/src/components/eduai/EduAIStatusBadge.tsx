@@ -1,5 +1,5 @@
 /**
- * Small status badge indicating EduAI availability with optional refresh action.
+ * Small status badge indicating AI service availability with optional refresh action.
  */
 import { RefreshCw } from 'lucide-react';
 import { Tooltip } from '../ui/tooltip';
@@ -27,7 +27,7 @@ export const EduAIStatusBadge = ({ status, message, onRefresh, compact = false, 
   const content = (
     <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-2 py-1 text-xs font-medium shadow-sm">
       <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} aria-hidden />
-      <span className="text-gray-700">EduAI</span>
+      <span className="text-gray-700">AI service</span>
       {status === 'loading' && <span className="text-gray-500">Checking…</span>}
       {status === 'error' && <span className="text-red-600">Unavailable</span>}
       {status === 'ok' && <span className="text-emerald-700">Online</span>}
@@ -36,7 +36,7 @@ export const EduAIStatusBadge = ({ status, message, onRefresh, compact = false, 
           type="button"
           onClick={onRefresh}
           className="ml-1 inline-flex items-center rounded-full p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-          aria-label="Refresh EduAI status"
+          aria-label="Refresh AI service status"
         >
           <RefreshCw className="h-3 w-3" />
         </button>
@@ -45,7 +45,7 @@ export const EduAIStatusBadge = ({ status, message, onRefresh, compact = false, 
   );
 
   return (
-    <Tooltip content={message || 'EduAI status'} side="bottom" className={className}>
+    <Tooltip content={message || 'AI service status'} side="bottom" className={className}>
       {content}
     </Tooltip>
   );

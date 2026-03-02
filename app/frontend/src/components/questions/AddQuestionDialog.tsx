@@ -306,7 +306,7 @@ export const AddQuestionDialog = ({
                     });
                 }
             } catch (optionsError) {
-                console.error('Failed to load EduAI options', optionsError);
+                console.error('Failed to load AI service options', optionsError);
             }
         };
 
@@ -463,7 +463,7 @@ export const AddQuestionDialog = ({
                         (eduCourse.code && eduCourse.code.toLowerCase() === normalizedName) ||
                         eduCourse.id.toLowerCase() === normalizedName;
                     if (matches) {
-                        console.log('[EduAI] fallback matched by name', { eduCourse, courseDetails });
+                        console.log('[AI service] fallback matched by name', { eduCourse, courseDetails });
                     }
                     return matches;
                 }
@@ -471,7 +471,7 @@ export const AddQuestionDialog = ({
                 if (courseId) {
                     const matchesId = eduCourse.id === courseId.toString();
                     if (matchesId) {
-                        console.log('[EduAI] fallback matched by id', { eduCourse, courseId });
+                        console.log('[AI service] fallback matched by id', { eduCourse, courseId });
                     }
                     return matchesId;
                 }
@@ -480,7 +480,7 @@ export const AddQuestionDialog = ({
             });
 
             if (fallback) {
-                console.log('[EduAI] using fallback course code', fallback);
+                console.log('[AI service] using fallback course code', fallback);
                 code = fallback.code;
             }
         }
@@ -491,7 +491,7 @@ export const AddQuestionDialog = ({
     const resolvedCourseCodeForDisplay = resolveCourseCodeForEduAI();
     const courseWarningMessage =
         resolvedCourseCodeForDisplay && !isCourseRecognizedByEduAI(resolvedCourseCodeForDisplay)
-            ? `EduAI does not recognize course code "${resolvedCourseCodeForDisplay}". Question generation will still run, but results may be less accurate.`
+            ? `AI service does not recognize course code "${resolvedCourseCodeForDisplay}". Question generation will still run, but results may be less accurate.`
             : null;
 
     /** Required-field validation for Create Question: missing labels for tooltip and first field id for scroll. */
@@ -540,13 +540,13 @@ export const AddQuestionDialog = ({
 
         if (!courseCode) {
             setError(
-                'EduAI requires a course code. Update the course with a code or ensure the course exists in EduAI.'
+                'AI service requires a course code. Update the course with a code or ensure the course exists in the AI service.'
             );
             return;
         }
 
         if (!form.generationPrompt.trim()) {
-            setError('Enter a topic or prompt before asking EduAI to generate a question.');
+            setError('Enter a topic or prompt before asking the AI service to generate a question.');
             return;
         }
 
@@ -627,7 +627,7 @@ export const AddQuestionDialog = ({
 
             const generated = response?.data?.questions?.[0];
             if (!generated) {
-                throw new Error('EduAI did not return a question. Try a different prompt.');
+                throw new Error('AI service did not return a question. Try a different prompt.');
             }
 
             const inferredType: QuestionType =
@@ -733,7 +733,7 @@ export const AddQuestionDialog = ({
                 description: 'Review the generated text and adjust any details before saving.'
             });
         } catch (generateError: any) {
-            console.error('EduAI generation failed', generateError);
+            console.error('AI service generation failed', generateError);
             // Prioritize AI-provided error reason (from details field) over generic error message
             const aiErrorReason = generateError?.response?.data?.aiErrorReason;
             const details = generateError?.response?.data?.details;
@@ -753,7 +753,7 @@ export const AddQuestionDialog = ({
             // Show a persistent toast with a click action to view details
             toast({
                 variant: 'destructive',
-                title: 'EduAI has thrown an error',
+                title: 'AI service has thrown an error',
                 description: 'Click to see why',
                 duration: Infinity, // Prevent auto-dismissal - user must manually dismiss
                 action: (
@@ -1429,16 +1429,16 @@ export const AddQuestionDialog = ({
                             <div className="space-y-4">
                                 <h4 className="text-sm font-semibold text-muted-foreground">How to Fill This Form</h4>
 
-                                {/* Generate with EduAI */}
+                                {/* Generate with AI service */}
                                 <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3" data-tour-id="aq-eduai-panel">
                                     <div className="space-y-2">
                                         <div className="flex items-start gap-2">
                                             <div className="flex-1">
-                                                <h5 className="text-sm font-semibold">Generate with EduAI</h5>
+                                                <h5 className="text-sm font-semibold">Generate with AI service</h5>
                                                 <p className="text-xs text-muted-foreground mt-1">
                                                     {mode === 'variant'
-                                                        ? 'Let EduAI create a variant based on a prompt'
-                                                        : 'Let EduAI generate a question from a prompt'}
+                                                        ? 'Let the AI service create a variant based on a prompt'
+                                                        : 'Let the AI service generate a question from a prompt'}
                                                 </p>
                                             </div>
                                         </div>
@@ -1598,7 +1598,7 @@ export const AddQuestionDialog = ({
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="balanced" className="text-xs">Let EduAI decide</SelectItem>
+                                                    <SelectItem value="balanced" className="text-xs">Let AI service decide</SelectItem>
                                                     <SelectItem value="easy" className="text-xs">Easy</SelectItem>
                                                     <SelectItem value="medium" className="text-xs">Medium</SelectItem>
                                                     <SelectItem value="hard" className="text-xs">Hard</SelectItem>
@@ -1618,7 +1618,7 @@ export const AddQuestionDialog = ({
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="balanced" className="text-xs">Let EduAI decide</SelectItem>
+                                                    <SelectItem value="balanced" className="text-xs">Let AI service decide</SelectItem>
                                                     <SelectItem value="factual" className="text-xs">Factual</SelectItem>
                                                     <SelectItem value="analytical" className="text-xs">Analytical</SelectItem>
                                                     <SelectItem value="application" className="text-xs">Application</SelectItem>

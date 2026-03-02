@@ -77,7 +77,7 @@ export const ApiTestPage = () => {
   });
   const [variantResult, setVariantResult] = useState<ResultState>(defaultResult);
 
-  // EduAI form states
+  // AI service form states
   const [eduaiChatForm, setEduaiChatForm] = useState({
     courseCode: 'COSC121',
     message: '',
@@ -675,14 +675,14 @@ export const ApiTestPage = () => {
           </Card>
         </section>
 
-        {/* EduAI Integration Tests */}
+        {/* AI service integration tests */}
         <section>
           <Card>
             <CardHeader>
-              <CardTitle>EduAI Integration Tests</CardTitle>
+              <CardTitle>AI Service Integration Tests</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* EduAI API Key Test */}
+              {/* AI service API key test */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">API Key Test</h3>
                 <Button
@@ -713,14 +713,14 @@ export const ApiTestPage = () => {
         <section>
           <Card>
             <CardHeader>
-              <CardTitle>EduAI Course Topics</CardTitle>
+              <CardTitle>AI Service Course Topics</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Hit the live EduAI endpoint <code>/api/courses/:courseId/topics</code> to preview the topic list for a course.
+                Hit the live AI service endpoint <code>/api/courses/:courseId/topics</code> to preview the topic list for a course.
               </p>
               <div className="space-y-1">
-                <Label htmlFor="eduai-topics-course-id">EduAI Course ID</Label>
+                <Label htmlFor="eduai-topics-course-id">AI Service Course ID</Label>
                 <Input
                   id="eduai-topics-course-id"
                   placeholder="e.g. COSC211"
@@ -737,7 +737,7 @@ export const ApiTestPage = () => {
                     toast({
                       variant: 'destructive',
                       title: 'Missing course ID',
-                      description: 'Enter the EduAI course identifier you want to inspect.'
+                      description: 'Enter the AI service course identifier you want to inspect.'
                     });
                     return;
                   }
@@ -752,7 +752,7 @@ export const ApiTestPage = () => {
                   );
                 }}
               >
-                Fetch EduAI Topics
+                Fetch AI Service Topics
               </Button>
               <div>{renderResult(eduaiTopicsResult)}</div>
             </CardContent>
@@ -760,10 +760,10 @@ export const ApiTestPage = () => {
         </section>
 
         <section className="grid gap-6 md:grid-cols-2">
-          {/* EduAI Chat Test */}
+          {/* AI service chat test */}
           <Card>
             <CardHeader>
-              <CardTitle>EduAI Chat</CardTitle>
+              <CardTitle>AI Service Chat</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">
@@ -836,10 +836,10 @@ export const ApiTestPage = () => {
             </CardContent>
           </Card>
 
-          {/* EduAI Question Generation Test */}
+          {/* AI service question generation test */}
           <Card>
             <CardHeader>
-              <CardTitle>EduAI Question Generation</CardTitle>
+              <CardTitle>AI Service Question Generation</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1">

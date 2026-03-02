@@ -1,5 +1,5 @@
 /**
- * Dialog for uploading PDF, image, or TXT files; runs OCR for PDF/image or uses text as-is for TXT, then extracts questions via EduAI.
+ * Dialog for uploading PDF, image, or TXT files; runs OCR for PDF/image or uses text as-is for TXT, then extracts questions via the AI service.
  * Manages draft review, topic selection, optional assessment creation, and save flows.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';

@@ -262,7 +262,7 @@ export const LandingPage = () => {
   const emptyStateMessage = selectedCourse
     ? questionsError || 'No questions found for this course yet. Try adding or uploading questions.'
     : courses.length === 0
-      ? 'No courses available. Start the guided tour to add courses from EduAI.'
+      ? 'No courses available. Start the guided tour to add courses from the AI service.'
       : 'Select a course to view its questions.';
 
   const filteredAssessments = useMemo(() => {

@@ -1,6 +1,6 @@
 /**
- * Dialog for linking EduAI courses into the local library, fetching topics, and handling logout.
- * Lets users select courses from EduAI, skip ones already added, and persist them via courseService.
+ * Dialog for linking AI service courses into the local library, fetching topics, and handling logout.
+ * Lets users select courses from the AI service, skip ones already added, and persist them via courseService.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -102,9 +102,9 @@ export const ProfileCoursesDialog = ({
                 if (!isMounted) return;
                 setTopicsByCourse(Object.fromEntries(entries));
             } catch (err) {
-                console.error('Failed to load EduAI courses', err);
+                console.error('Failed to load AI service courses', err);
                 if (isMounted) {
-                    setError('Failed to load EduAI courses. Please try again.');
+                    setError('Failed to load AI service courses. Please try again.');
                 }
             } finally {
                 if (isMounted) {
@@ -199,7 +199,7 @@ export const ProfileCoursesDialog = ({
 
             toast({
                 title: 'Test course created',
-                description: 'You can now use this course to create questions and assessments without connecting to EduAI.'
+                description: 'You can now use this course to create questions and assessments without connecting to the AI service.'
             });
 
             onClose();
@@ -224,7 +224,7 @@ export const ProfileCoursesDialog = ({
         if (targetCourseIds.length === 0) {
             toast({
                 title: 'No new courses selected',
-                description: 'Select at least one EduAI course that is not already in your library.'
+                description: 'Select at least one AI service course that is not already in your library.'
             });
             return;
         }
@@ -267,7 +267,7 @@ export const ProfileCoursesDialog = ({
                 }
                 toast({
                     title: `Added ${createdCount} course${createdCount > 1 ? 's' : ''}`,
-                    description: 'Courses and topics have been synced from EduAI.'
+                    description: 'Courses and topics have been synced from the AI service.'
                 });
             } else {
                 toast({
@@ -293,7 +293,7 @@ export const ProfileCoursesDialog = ({
                         <div>
                             <DialogTitle>Add Courses</DialogTitle>
                             <DialogDescription>
-                                Link courses from EduAI or create a test course to get started without connecting to EduAI.
+                                Link courses from the AI service or create a test course to get started without connecting to it.
                             </DialogDescription>
                         </div>
                         <div className="flex items-center gap-2">
@@ -319,11 +319,11 @@ export const ProfileCoursesDialog = ({
                         <div className="flex items-center justify-between">
                             <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-sm font-semibold text-foreground">Test Course</span>
-                                    <Badge variant="outline" className="text-xs">No EduAI required</Badge>
+                                    <span className="text-sm font-semibold text-foreground">Sandbox Course</span>
+                                    <Badge variant="outline" className="text-xs">No AI service required</Badge>
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Create a test course to start making questions and assessments without connecting to EduAI.
+                                    Create a test course to start making questions and assessments without connecting to the AI service.
                                 </p>
                             </div>
                             <Button
@@ -347,11 +347,11 @@ export const ProfileCoursesDialog = ({
                         </div>
                     </div>
 
-                    {/* EduAI Courses Section */}
+                    {/* AI service courses section */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
                             <div className="h-px flex-1 bg-border"></div>
-                            <span className="text-xs text-muted-foreground font-medium">OR LINK FROM EDUAI</span>
+                            <span className="text-xs text-muted-foreground font-medium">OR LINK FROM AI SERVICE</span>
                             <div className="h-px flex-1 bg-border"></div>
                         </div>
                     </div>
@@ -359,7 +359,7 @@ export const ProfileCoursesDialog = ({
                     {isLoading ? (
                         <div className="flex items-center justify-center py-12 text-muted-foreground">
                             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                            Loading courses from EduAI...
+                            Loading courses from AI service...
                         </div>
                     ) : (
                         <div className="max-h-80 space-y-3 overflow-y-auto pr-1" data-tour-id="profile-course-list">
@@ -422,8 +422,8 @@ export const ProfileCoursesDialog = ({
                             {courseOptions.length === 0 && !isLoading && (
                                 <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
                                     {error 
-                                        ? 'Unable to load courses from EduAI. You can still create a test course above.'
-                                        : 'No courses available from EduAI right now. You can create a test course above to get started.'}
+                                        ? 'Unable to load courses from the AI service. You can still create a test course above.'
+                                        : 'No courses available from the AI service right now. You can create a test course above to get started.'}
                                 </div>
                             )}
                         </div>

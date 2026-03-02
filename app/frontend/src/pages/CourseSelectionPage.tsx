@@ -103,7 +103,7 @@ export const CourseSelectionPage = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
           {/* Add new course card */}
-          <Tooltip content="Add or link a course from EduAI to get started" side="top">
+          <Tooltip content="Add or link a course from the AI service to get started" side="top">
             <Card
               className="border-2 border-dashed border-muted-foreground/30 bg-muted/30 hover:border-primary hover:bg-muted/50 cursor-pointer transition-colors flex min-h-[140px]"
               onClick={() => setProfileOpen(true)}
