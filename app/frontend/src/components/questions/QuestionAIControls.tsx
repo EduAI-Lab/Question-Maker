@@ -101,55 +101,6 @@ export function QuestionAIControls({
                 />
             </div>
 
-            <div className="space-y-1.5" data-tour-id="aq-model-picker">
-                <Label htmlFor="ai-model" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Model
-                </Label>
-                <Select
-                    value={value.generationModel}
-                    onValueChange={(v) => onChange('generationModel', v)}
-                    disabled={disabled || availableModels.length === 0}
-                >
-                    <SelectTrigger id="ai-model" className="h-9 bg-secondary border-border">
-                        <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {availableModels.length === 0 ? (
-                            <SelectItem value="__no_models" disabled className="text-xs">
-                                No models available
-                            </SelectItem>
-                        ) : (
-                            <>
-                                {availableModels.some((m) => m.provider === 'ollama') && (
-                                    <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
-                                        UBC Hosted
-                                    </div>
-                                )}
-                                {availableModels
-                                    .filter((m) => m.provider === 'ollama')
-                                    .map((m) => (
-                                        <SelectItem key={m.id} value={m.id} className="text-xs">
-                                            {m.label}
-                                        </SelectItem>
-                                    ))}
-                                {availableModels.some((m) => m.provider !== 'ollama') && (
-                                    <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
-                                        External
-                                    </div>
-                                )}
-                                {availableModels
-                                    .filter((m) => m.provider !== 'ollama')
-                                    .map((m) => (
-                                        <SelectItem key={m.id} value={m.id} className="text-xs">
-                                            {m.label} {m.provider ? `(${m.provider})` : ''}
-                                        </SelectItem>
-                                    ))}
-                            </>
-                        )}
-                    </SelectContent>
-                </Select>
-            </div>
-
             {isExternal && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
                     <span className="font-semibold">Warning:</span> External models send your prompts and course data to

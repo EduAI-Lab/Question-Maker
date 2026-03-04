@@ -128,41 +128,6 @@ export function QuestionMetadataPanel({
                 )}
             </div>
 
-            <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Secondary Topics <span className="text-muted-foreground/60 normal-case">(optional)</span>
-                </Label>
-                <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-auto bg-secondary/30 border-border">
-                    {topics.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                            {isAuxLoading ? 'Loading topics...' : 'No topics available'}
-                        </p>
-                    ) : (
-                        topics.map((topic) => {
-                            const checked = value.variantSecondaryTopics.includes(topic.id);
-                            const isPrimary = value.primaryTopicId === topic.id.toString();
-                            return (
-                                <label
-                                    key={topic.id}
-                                    className={`flex items-center space-x-2 text-sm cursor-pointer ${
-                                        isPrimary ? 'text-muted-foreground/70' : 'text-foreground'
-                                    }`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        className="h-4 w-4 rounded border-border"
-                                        checked={checked}
-                                        disabled={disabled || isPrimary}
-                                        onChange={(e) => onToggleSecondaryTopic(topic.id, e.target.checked)}
-                                    />
-                                    <span>{topic.name}</span>
-                                </label>
-                            );
-                        })
-                    )}
-                </div>
-            </div>
-
             <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                     <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -208,19 +173,6 @@ export function QuestionMetadataPanel({
                 </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Description <span className="text-muted-foreground/60 normal-case">(optional)</span>
-                </Label>
-                <Textarea
-                    placeholder="Short label for this question"
-                    value={value.questionDescription}
-                    onChange={(e) => onChange('questionDescription', e.target.value)}
-                    disabled={disabled}
-                    className="bg-secondary border-border min-h-[4.5rem] resize-none text-sm"
-                    rows={2}
-                />
-            </div>
         </div>
     );
 }

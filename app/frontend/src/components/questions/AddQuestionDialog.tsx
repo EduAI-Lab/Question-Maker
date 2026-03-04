@@ -1084,6 +1084,54 @@ export const AddQuestionDialog = ({
                                                 className="bg-muted/50"
                                             />
                                         </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="question-description-advanced">
+                                                Description <span className="text-xs text-muted-foreground">(optional)</span>
+                                            </Label>
+                                            <Textarea
+                                                id="question-description-advanced"
+                                                placeholder="Short label for this question"
+                                                value={form.questionDescription}
+                                                onChange={(event) => handleFieldChange('questionDescription', event.target.value)}
+                                                className="min-h-[4.5rem] resize-none"
+                                                rows={2}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>
+                                                Secondary Topics <span className="text-xs text-muted-foreground">(optional)</span>
+                                            </Label>
+                                            <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-auto">
+                                                {topics.length === 0 ? (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {isAuxLoading ? 'Loading topics...' : 'No topics available'}
+                                                    </p>
+                                                ) : (
+                                                    topics.map((topic) => {
+                                                        const checked = form.variantSecondaryTopics.includes(topic.id);
+                                                        const isPrimary = form.primaryTopicId === topic.id.toString();
+                                                        return (
+                                                            <label
+                                                                key={topic.id}
+                                                                className={`flex items-center space-x-2 text-sm ${isPrimary ? 'text-muted-foreground/70' : 'text-foreground'}`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="h-4 w-4"
+                                                                    checked={checked}
+                                                                    disabled={isPrimary}
+                                                                    onChange={(event) => toggleSecondaryTopic(topic.id, event.target.checked)}
+                                                                />
+                                                                <span>{topic.name}</span>
+                                                            </label>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+
                                         <div className="space-y-2">
                                             <Label htmlFor="variant-assessment">Assessment <span className="text-xs text-muted-foreground">(optional)</span></Label>
                                             <Select
@@ -1105,6 +1153,53 @@ export const AddQuestionDialog = ({
                                                                 {assessment.name} ({assessment.type})
                                                             </SelectItem>
                                                         ))
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2" data-tour-id="aq-model-picker">
+                                            <Label htmlFor="ai-model-advanced">Model</Label>
+                                            <Select
+                                                value={form.generationModel}
+                                                onValueChange={(value) => handleFieldChange('generationModel', value)}
+                                                disabled={availableModels.length === 0}
+                                            >
+                                                <SelectTrigger id="ai-model-advanced">
+                                                    <SelectValue placeholder="Select model" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {availableModels.length === 0 ? (
+                                                        <SelectItem value="__no_models" disabled>
+                                                            No models available
+                                                        </SelectItem>
+                                                    ) : (
+                                                        <>
+                                                            {availableModels.some((model) => model.provider === 'ollama') && (
+                                                                <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
+                                                                    UBC Hosted
+                                                                </div>
+                                                            )}
+                                                            {availableModels
+                                                                .filter((model) => model.provider === 'ollama')
+                                                                .map((model) => (
+                                                                    <SelectItem key={model.id} value={model.id}>
+                                                                        {model.label}
+                                                                    </SelectItem>
+                                                                ))}
+                                                            {availableModels.some((model) => model.provider !== 'ollama') && (
+                                                                <div className="px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">
+                                                                    External
+                                                                </div>
+                                                            )}
+                                                            {availableModels
+                                                                .filter((model) => model.provider !== 'ollama')
+                                                                .map((model) => (
+                                                                    <SelectItem key={model.id} value={model.id}>
+                                                                        {model.label} {model.provider ? `(${model.provider})` : ''}
+                                                                    </SelectItem>
+                                                                ))}
+                                                        </>
                                                     )}
                                                 </SelectContent>
                                             </Select>
