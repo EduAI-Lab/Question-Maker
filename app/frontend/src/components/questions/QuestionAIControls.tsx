@@ -16,13 +16,10 @@ import {
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 import { apiKeyStorage } from '../../services/apiKeyStorage';
 import type { EduAIModelOption } from '../../services/eduaiService';
-import type { QuestionDifficulty, ReasoningLevel } from '../../types/question';
 
 export interface QuestionAIControlsValue {
     generationPrompt: string;
     generationModel: string;
-    generationDifficulty: QuestionDifficulty | 'balanced';
-    generationReasoningLevel: ReasoningLevel | 'balanced';
 }
 
 interface QuestionAIControlsProps {
@@ -201,55 +198,6 @@ export function QuestionAIControls({
                     </p>
                 </div>
             )}
-
-            <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Difficulty
-                    </Label>
-                    <Select
-                        value={value.generationDifficulty}
-                        onValueChange={(v) => onChange('generationDifficulty', v as QuestionDifficulty | 'balanced')}
-                        disabled={disabled}
-                    >
-                        <SelectTrigger className="h-9 bg-secondary border-border">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="balanced" className="text-xs">
-                                Let AI service decide
-                            </SelectItem>
-                            <SelectItem value="easy" className="text-xs">Easy</SelectItem>
-                            <SelectItem value="medium" className="text-xs">Medium</SelectItem>
-                            <SelectItem value="hard" className="text-xs">Hard</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Reasoning Focus
-                    </Label>
-                    <Select
-                        value={value.generationReasoningLevel}
-                        onValueChange={(v) =>
-                            onChange('generationReasoningLevel', v as ReasoningLevel | 'balanced')
-                        }
-                        disabled={disabled}
-                    >
-                        <SelectTrigger className="h-9 bg-secondary border-border">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="balanced" className="text-xs">
-                                Let AI service decide
-                            </SelectItem>
-                            <SelectItem value="factual" className="text-xs">Factual</SelectItem>
-                            <SelectItem value="analytical" className="text-xs">Analytical</SelectItem>
-                            <SelectItem value="application" className="text-xs">Application</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-            </div>
 
             <Button
                 type="button"

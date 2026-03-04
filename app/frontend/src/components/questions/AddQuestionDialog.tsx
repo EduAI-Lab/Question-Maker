@@ -70,8 +70,6 @@ type FormState = {
     questionOrder: string;
     generationPrompt: string;
     generationModel: string;
-    generationDifficulty: QuestionDifficulty | 'balanced';
-    generationReasoningLevel: ReasoningLevel | 'balanced';
 };
 
 const defaultForm: FormState = {
@@ -89,9 +87,7 @@ const defaultForm: FormState = {
     primaryTopicId: '',
     questionOrder: '',
     generationPrompt: '',
-    generationModel: 'ollama:gpt-oss:120b',
-    generationDifficulty: 'balanced',
-    generationReasoningLevel: 'balanced'
+    generationModel: 'ollama:gpt-oss:120b'
 };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
@@ -138,7 +134,7 @@ export const AddQuestionDialog = ({
         { id: 'aq-save-area', content: 'Mark as reviewed, then save.' },
         { id: 'aq-eduai-panel', content: 'To create a question with AI, use the panel on the right.' },
         { id: 'aq-ai-prompt', content: 'Write out your prompt for how you would like your variant.' },
-        { id: 'aq-model-picker', content: 'Select model, difficulty focus and reasoning level.' },
+        { id: 'aq-model-picker', content: 'Select a model. Difficulty and reasoning are set in Question Parameters.' },
         { id: 'aq-ai-generate', content: 'Click Generate, then wait 30–60 seconds for your question to be generated.' },
         { id: 'aq-form-fields', content: 'Review the generated question.' },
         { id: 'aq-save-area', content: 'Mark as reviewed, then save.' }
@@ -556,31 +552,44 @@ export const AddQuestionDialog = ({
                 description: 'Your request is being processed. This may take 30–60 seconds.',
             });
 
-            const difficultyDistribution = (() => {
-                if (form.generationDifficulty === 'balanced') {
-                    return { easy: 0, medium: 1, hard: 0 };
-                }
-                return {
-                    easy: form.generationDifficulty === 'easy' ? 1 : 0,
-                    medium: form.generationDifficulty === 'medium' ? 1 : 0,
-                    hard: form.generationDifficulty === 'hard' ? 1 : 0
-                };
-            })();
+            const difficultyDistribution = {
+                easy: form.variantDifficulty === 'easy' ? 1 : 0,
+                medium: form.variantDifficulty === 'medium' ? 1 : 0,
+                hard: form.variantDifficulty === 'hard' ? 1 : 0
+            };
 
-            const reasoningDistribution = (() => {
-                if (form.generationReasoningLevel === 'balanced') {
-                    return { factual: 33, analytical: 33, application: 34 };
+            const reasoningDistribution = {
+                factual: form.variantReasoningLevel === 'factual' ? 100 : 0,
+                analytical: form.variantReasoningLevel === 'analytical' ? 100 : 0,
+                application: form.variantReasoningLevel === 'application' ? 100 : 0
+            };
+
+            const questionParamsBlock = (() => {
+                const lines: string[] = [
+                    'Question parameters (use these in your response):',
+                    `- Type: ${questionTypeLabels[form.questionType]}`,
+                    `- Difficulty: ${form.variantDifficulty}`,
+                    `- Reasoning focus: ${form.variantReasoningLevel}`
+                ];
+                const primaryTopic = topics.find((t) => t.id.toString() === form.primaryTopicId);
+                if (primaryTopic) {
+                    lines.push(`- Primary topic: ${primaryTopic.name} (ID: ${primaryTopic.id})`);
                 }
-                return {
-                    factual: form.generationReasoningLevel === 'factual' ? 100 : 0,
-                    analytical: form.generationReasoningLevel === 'analytical' ? 100 : 0,
-                    application: form.generationReasoningLevel === 'application' ? 100 : 0
-                };
+                if (form.questionDescription.trim()) {
+                    lines.push(`- Description: ${form.questionDescription.trim()}`);
+                }
+                if (form.variantSecondaryTopics.length > 0) {
+                    const names = form.variantSecondaryTopics
+                        .map((id) => topics.find((t) => t.id === id)?.name ?? id)
+                        .join(', ');
+                    lines.push(`- Secondary topics: ${names}`);
+                }
+                return lines.join('\n');
             })();
 
             const promptWithTopics = (() => {
                 const trimmedPrompt = form.generationPrompt.trim();
-                const sections: string[] = [trimmedPrompt];
+                const sections: string[] = [trimmedPrompt, questionParamsBlock];
 
                 if (mode === 'variant') {
                     const contextLines: string[] = [];
@@ -596,7 +605,7 @@ export const AddQuestionDialog = ({
                     }
 
                     if (contextLines.length > 0) {
-                        sections.push(`Base question context:\n${contextLines.join('\n')}`);
+                        sections.splice(1, 0, `Base question context:\n${contextLines.join('\n')}`);
                     }
                 }
 
@@ -1113,9 +1122,7 @@ export const AddQuestionDialog = ({
                         <QuestionAIControls
                             value={{
                                 generationPrompt: form.generationPrompt,
-                                generationModel: form.generationModel,
-                                generationDifficulty: form.generationDifficulty,
-                                generationReasoningLevel: form.generationReasoningLevel
+                                generationModel: form.generationModel
                             }}
                             onChange={(field, value) => handleFieldChange(field, value)}
                             onGenerate={handleGenerateWithAI}
