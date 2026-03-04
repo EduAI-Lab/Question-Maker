@@ -11,9 +11,12 @@ interface AssessmentSectionCardProps {
     questionLinks: SectionVariantLink[];
     questionBank: QuestionVariantEntry[];
     onUpdateTitle: (name: string) => void;
-    onRemoveQuestion: (linkId: number) => void;
+    onRemoveQuestion: (variantId: number) => void;
     onDeleteSection: () => void;
     onAddQuestions: () => void;
+    onViewQuestion?: (entry: QuestionVariantEntry) => void;
+    onToggleDraft?: (entry: QuestionVariantEntry, nextDraft: boolean) => void;
+    onCreateVariant?: (entry: QuestionVariantEntry) => void;
 }
 
 export function AssessmentSectionCard({
@@ -24,7 +27,10 @@ export function AssessmentSectionCard({
     onUpdateTitle,
     onRemoveQuestion,
     onDeleteSection,
-    onAddQuestions
+    onAddQuestions,
+    onViewQuestion,
+    onToggleDraft,
+    onCreateVariant
 }: AssessmentSectionCardProps) {
     const questions = React.useMemo(
         () =>
@@ -33,20 +39,11 @@ export function AssessmentSectionCard({
                     const entry = questionBank.find((q) => q.variant.id === link.variantId);
                     if (!entry) return null;
                     return {
-                        linkId: link.id,
-                        text: entry.variant.questionText,
-                        type: entry.questionType,
-                        difficulty: entry.variant.difficulty,
-                        primaryTopicName: entry.primaryTopicName
+                        link,
+                        entry
                     };
                 })
-                .filter(Boolean) as Array<{
-                linkId: number;
-                text: string;
-                type: QuestionVariantEntry['questionType'];
-                difficulty: QuestionVariantEntry['variant']['difficulty'];
-                primaryTopicName?: string;
-            }>,
+                .filter(Boolean) as Array<{ link: SectionVariantLink; entry: QuestionVariantEntry }>,
         [questionLinks, questionBank]
     );
 
@@ -87,27 +84,70 @@ export function AssessmentSectionCard({
                 </div>
             ) : (
                 <div className="flex flex-col gap-2">
-                    {questions.map((q, idx) => (
-                        <div
-                            key={q.linkId}
-                            className="flex items-start gap-3 rounded-md border border-border bg-card p-3 group"
-                        >
+                    {questions.map(({ link, entry }, idx) => {
+                        const isDraft = entry.isDraft ?? entry.variant.isDraft ?? false;
+                        return (
+                            <div
+                                key={link.id}
+                                className="flex items-start gap-3 rounded-md border border-border bg-card p-3 group"
+                            >
                             <span className="text-xs font-mono text-muted-foreground mt-0.5 shrink-0 w-5 text-right">
                                 {idx + 1}.
                             </span>
                             <div className="flex-1 min-w-0 space-y-1">
-                                <p className="text-sm text-foreground line-clamp-2 leading-relaxed">{q.text}</p>
-                                <div className="flex items-center gap-1.5">
+                                <p className="text-sm text-foreground line-clamp-2 leading-relaxed">
+                                    {entry.variant.questionText}
+                                </p>
+                                <div className="flex flex-wrap items-center gap-1.5">
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
-                                        {q.type}
+                                        {entry.questionType}
                                     </Badge>
                                     <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
-                                        {q.difficulty}
+                                        {entry.variant.difficulty}
                                     </Badge>
-                                    {q.primaryTopicName && (
+                                    {entry.primaryTopicName && (
                                         <span className="text-[10px] text-muted-foreground truncate">
-                                            {q.primaryTopicName}
+                                            {entry.primaryTopicName}
                                         </span>
+                                    )}
+                                    <Badge variant={isDraft ? 'outline' : 'secondary'} className="text-[10px] px-1.5 py-0">
+                                        {isDraft ? 'Draft' : 'Reviewed'}
+                                    </Badge>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    {onViewQuestion && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                                            onClick={() => onViewQuestion(entry)}
+                                        >
+                                            View
+                                        </Button>
+                                    )}
+                                    {onToggleDraft && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                                            onClick={() => onToggleDraft(entry, !isDraft)}
+                                        >
+                                            {isDraft ? 'Mark reviewed' : 'Mark draft'}
+                                        </Button>
+                                    )}
+                                    {onCreateVariant && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                                            onClick={() => onCreateVariant(entry)}
+                                        >
+                                            New variant
+                                        </Button>
                                     )}
                                 </div>
                             </div>
@@ -115,14 +155,15 @@ export function AssessmentSectionCard({
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => onRemoveQuestion(q.linkId)}
+                                onClick={() => onRemoveQuestion(link.variantId)}
                                 className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                                 aria-label="Remove question"
                             >
                                 <X className="h-3.5 w-3.5" />
                             </Button>
                         </div>
-                    ))}
+                        );
+                    })}
 
                     <Button
                         type="button"
