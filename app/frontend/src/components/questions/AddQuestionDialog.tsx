@@ -130,14 +130,22 @@ export const AddQuestionDialog = ({
     const showNewUserHint = totalQuestionsInBank === 0;
 
     const modalTourSteps = useMemo<{ id: string; content: string }[]>(() => [
-        { id: 'aq-form-fields', content: 'To create a question manually, fill out the form on the left.' },
-        { id: 'aq-save-area', content: 'Mark as reviewed, then save.' },
-        { id: 'aq-eduai-panel', content: 'To create a question with AI, use the panel on the right.' },
-        { id: 'aq-ai-prompt', content: 'Write out your prompt for how you would like your variant.' },
-        { id: 'aq-model-picker', content: 'Select a model. Difficulty and reasoning are set in Question Parameters.' },
-        { id: 'aq-ai-generate', content: 'Click Generate, then wait 30–60 seconds for your question to be generated.' },
-        { id: 'aq-form-fields', content: 'Review the generated question.' },
-        { id: 'aq-save-area', content: 'Mark as reviewed, then save.' }
+        {
+            id: 'aq-metadata',
+            content: 'Step 1: Set the question type, primary topic, difficulty, and reasoning in Question Parameters.'
+        },
+        {
+            id: 'aq-form-fields',
+            content: 'Step 2: You can enter the full question  manually in the Question content box on the right.'
+        },
+        {
+            id: 'aq-ai-prompt',
+            content: 'Step 3: Or you can type a prompt and click Generate to have the AI create a question for you in about 15–60 seconds.'
+        },
+        {
+            id: 'aq-save-area',
+            content: 'Step 4: When you are happy with the question, mark it as reviewed (or leave as draft) and save.'
+        }
     ], []);
 
     const [tourHighlightRect, setTourHighlightRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -1063,6 +1071,29 @@ export const AddQuestionDialog = ({
                                 />
                             </div>
 
+                            <QuestionAIControls
+                                value={{
+                                    generationPrompt: form.generationPrompt,
+                                    generationModel: form.generationModel
+                                }}
+                                onChange={(field, value) => handleFieldChange(field, value)}
+                                onGenerate={handleGenerateWithAI}
+                                isGenerating={isGenerating}
+                                availableModels={availableModels}
+                                providerApiKey={providerApiKey}
+                                onProviderApiKeyChange={(value) => {
+                                    setProviderApiKey(value);
+                                    const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
+                                    if (provider && value) void apiKeyStorage.setApiKey(provider, value);
+                                }}
+                                status={eduaiStatus.status}
+                                statusMessage={eduaiStatus.message}
+                                onRefreshStatus={eduaiStatus.refresh}
+                                courseWarningMessage={courseWarningMessage}
+                                mode={mode}
+                                disabled={isSubmitting}
+                            />
+
                             <div className="border rounded-lg overflow-hidden">
                                 <button
                                     type="button"
@@ -1159,7 +1190,7 @@ export const AddQuestionDialog = ({
                                         </div>
 
                                         <div className="space-y-2" data-tour-id="aq-model-picker">
-                                            <Label htmlFor="ai-model-advanced">Model</Label>
+                                            <Label htmlFor="ai-model-advanced">AI Model</Label>
                                             <Select
                                                 value={form.generationModel}
                                                 onValueChange={(value) => handleFieldChange('generationModel', value)}
@@ -1212,30 +1243,8 @@ export const AddQuestionDialog = ({
                         </div>
                     </ScrollArea>
 
-                    {/* RIGHT: AI Configuration + Question content */}
-                    <div className="flex flex-col gap-4 min-h-0 overflow-hidden">
-                        <QuestionAIControls
-                            value={{
-                                generationPrompt: form.generationPrompt,
-                                generationModel: form.generationModel
-                            }}
-                            onChange={(field, value) => handleFieldChange(field, value)}
-                            onGenerate={handleGenerateWithAI}
-                            isGenerating={isGenerating}
-                            availableModels={availableModels}
-                            providerApiKey={providerApiKey}
-                            onProviderApiKeyChange={(value) => {
-                                setProviderApiKey(value);
-                                const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
-                                if (provider && value) void apiKeyStorage.setApiKey(provider, value);
-                            }}
-                            status={eduaiStatus.status}
-                            statusMessage={eduaiStatus.message}
-                            onRefreshStatus={eduaiStatus.refresh}
-                            courseWarningMessage={courseWarningMessage}
-                            mode={mode}
-                            disabled={isSubmitting}
-                        />
+                    {/* RIGHT: Question content */}
+                    <div className="flex flex-col min-h-0 overflow-hidden">
                         <div
                             className="rounded-lg border border-border bg-card p-5 flex-1 min-h-0 overflow-auto flex flex-col"
                             data-tour-id="aq-form-fields"
