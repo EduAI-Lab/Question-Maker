@@ -18,7 +18,8 @@ import {
     Trash2,
     AlertTriangle,
     FileText,
-    Download
+    Download,
+    Layers3
 } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
@@ -282,6 +283,22 @@ export const AssessmentSection = ({
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                     <span>View</span>
+                                                </Button>
+                                            </Tooltip>
+
+                                            <Tooltip content="Open the new assessment builder" side="bottom">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        navigate(`/assessments/${assessment.id}/builder`, {
+                                                            state: { fromTab: 'assessments' }
+                                                        })
+                                                    }
+                                                    className="flex items-center space-x-1"
+                                                >
+                                                    <Layers3 className="h-4 w-4" />
+                                                    <span>Builder</span>
                                                 </Button>
                                             </Tooltip>
 

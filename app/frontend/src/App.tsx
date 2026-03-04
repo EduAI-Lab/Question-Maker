@@ -11,6 +11,7 @@ import { CourseSelectionPage } from './pages/CourseSelectionPage';
 import { LandingPage } from './pages/LandingPage';
 import { ApiTestPage } from './pages/ApiTestPage';
 import AssessmentViewPage from './pages/AssessmentViewPage';
+import AssessmentBuilderPage from './pages/AssessmentBuilderPage';
 import { HelpPage } from './pages/HelpPage';
 import { GuidedTourProvider } from './contexts/GuidedTourContext';
 
@@ -29,6 +30,7 @@ function App() {
                   <Route path="/api-test" element={<ApiTestPage />} />
                 )}
                 <Route path="/assessments/:id" element={<AssessmentViewPage />} />
+                <Route path="/assessments/:id/builder" element={<AssessmentBuilderPage />} />
                 <Route path="/help" element={<HelpPage />} />
                 <Route path="/" element={<Navigate to="/login" replace />} />
               </Routes>
