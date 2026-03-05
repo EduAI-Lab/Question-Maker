@@ -49,15 +49,6 @@ export function AssessmentBuilder({
 
     return (
         <div className="flex flex-col gap-4 h-full">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-lg font-semibold text-foreground">{assessment.name}</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Arrange sections and assign questions to this assessment.
-                    </p>
-                </div>
-            </div>
-
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)] h-full">
                 <ScrollArea className="h-full pr-2">
                     <div className="flex flex-col gap-4">

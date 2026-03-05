@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { AssessmentBuilder } from '../components/assessments/AssessmentBuilder';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
 import { useToast } from '../components/ui/use-toast';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
 
 const AssessmentBuilderPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -143,8 +143,85 @@ const AssessmentBuilderPage = () => {
             });
             return;
         }
+        setViewEntry(null);
         setPresetVariant(entry);
         setIsAddQuestionOpen(true);
+    };
+
+    const handleUpdateVariant = async (
+        variantId: number,
+        _updates: { isDraft?: boolean; isAiGenerated?: boolean; difficulty?: string; choices?: unknown; answer?: string | null }
+    ) => {
+        await refreshQuestionsAndAssessment();
+        if (viewEntry?.variant.id === variantId) {
+            const next = questionVariantEntries.find((e) => e.variant.id === variantId);
+            if (next) setViewEntry(next);
+        }
+    };
+
+    const handleUpdateQuestionMetadata = async (
+        questionId: number,
+        _updates: { description?: string | null; primaryTopicId?: number; type?: string; primaryTopicName?: string }
+    ) => {
+        try {
+            const fetched = await questionService.getQuestion(questionId);
+            await refreshQuestionsAndAssessment();
+            if (viewEntry?.questionId === questionId) {
+                const resolveTopicName = (topicId: number) => topicById[topicId]?.name ?? `Topic ${topicId}`;
+                const variant = fetched.variants?.find((v) => v.id === viewEntry.variant.id) ?? viewEntry.variant;
+                const secondaryTopicNames = Array.isArray(variant.secondaryTopicsId)
+                    ? (variant.secondaryTopicsId
+                          .map((tid) => resolveTopicName(tid))
+                          .filter(Boolean) as string[])
+                    : undefined;
+                setViewEntry({
+                    questionId: fetched.id,
+                    questionDescription: fetched.description ?? null,
+                    questionType: fetched.type,
+                    primaryTopicId: fetched.primaryTopicId,
+                    primaryTopicName: resolveTopicName(fetched.primaryTopicId),
+                    courseId: fetched.courseId,
+                    courseName: fetched.course?.name,
+                    courseCode: fetched.course?.code,
+                    secondaryTopicNames:
+                        secondaryTopicNames && secondaryTopicNames.length > 0 ? secondaryTopicNames : undefined,
+                    isAiGenerated: variant.isAiGenerated,
+                    isDraft: variant.isDraft,
+                    variant
+                });
+            }
+        } catch (err: unknown) {
+            toast({
+                title: 'Update failed',
+                description: (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Please try again.',
+                variant: 'destructive'
+            });
+        }
+    };
+
+    const handleDeleteVariant = async (entry: QuestionVariantEntry) => {
+        const question = questions.find((q) => q.id === entry.questionId);
+        if (!question) return;
+        try {
+            const isLastVariant = (question.variants?.length ?? 0) <= 1;
+            if (isLastVariant) {
+                await questionService.deleteQuestion(question.id);
+            } else {
+                await questionService.deleteVariant(entry.variant.id);
+            }
+            await refreshQuestionsAndAssessment();
+            if (viewEntry?.variant.id === entry.variant.id) setViewEntry(null);
+            toast({
+                title: 'Question removed',
+                description: isLastVariant ? 'Question deleted.' : 'Variant removed.'
+            });
+        } catch (err: unknown) {
+            toast({
+                title: 'Delete failed',
+                description: (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Please try again.',
+                variant: 'destructive'
+            });
+        }
     };
 
     const handleQuestionCreated = (newQuestion: Question) => {
@@ -160,43 +237,18 @@ const AssessmentBuilderPage = () => {
 
     if (isLoading) {
         return (
-            <div className="p-6">
-                <p className="text-sm text-muted-foreground">Loading assessment builder…</p>
+            <div className="min-h-screen bg-gray-50">
+                <div className="mx-auto max-w-6xl px-6 py-8">
+                    <p className="text-sm text-muted-foreground">Loading assessment builder…</p>
+                </div>
             </div>
         );
     }
 
     if (!assessment || error) {
         return (
-            <div className="p-6 space-y-3">
-                <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate(-1)}
-                    className="gap-1.5 text-muted-foreground hover:text-foreground"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
-                </Button>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Assessment builder</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-destructive">
-                            {error ?? 'Assessment not found or failed to load.'}
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
-    return (
-        <>
-            <div className="p-6 space-y-4">
-                <div className="flex items-center gap-3">
+            <div className="min-h-screen bg-gray-50">
+                <div className="mx-auto max-w-6xl space-y-4 px-6 py-8">
                     <Button
                         type="button"
                         variant="ghost"
@@ -207,10 +259,66 @@ const AssessmentBuilderPage = () => {
                         <ArrowLeft className="h-4 w-4" />
                         Back
                     </Button>
-                    <h1 className="text-lg font-semibold text-foreground">Assessment builder</h1>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Assessment builder</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-sm text-destructive">
+                                {error ?? 'Assessment not found or failed to load.'}
+                            </p>
+                        </CardContent>
+                    </Card>
                 </div>
+            </div>
+        );
+    }
 
-                <AssessmentBuilder
+    return (
+        <>
+            <div className="min-h-screen bg-gray-50">
+                <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(-1)}
+                            className="gap-1.5 text-muted-foreground hover:text-foreground"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back
+                        </Button>
+                        <div className="text-sm text-muted-foreground">Assessment Builder</div>
+                    </div>
+
+                    <Card>
+                        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="space-y-1">
+                                <CardTitle className="text-2xl">{assessment.name}</CardTitle>
+                                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                                    {assessment.type && <span className="rounded-full border px-2 py-0.5 text-xs">{assessment.type}</span>}
+                                    {assessment.semester && (
+                                        <span className="rounded-full border px-2 py-0.5 text-xs">
+                                            {assessment.semester}
+                                        </span>
+                                    )}
+                                    {assessment.course?.name && (
+                                        <span className="rounded-full border px-2 py-0.5 text-xs">
+                                            {assessment.course.name}
+                                        </span>
+                                    )}
+                                </div>
+                                {assessment.description && (
+                                    <p className="text-sm text-muted-foreground">{assessment.description}</p>
+                                )}
+                            </div>
+                            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                                Builder view
+                            </div>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            <AssessmentBuilder
                     assessment={assessment}
                     questionBank={questionVariantEntries}
                     topics={topics}
@@ -286,7 +394,7 @@ const AssessmentBuilderPage = () => {
                             });
                         }
                     }}
-                    onAddQuestionsToSection={async (sectionId, variantIds) => {
+                                onAddQuestionsToSection={async (sectionId, variantIds) => {
                         if (!assessment) return;
                         try {
                             await Promise.all(
@@ -303,7 +411,7 @@ const AssessmentBuilderPage = () => {
                             });
                         }
                     }}
-                    onRemoveQuestionFromSection={async (sectionId, variantId) => {
+                                onRemoveQuestionFromSection={async (sectionId, variantId) => {
                         if (!assessment) return;
                         try {
                             await assessmentService.removeVariantFromSection(assessment.id, sectionId, variantId);
@@ -316,55 +424,37 @@ const AssessmentBuilderPage = () => {
                             });
                         }
                     }}
-                    onViewQuestion={handleViewQuestion}
-                    onToggleDraft={handleToggleDraft}
-                    onCreateVariant={handleCreateVariant}
-                />
+                                onViewQuestion={handleViewQuestion}
+                                onToggleDraft={handleToggleDraft}
+                                onCreateVariant={handleCreateVariant}
+                            />
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
 
-            <Dialog open={!!viewEntry} onOpenChange={(open) => !open && setViewEntry(null)}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Question preview</DialogTitle>
-                    </DialogHeader>
-                    {viewEntry && (
-                        <div className="space-y-3 text-sm">
-                            <div className="space-y-1">
-                                <p className="font-semibold">Question text</p>
-                                <p className="whitespace-pre-line text-foreground">
-                                    {viewEntry.variant.questionText}
-                                </p>
-                            </div>
-                            {viewEntry.variant.choices && viewEntry.variant.choices.length > 0 && (
-                                <div className="space-y-1">
-                                    <p className="font-semibold">Choices</p>
-                                    <ul className="list-disc list-inside space-y-0.5">
-                                        {viewEntry.variant.choices.map((choice) => (
-                                            <li key={choice.letter}>
-                                                <span className="font-mono mr-1">{choice.letter}.</span>
-                                                {choice.text}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                            {viewEntry.variant.answer && (
-                                <div className="space-y-1">
-                                    <p className="font-semibold">Answer</p>
-                                    <p className="whitespace-pre-line text-foreground">
-                                        {viewEntry.variant.answer}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
+            {viewEntry && (
+                <QuestionDetailView
+                    entry={viewEntry}
+                    relatedVariants={questionVariantEntries.filter(
+                        (e) => e.questionId === viewEntry.questionId
                     )}
-                </DialogContent>
-            </Dialog>
+                    onClose={() => setViewEntry(null)}
+                    onCreateVariant={handleCreateVariant}
+                    onUpdateVariant={handleUpdateVariant}
+                    onUpdateQuestionMetadata={handleUpdateQuestionMetadata}
+                    onDeleteVariant={handleDeleteVariant}
+                    onSelectVariant={(entry) => setViewEntry(entry)}
+                />
+            )}
 
             {assessment.course?.id && (
                 <AddQuestionDialog
                     open={isAddQuestionOpen}
-                    onClose={() => setIsAddQuestionOpen(false)}
+                    onClose={() => {
+                        setIsAddQuestionOpen(false);
+                        setPresetVariant(null);
+                    }}
                     courseId={assessment.course.id}
                     variants={questionVariantEntries}
                     onQuestionCreated={handleQuestionCreated}
