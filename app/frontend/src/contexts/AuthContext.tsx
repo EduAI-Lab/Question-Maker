@@ -5,6 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { User } from '../types/auth';
 import { authService } from '../services/authService';
+import { refreshEduAIStatus } from '../hooks/useEduAIStatus';
 
 interface AuthContextType {
   user: User | null;
@@ -81,7 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(userData);
       setIsAuthenticated(true);
       setIsInitialized(true);
-      
+      void refreshEduAIStatus();
       console.log('AuthProvider: Login successful');
       return { success: true };
     } catch (error: any) {
@@ -106,7 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(userData);
       setIsAuthenticated(true);
       setIsInitialized(true);
-      
+      void refreshEduAIStatus();
       console.log('AuthProvider: Registration successful');
       return { success: true };
     } catch (error: any) {
