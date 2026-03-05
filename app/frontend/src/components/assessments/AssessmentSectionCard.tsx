@@ -121,9 +121,25 @@ export function AssessmentSectionCard({
                                             {idx + 1}.
                                         </span>
                                         <div className="min-w-0 flex-1 space-y-1.5">
-                                            <p className="line-clamp-2 text-sm leading-relaxed text-gray-800">
+                                            <p className="text-sm leading-relaxed text-gray-800">
                                                 {entry.variant.questionText}
                                             </p>
+                                            {(entry.variant.choices?.length ?? 0) > 0 && (
+                                                <ul className="list-none space-y-0.5 pl-0 text-xs text-gray-600">
+                                                    {entry.variant.choices?.map((c) => (
+                                                        <li key={c.letter} className="flex gap-1.5">
+                                                            <span className="font-mono font-medium text-gray-500">{c.letter}.</span>
+                                                            <span>{c.text}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                            {entry.variant.answer != null && String(entry.variant.answer).trim() !== '' && (
+                                                <p className="text-xs text-gray-600">
+                                                    <span className="font-medium text-gray-500">Answer: </span>
+                                                    <span className="whitespace-pre-wrap">{entry.variant.answer}</span>
+                                                </p>
+                                            )}
                                             <div className="flex flex-wrap items-center gap-1.5">
                                                 <span className="rounded border border-gray-200 bg-gray-100 px-1.5 py-0 text-[10px] font-medium capitalize text-gray-700">
                                                     {entry.questionType}
