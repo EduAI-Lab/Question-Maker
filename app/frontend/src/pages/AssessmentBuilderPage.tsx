@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
 import { Assessment, Question, QuestionVariantEntry } from '../types/question';
 import { Topic } from '../types/topic';
 import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { AssessmentBuilder } from '../components/assessments/AssessmentBuilder';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
@@ -94,6 +95,16 @@ const AssessmentBuilderPage = () => {
             })
         );
     }, [questions, topicById]);
+
+    const hasDraftQuestions = useMemo(() => {
+        if (!assessment?.sections) return false;
+        const variantIdsInSections = new Set(
+            assessment.sections.flatMap((s) => (s.sectionVariants ?? []).map((l) => l.variantId))
+        );
+        return questionVariantEntries.some(
+            (e) => variantIdsInSections.has(e.variant.id) && (e.isDraft ?? e.variant.isDraft === true)
+        );
+    }, [assessment?.sections, questionVariantEntries]);
 
     const refreshQuestionsAndAssessment = async () => {
         if (!assessment?.course?.id) return;
@@ -292,28 +303,45 @@ const AssessmentBuilderPage = () => {
                         <div className="text-sm text-muted-foreground">Assessment Builder</div>
                     </div>
 
-                    <Card>
+                    <Card className="border border-gray-200">
                         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="space-y-1">
-                                <CardTitle className="text-2xl">{assessment.name}</CardTitle>
-                                <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                                    {assessment.type && <span className="rounded-full border px-2 py-0.5 text-xs">{assessment.type}</span>}
+                            <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <CardTitle className="text-2xl font-semibold text-gray-900">
+                                        {assessment.name}
+                                    </CardTitle>
+                                    {hasDraftQuestions && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="flex items-center gap-1 border-amber-300 bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                        >
+                                            <AlertTriangle className="h-3 w-3" />
+                                            Contains Draft questions
+                                        </Badge>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {assessment.type && (
+                                        <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-700">
+                                            {assessment.type}
+                                        </Badge>
+                                    )}
                                     {assessment.semester && (
-                                        <span className="rounded-full border px-2 py-0.5 text-xs">
+                                        <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-700">
                                             {assessment.semester}
-                                        </span>
+                                        </Badge>
                                     )}
                                     {assessment.course?.name && (
-                                        <span className="rounded-full border px-2 py-0.5 text-xs">
+                                        <Badge variant="outline" className="border-gray-200 bg-gray-50 text-gray-700">
                                             {assessment.course.name}
-                                        </span>
+                                        </Badge>
                                     )}
                                 </div>
                                 {assessment.description && (
-                                    <p className="text-sm text-muted-foreground">{assessment.description}</p>
+                                    <p className="text-sm text-gray-500">{assessment.description}</p>
                                 )}
                             </div>
-                            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                                 Builder view
                             </div>
                         </CardHeader>

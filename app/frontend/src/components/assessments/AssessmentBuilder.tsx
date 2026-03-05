@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import { Assessment, AssessmentSection, QuestionVariantEntry, Topic } from '../../types/question';
@@ -53,21 +54,13 @@ export function AssessmentBuilder({
                 <ScrollArea className="h-full pr-2">
                     <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
                                 Sections
                             </h3>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={onAddSection}
-                            >
-                                Add section
-                            </Button>
                         </div>
 
                         {sections.length === 0 ? (
-                            <div className="rounded-md border border-dashed border-border bg-secondary/30 p-8 text-center text-sm text-muted-foreground">
+                            <div className="rounded border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
                                 No sections yet. Click &quot;Add section&quot; to get started.
                             </div>
                         ) : (
@@ -80,7 +73,9 @@ export function AssessmentBuilder({
                                         questionLinks={section.sectionVariants ?? []}
                                         questionBank={questionBank}
                                         onUpdateTitle={(name) => onUpdateSectionName(section.id, name)}
-                                        onRemoveQuestion={(variantId) => onRemoveQuestionFromSection(section.id, variantId)}
+                                        onRemoveQuestion={(variantId) =>
+                                            onRemoveQuestionFromSection(section.id, variantId)
+                                        }
                                         onDeleteSection={() => onDeleteSection(section.id)}
                                         onViewQuestion={onViewQuestion}
                                         onToggleDraft={onToggleDraft}
@@ -93,6 +88,17 @@ export function AssessmentBuilder({
                                 ))}
                             </div>
                         )}
+                        <div className="pt-3">
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="gap-1.5 bg-slate-800 text-white hover:bg-slate-700"
+                                onClick={onAddSection}
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                Add section
+                            </Button>
+                        </div>
                     </div>
                 </ScrollArea>
             </div>
