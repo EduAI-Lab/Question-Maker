@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { Trash2, X, Plus, AlertTriangle } from 'lucide-react';
 import type { AssessmentSection, SectionVariantLink, QuestionVariantEntry } from '../../types/question';
+
+const RENAME_DEBOUNCE_MS = 400;
 
 interface AssessmentSectionCardProps {
     section: AssessmentSection;
@@ -32,6 +34,28 @@ export function AssessmentSectionCard({
     onToggleDraft,
     onCreateVariant
 }: AssessmentSectionCardProps) {
+    const [localName, setLocalName] = useState(section.name);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        setLocalName(section.name);
+    }, [section.name]);
+
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, []);
+
+    const handleTitleChange = (value: string) => {
+        setLocalName(value);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            debounceRef.current = null;
+            if (value.trim() !== section.name) onUpdateTitle(value.trim() || section.name);
+        }, RENAME_DEBOUNCE_MS);
+    };
+
     const questions = React.useMemo(
         () =>
             questionLinks
@@ -55,8 +79,8 @@ export function AssessmentSectionCard({
                     Section {sectionIndex + 1}
                 </span>
                 <Input
-                    value={section.name}
-                    onChange={(event) => onUpdateTitle(event.target.value)}
+                    value={localName}
+                    onChange={(event) => handleTitleChange(event.target.value)}
                     placeholder={`Section ${sectionIndex + 1}`}
                     className="h-8 flex-1 min-w-0 border-0 bg-white text-gray-900 font-medium placeholder:text-gray-500 focus-visible:ring-1 focus-visible:ring-white"
                 />

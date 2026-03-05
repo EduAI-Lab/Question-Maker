@@ -1,6 +1,6 @@
 /**
- * Modal for creating or editing an assessment blueprint with topic/difficulty settings.
- * Loads course topics and returns collected params to parent callbacks.
+ * Modal for creating or editing an assessment blueprint (name, type, semester).
+ * Returns collected params to parent callbacks.
  */
 import * as React from 'react';
 import { Button } from '../ui/button';
@@ -9,8 +9,6 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tooltip } from '../ui/tooltip';
-import { courseService } from '../../services/courseService';
-import { TopicSelect } from './TopicSelect';
 import { AssessmentGenerationParams, AssessmentType } from '../../types/question';
 
 interface GenerateAssessmentModalProps {
@@ -23,7 +21,21 @@ interface GenerateAssessmentModalProps {
   courseId: number;
 }
 
-type Topic = { id: number; name: string };
+function getSemesterOptions(initialSemester?: string): string[] {
+  const options: string[] = [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const seasons = ['Winter', 'Spring', 'Summer', 'Fall'] as const;
+  for (let y = currentYear - 1; y <= currentYear + 2; y++) {
+    for (const season of seasons) {
+      options.push(`${season} ${y}`);
+    }
+  }
+  if (initialSemester?.trim() && !options.includes(initialSemester.trim())) {
+    options.unshift(initialSemester.trim());
+  }
+  return options;
+}
 
 export const GenerateAssessmentModal = ({
   open,
@@ -42,40 +54,23 @@ export const GenerateAssessmentModal = ({
     const now = new Date();
     return `Fall ${now.getFullYear()}`;
   });
-  const [availableTopics, setAvailableTopics] = React.useState<Topic[]>([]);
-  const [primaryTopicIds, setPrimaryTopicIds] = React.useState<number[]>(initialValues?.primaryTopicIds ?? []);
-  const [secondaryTopicIds, setSecondaryTopicIds] = React.useState<number[]>(initialValues?.secondaryTopicIds ?? []);
-  const [excludedTopicIds, setExcludedTopicIds] = React.useState<number[]>(initialValues?.excludedTopicIds ?? []);
 
   React.useEffect(() => {
     if (!open) return;
-    let isActive = true;
-    (async () => {
-      try {
-        const topics = await courseService.getCourseTopics(courseId);
-        if (!isActive) return;
-        setAvailableTopics(topics);
-        if (topics.length && !primaryTopicIds.length) {
-          setPrimaryTopicIds([topics[0].id]);
-        } else {
-          setPrimaryTopicIds((prev) => prev.filter((id) => topics.some((t) => t.id === id)));
-        }
-        setSecondaryTopicIds((prev) => prev.filter((id) => topics.some((t) => t.id === id)));
-        setExcludedTopicIds((prev) => prev.filter((id) => topics.some((t) => t.id === id)));
-      } catch (e) {
-        // ignore for now; could add toast later
-      }
-    })();
-    return () => { isActive = false; };
-  }, [open, courseId]);
+    setAssessmentName(initialValues?.name ?? '');
+    setAssessmentType(initialValues?.type ?? 'Assignment');
+    setAssessmentSemester(initialValues?.semester ?? `Fall ${new Date().getFullYear()}`);
+  }, [open, initialValues?.name, initialValues?.type, initialValues?.semester]);
 
-  if (!open) return null;
+  const semesterOptions = React.useMemo(
+    () => getSemesterOptions(assessmentSemester || initialValues?.semester),
+    [assessmentSemester, initialValues?.semester]
+  );
 
   const canGenerate =
     courseId > 0 &&
     assessmentName.trim().length > 0 &&
-    assessmentSemester.trim().length > 0 &&
-    primaryTopicIds.length > 0;
+    assessmentSemester.trim().length > 0;
 
   const getDisabledReason = (): string | null => {
     if (!canGenerate) {
@@ -83,8 +78,6 @@ export const GenerateAssessmentModal = ({
       if (courseId <= 0) reasons.push('course');
       if (assessmentName.trim().length === 0) reasons.push('name');
       if (assessmentSemester.trim().length === 0) reasons.push('semester');
-      if (primaryTopicIds.length === 0) reasons.push('at least one primary topic');
-      
       if (reasons.length > 0) {
         return `Missing required fields: ${reasons.join(', ')}`;
       }
@@ -93,6 +86,8 @@ export const GenerateAssessmentModal = ({
   };
 
   const disabledReason = getDisabledReason();
+
+  if (!open) return null;
 
   const handleGenerate = () => {
     // Provide default values for removed difficulty matrix fields
@@ -132,9 +127,9 @@ export const GenerateAssessmentModal = ({
       type: assessmentType,
       description: '',
       semester: assessmentSemester.trim(),
-      primaryTopicIds,
-      secondaryTopicIds,
-      excludedTopicIds,
+      primaryTopicIds: initialValues?.primaryTopicIds ?? [],
+      secondaryTopicIds: initialValues?.secondaryTopicIds ?? [],
+      excludedTopicIds: initialValues?.excludedTopicIds ?? [],
       difficultyDistribution,
       reasoningDistribution,
       reasoningData
@@ -183,28 +178,21 @@ export const GenerateAssessmentModal = ({
             </div>
             <div className="space-y-2">
               <Label htmlFor="assessmentSemester">Semester</Label>
-              <Input
-                id="assessmentSemester"
-                value={assessmentSemester}
-                onChange={(e) => setAssessmentSemester(e.target.value)}
-                placeholder="e.g. Fall 2024"
-              />
+              <Select value={assessmentSemester} onValueChange={setAssessmentSemester}>
+                <SelectTrigger id="assessmentSemester">
+                  <SelectValue placeholder="Select semester" />
+                </SelectTrigger>
+                <SelectContent>
+                  {semesterOptions.map((sem) => (
+                    <SelectItem key={sem} value={sem}>
+                      {sem}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-
-          {/* Topic Selection Section */}
-          <div className="mt-6">
-            <TopicSelect
-              availableTopics={availableTopics}
-              primaryTopicIds={primaryTopicIds}
-              secondaryTopicIds={secondaryTopicIds}
-              excludedTopicIds={excludedTopicIds}
-              onPrimaryChange={setPrimaryTopicIds}
-              onSecondaryChange={setSecondaryTopicIds}
-              onExcludedChange={setExcludedTopicIds}
-            />
-          </div>
-          </CardContent>
+        </CardContent>
         <CardFooter className="flex justify-end gap-3 border-t bg-muted/40 py-4">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           {disabledReason ? (

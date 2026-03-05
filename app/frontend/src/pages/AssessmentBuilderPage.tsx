@@ -1,18 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Upload, FileText } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
 import { Assessment, Question, QuestionVariantEntry } from '../types/question';
+import type { AssessmentGenerationParams } from '../types/question';
 import { Topic } from '../types/topic';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { AssessmentBuilder } from '../components/assessments/AssessmentBuilder';
 import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
+import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
+import GenerateAssessmentModal from '../components/assessments/GenerateAssessmentModal';
+import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
+import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
+import { defaultReasoningData } from './assessments/assessmentViewTypes';
 
 const AssessmentBuilderPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -28,6 +34,11 @@ const AssessmentBuilderPage = () => {
     const [viewEntry, setViewEntry] = useState<QuestionVariantEntry | null>(null);
     const [isAddQuestionOpen, setIsAddQuestionOpen] = useState(false);
     const [presetVariant, setPresetVariant] = useState<QuestionVariantEntry | null>(null);
+    const [isEditAssessmentOpen, setIsEditAssessmentOpen] = useState(false);
+    const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
+    const [isTxtExporting, setIsTxtExporting] = useState(false);
+    const [isDeletingAssessment, setIsDeletingAssessment] = useState(false);
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -106,6 +117,15 @@ const AssessmentBuilderPage = () => {
         );
     }, [assessment?.sections, questionVariantEntries]);
 
+    const hasQuestions = useMemo(() => {
+        if (!assessment?.sections) return false;
+        const count = assessment.sections.reduce(
+            (acc, s) => acc + (s.sectionVariants?.length ?? 0),
+            0
+        );
+        return count > 0;
+    }, [assessment?.sections]);
+
     const refreshQuestionsAndAssessment = async () => {
         if (!assessment?.course?.id) return;
         try {
@@ -121,6 +141,126 @@ const AssessmentBuilderPage = () => {
                 description: refreshError?.response?.data?.error || 'Please try again.',
                 variant: 'destructive'
             });
+        }
+    };
+
+    const handleExportTxt = () => {
+        if (!assessment) return;
+        if (!hasQuestions) {
+            toast({
+                title: 'Cannot export',
+                description: 'No questions in assessment.',
+                variant: 'destructive'
+            });
+            return;
+        }
+        if (hasDraftQuestions) {
+            toast({
+                title: 'Cannot export',
+                description:
+                    'Assessment contains draft questions. Please review all draft questions before exporting.',
+                variant: 'destructive'
+            });
+            return;
+        }
+        setIsTxtExporting(true);
+        try {
+            const entries: Array<{ order: number; text: string }> = [];
+            (assessment.sections ?? []).forEach((section) => {
+                (section.sectionVariants ?? []).forEach((link) => {
+                    const entry = questionVariantEntries.find((e) => e.variant.id === link.variantId);
+                    if (!entry) return;
+                    const v = entry.variant;
+                    const questionText =
+                        v.questionText?.trim() || (v as { questionMetadata?: { description?: string } }).questionMetadata?.description?.trim() || '';
+                    if (!questionText) return;
+                    const parts: string[] = [questionText];
+                    const choices = v.choices && Array.isArray(v.choices) ? v.choices : [];
+                    choices.forEach((c) => {
+                        parts.push(`${c.letter}. ${(c.text || '').trim()}`);
+                    });
+                    const answer = v.answer?.trim();
+                    if (answer) parts.push(`Correct answer: ${answer}`);
+                    const orderValue = link.displayOrder ?? (v as { questionMetadata?: { questionOrder?: Record<number, number> } }).questionMetadata?.questionOrder?.[assessment.id];
+                    const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
+                    entries.push({ order, text: parts.join('\n') });
+                });
+            });
+            if (entries.length === 0) {
+                toast({
+                    title: 'Cannot export',
+                    description: 'No questions to export for this assessment.',
+                    variant: 'destructive'
+                });
+                return;
+            }
+            entries.sort((a, b) => a.order - b.order);
+            const content = entries.map((e, i) => `${i + 1}. ${e.text}`).join('\n\n');
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const linkEl = document.createElement('a');
+            const slug = (assessment.name || 'assessment')
+                .replace(/[^a-z0-9]+/gi, '-')
+                .replace(/^-+|-+$/g, '')
+                .toLowerCase() || 'assessment';
+            linkEl.href = url;
+            linkEl.download = `${slug}-questions.txt`;
+            document.body.appendChild(linkEl);
+            linkEl.click();
+            linkEl.remove();
+            URL.revokeObjectURL(url);
+            toast({
+                title: 'Export started',
+                description: 'Questions downloaded as a TXT file.'
+            });
+        } finally {
+            setIsTxtExporting(false);
+        }
+    };
+
+    const handleUpdateAssessmentBlueprint = async (params: AssessmentGenerationParams) => {
+        if (!assessment) return;
+        try {
+            const updated = await assessmentService.updateAssessment(assessment.id, params);
+            setAssessment((prev) => (prev ? { ...updated, sections: prev.sections } : prev));
+            toast({
+                title: 'Assessment updated',
+                description: 'Blueprint details have been saved.'
+            });
+            setIsEditAssessmentOpen(false);
+        } catch (err: unknown) {
+            toast({
+                title: 'Failed to update assessment',
+                description: (err as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Please try again.',
+                variant: 'destructive'
+            });
+        }
+    };
+
+    const handleDeleteAssessment = () => {
+        if (!assessment) return;
+        setDeleteModalOpen(true);
+    };
+
+    const confirmDeleteAssessment = async () => {
+        if (!assessment) return;
+        try {
+            setIsDeletingAssessment(true);
+            await assessmentService.deleteAssessment(assessment.id);
+            toast({
+                title: 'Assessment deleted',
+                description: `"${assessment.name}" has been removed.`
+            });
+            navigate('/landing');
+        } catch (_err) {
+            toast({
+                title: 'Failed to delete assessment',
+                description: 'Please try again.',
+                variant: 'destructive'
+            });
+        } finally {
+            setIsDeletingAssessment(false);
+            setDeleteModalOpen(false);
         }
     };
 
@@ -341,8 +481,82 @@ const AssessmentBuilderPage = () => {
                                     <p className="text-sm text-gray-500">{assessment.description}</p>
                                 )}
                             </div>
-                            <div className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-                                Builder view
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsEditAssessmentOpen(true)}
+                                    className="border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                                >
+                                    Edit Blueprint
+                                </Button>
+                                {hasQuestions && !hasDraftQuestions ? (
+                                    <>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setIsCanvasExportOpen(true)}
+                                            className="border-gray-800 bg-gray-900 text-white hover:bg-gray-800"
+                                        >
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Export to Canvas
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleExportTxt}
+                                            disabled={isTxtExporting}
+                                            className="border-gray-800 bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+                                        >
+                                            <FileText className="mr-2 h-4 w-4" />
+                                            {isTxtExporting ? 'Exporting…' : 'Export TXT'}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <Tooltip
+                                        content={
+                                            !hasQuestions
+                                                ? 'No questions in assessment'
+                                                : 'Cannot export: Assessment contains draft questions. Please review all draft questions before exporting.'
+                                        }
+                                        side="bottom"
+                                    >
+                                        <span className="inline-flex gap-2">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled
+                                                className="border-gray-800 bg-gray-900 text-white opacity-50"
+                                            >
+                                                <Upload className="mr-2 h-4 w-4" />
+                                                Export to Canvas
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled
+                                                className="border-gray-800 bg-gray-900 text-white opacity-50"
+                                            >
+                                                <FileText className="mr-2 h-4 w-4" />
+                                                Export TXT
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                )}
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={handleDeleteAssessment}
+                                    disabled={isDeletingAssessment}
+                                >
+                                    {isDeletingAssessment ? 'Deleting…' : 'Delete Assessment'}
+                                </Button>
                             </div>
                         </CardHeader>
                         <CardContent className="pt-4">
@@ -381,17 +595,8 @@ const AssessmentBuilderPage = () => {
                     onUpdateSectionName={async (sectionId, name) => {
                         if (!assessment) return;
                         try {
-                            const updated = await assessmentService.updateSection(assessment.id, sectionId, { name });
-                            setAssessment((prev) =>
-                                prev
-                                    ? {
-                                          ...prev,
-                                          sections: (prev.sections ?? []).map((section) =>
-                                              section.id === sectionId ? updated : section
-                                          )
-                                      }
-                                    : prev
-                            );
+                            await assessmentService.updateSection(assessment.id, sectionId, { name });
+                            await refreshQuestionsAndAssessment();
                         } catch (updateError: any) {
                             toast({
                                 title: 'Failed to rename section',
@@ -490,6 +695,62 @@ const AssessmentBuilderPage = () => {
                     totalQuestionsInBank={questions.length}
                 />
             )}
+
+            {assessment && (
+                <CanvasExportDialog
+                    open={isCanvasExportOpen}
+                    onClose={() => setIsCanvasExportOpen(false)}
+                    assessmentId={assessment.id}
+                    assessmentName={assessment.name ?? 'Assessment'}
+                    onExportSuccess={() => {
+                        toast({
+                            title: 'Export successful',
+                            description: 'Assessment exported to Canvas.'
+                        });
+                    }}
+                />
+            )}
+
+            {assessment && (
+                <GenerateAssessmentModal
+                    open={isEditAssessmentOpen}
+                    onClose={() => setIsEditAssessmentOpen(false)}
+                    onUpdate={handleUpdateAssessmentBlueprint}
+                    mode="edit"
+                    initialValues={{
+                        name: assessment.name,
+                        type: assessment.type,
+                        description: assessment.description ?? '',
+                        semester: assessment.semester ?? '',
+                        courseId: assessment.courseId ?? assessment.course?.id ?? 0,
+                        primaryTopicIds: assessment.blueprintConfig?.primaryTopicIds ?? [],
+                        secondaryTopicIds: assessment.blueprintConfig?.secondaryTopicIds ?? [],
+                        excludedTopicIds: assessment.blueprintConfig?.excludedTopicIds ?? [],
+                        difficultyDistribution: assessment.blueprintConfig?.difficultyDistribution ?? {
+                            easy: 0,
+                            medium: 0,
+                            hard: 0
+                        },
+                        reasoningDistribution: assessment.blueprintConfig?.reasoningDistribution ?? {
+                            factual: 0,
+                            analytical: 0,
+                            application: 0
+                        },
+                        reasoningData: assessment.blueprintConfig?.reasoningData ?? defaultReasoningData()
+                    }}
+                    courseId={assessment.courseId ?? assessment.course?.id ?? 0}
+                />
+            )}
+
+            <DeleteConfirmationModal
+                open={deleteModalOpen}
+                onOpenChange={setDeleteModalOpen}
+                onConfirm={confirmDeleteAssessment}
+                title={assessment ? `Delete assessment "${assessment.name}"?` : 'Delete assessment?'}
+                message="This action cannot be undone. All sections and questions in this assessment will be removed."
+                confirmLabel="Delete"
+                isLoading={isDeletingAssessment}
+            />
         </>
     );
 };
