@@ -413,13 +413,11 @@ export const AssessmentSection = ({
                                             {assessment.description && <p>{assessment.description}</p>}
                                             {blueprint && (
                                                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                                    <span>Primary topics: {primaryCount}</span>
-                                                    <span>Secondary topics: {secondaryCount}</span>
                                                     {totalQuestionCount > 0 && (
                                                         <span>
-                                                            Difficulty mix: {difficultyDistribution.easy} easy /{' '}
-                                                            {difficultyDistribution.medium} medium /{' '}
-                                                            {difficultyDistribution.hard} hard
+                                                            Easy: {difficultyDistribution.easy}, Medium: {' '}
+                                                            {difficultyDistribution.medium}, Hard: {' '}
+                                                            {difficultyDistribution.hard} 
                                                         </span>
                                                     )}
                                                 </div>

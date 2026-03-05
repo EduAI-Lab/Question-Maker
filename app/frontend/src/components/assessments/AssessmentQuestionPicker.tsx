@@ -11,6 +11,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { ScrollArea } from '../ui/scroll-area';
 import { Separator } from '../ui/separator';
+import { MultiSelectDropdown } from '../../pages/assessments/MultiSelectDropdown';
 import { QuestionDifficulty, QuestionType, QuestionVariantEntry, Topic } from '../../types/question';
 
 interface AssessmentQuestionPickerProps {
@@ -26,6 +27,7 @@ type PickerFilter = {
     types: QuestionType[];
     difficulties: QuestionDifficulty[];
     primaryTopicId: string;
+    secondaryTopicIds: number[];
     search: string;
 };
 
@@ -44,6 +46,7 @@ export function AssessmentQuestionPicker({
         types: [],
         difficulties: [],
         primaryTopicId: '',
+        secondaryTopicIds: [],
         search: ''
     });
     const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -64,6 +67,11 @@ export function AssessmentQuestionPicker({
             if (filter.primaryTopicId && entry.primaryTopicId.toString() !== filter.primaryTopicId) {
                 return false;
             }
+            if (filter.secondaryTopicIds.length > 0) {
+                const variantSecondary = entry.variant.secondaryTopicsId ?? [];
+                const hasMatchingSecondary = filter.secondaryTopicIds.some((id) => variantSecondary.includes(id));
+                if (!hasMatchingSecondary) return false;
+            }
             if (filter.search.trim()) {
                 const needle = filter.search.toLowerCase();
                 const haystack = `${entry.variant.questionText} ${entry.questionDescription ?? ''}`.toLowerCase();
@@ -79,6 +87,7 @@ export function AssessmentQuestionPicker({
         filter.types.length > 0 ||
         filter.difficulties.length > 0 ||
         !!filter.primaryTopicId ||
+        filter.secondaryTopicIds.length > 0 ||
         filter.search.trim().length > 0;
 
     const handleToggleQuestion = (variantId: number) => {
@@ -106,6 +115,7 @@ export function AssessmentQuestionPicker({
             types: [],
             difficulties: [],
             primaryTopicId: '',
+            secondaryTopicIds: [],
             search: ''
         });
     };
@@ -245,6 +255,26 @@ export function AssessmentQuestionPicker({
                                             </option>
                                         ))}
                                     </select>
+                                </div>
+
+                                <Separator className="bg-border" />
+
+                                {/* Secondary topics */}
+                                <div className="flex flex-col gap-1.5">
+                                    <MultiSelectDropdown
+                                        label="Secondary topics"
+                                        options={topics}
+                                        selectedIds={filter.secondaryTopicIds}
+                                        onChange={(ids) =>
+                                            setFilter((prev) => ({
+                                                ...prev,
+                                                secondaryTopicIds: ids
+                                            }))
+                                        }
+                                        labelClassName="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                                        triggerClassName="flex h-8 w-full items-center justify-between rounded-md border border-border bg-secondary px-2 text-left text-xs text-foreground"
+                                        listClassName="z-20 mt-1 max-h-56 w-full rounded-md border border-border bg-card shadow-md"
+                                    />
                                 </div>
 
                                 <Separator className="bg-border" />
