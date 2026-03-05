@@ -13,7 +13,6 @@ import {
     Plus,
     ChevronUp,
     ChevronDown,
-    Eye,
     Upload,
     Trash2,
     AlertTriangle,
@@ -274,34 +273,17 @@ export const AssessmentSection = ({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() =>
-                                                        navigate(`/assessments/${assessment.id}`, {
+                                                        navigate(`/assessments/${assessment.id}/builder`, {
                                                             state: { fromTab: 'assessments' }
                                                         })
                                                     }
                                                     className="flex items-center space-x-1"
                                                     data-tour-id="assessment-view-btn"
                                                 >
-                                                    <Eye className="h-4 w-4" />
-                                                    <span>View</span>
-                                                </Button>
-                                            </Tooltip>
-
-                                            <Tooltip content="Open the new assessment builder" side="bottom">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        navigate(`/assessments/${assessment.id}/builder`, {
-                                                            state: { fromTab: 'assessments' }
-                                                        })
-                                                    }
-                                                    className="flex items-center space-x-1"
-                                                >
                                                     <Layers3 className="h-4 w-4" />
-                                                    <span>Builder</span>
+                                                    <span>Open</span>
                                                 </Button>
                                             </Tooltip>
-
 
                                             {onExportToCanvas &&
                                                 (totalQuestionCount === 0 || hasDrafts ? (
