@@ -67,14 +67,14 @@ const fetchStatus = async () => {
         } else {
             setState({
                 status: 'error',
-                message: 'AI service is unavailable. AI features will be disabled.'
+                message: 'AI service not available. Connect to UBC wifi or VPN.'
             });
             scheduleHeartbeatIfNeeded();
         }
     } catch {
         setState({
             status: 'error',
-            message: 'AI service is unavailable. AI features will be disabled.'
+            message: 'AI service not available. Connect to UBC wifi or VPN.'
         });
         scheduleHeartbeatIfNeeded();
     }
@@ -82,7 +82,7 @@ const fetchStatus = async () => {
 
 export const refreshEduAIStatus = async () => {
     if (inflight) return inflight;
-    setState({ status: 'loading', message: 'Checking AI service status' });
+    setState({ status: 'loading', message: 'Checking AI service status. Connect to UBC wifi or VPN.' });
     inflight = fetchStatus().finally(() => {
         inflight = null;
     });
@@ -96,7 +96,7 @@ if (token) {
   void refreshEduAIStatus();
 } else {
   // Set initial state to error if not authenticated
-  setState({ status: 'error', message: 'AI service status unavailable - please log in' });
+  setState({ status: 'error', message: 'AI service not available. Connect to UBC wifi or VPN.' });
 }
 
 export const useEduAIStatus = () => {
