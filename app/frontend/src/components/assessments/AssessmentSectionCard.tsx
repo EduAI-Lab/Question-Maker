@@ -75,9 +75,6 @@ export function AssessmentSectionCard({
         <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
             {/* Section header: */}
             <div className="flex items-center gap-2 rounded-t-lg bg-slate-800 px-3 py-2">
-                <span className="text-xs font-medium tracking-wide text-white shrink-0">
-                    Section {sectionIndex + 1}
-                </span>
                 <Input
                     value={localName}
                     onChange={(event) => handleTitleChange(event.target.value)}
