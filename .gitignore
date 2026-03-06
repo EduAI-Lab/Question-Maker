@@ -34,3 +34,4 @@ build/
 *.db
 *.sqlite
 docs/Saad's TODO.md
+app/frontend/src/components/prototype/

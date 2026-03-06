@@ -10,7 +10,7 @@ import {
   QuestionType,
   ReasoningDataState
 } from '../../types/question';
-import { QuestionSearchFilters, QUESTION_TYPES, defaultReasoningData } from './assessmentViewTypes';
+import { QuestionSearchFilters, QUESTION_TYPES, defaultReasoningData } from '../../pages/assessments/assessmentViewTypes';
 
 export const sanitizeTopicGroups = (
   primaryInput: number[],

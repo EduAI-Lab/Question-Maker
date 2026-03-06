@@ -13,12 +13,12 @@ import {
     Plus,
     ChevronUp,
     ChevronDown,
-    Eye,
     Upload,
     Trash2,
     AlertTriangle,
     FileText,
-    Download
+    Download,
+    Layers3
 } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
@@ -273,18 +273,17 @@ export const AssessmentSection = ({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() =>
-                                                        navigate(`/assessments/${assessment.id}`, {
+                                                        navigate(`/assessments/${assessment.id}/builder`, {
                                                             state: { fromTab: 'assessments' }
                                                         })
                                                     }
                                                     className="flex items-center space-x-1"
                                                     data-tour-id="assessment-view-btn"
                                                 >
-                                                    <Eye className="h-4 w-4" />
-                                                    <span>View</span>
+                                                    <Layers3 className="h-4 w-4" />
+                                                    <span>Open</span>
                                                 </Button>
                                             </Tooltip>
-
 
                                             {onExportToCanvas &&
                                                 (totalQuestionCount === 0 || hasDrafts ? (
@@ -396,13 +395,11 @@ export const AssessmentSection = ({
                                             {assessment.description && <p>{assessment.description}</p>}
                                             {blueprint && (
                                                 <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                                                    <span>Primary topics: {primaryCount}</span>
-                                                    <span>Secondary topics: {secondaryCount}</span>
                                                     {totalQuestionCount > 0 && (
                                                         <span>
-                                                            Difficulty mix: {difficultyDistribution.easy} easy /{' '}
-                                                            {difficultyDistribution.medium} medium /{' '}
-                                                            {difficultyDistribution.hard} hard
+                                                            Easy: {difficultyDistribution.easy}, Medium: {' '}
+                                                            {difficultyDistribution.medium}, Hard: {' '}
+                                                            {difficultyDistribution.hard} 
                                                         </span>
                                                     )}
                                                 </div>

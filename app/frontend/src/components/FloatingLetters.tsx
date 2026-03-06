@@ -14,7 +14,14 @@ interface Letter {
   opacity: number;
 }
 
-export function FloatingLetters() {
+interface FloatingLettersProps {
+  /** Optional class for the container */
+  className?: string;
+  /** Optional class for each letter (e.g. text-slate-400 for dark backgrounds) */
+  letterClassName?: string;
+}
+
+export function FloatingLetters({ className, letterClassName = 'text-primary' }: FloatingLettersProps = {}) {
   const [letters, setLetters] = useState<Letter[]>([]);
 
   useEffect(() => {
@@ -43,18 +50,17 @@ export function FloatingLetters() {
   }, []);
 
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none">
+    <div className={`fixed inset-0 overflow-hidden pointer-events-none ${className ?? ''}`}>
       {letters.map((letter) => (
         <div
           key={letter.id}
-          className="absolute transition-all duration-1000 ease-linear select-none"
+          className={`absolute transition-all duration-1000 ease-linear select-none ${letterClassName}`}
           style={{
             left: `${letter.x}%`,
             top: `${letter.y}%`,
             fontSize: `${letter.size}rem`,
             opacity: letter.opacity,
-            transform: 'translate(-50%, -50%)',
-            color: 'var(--primary)'
+            transform: 'translate(-50%, -50%)'
           }}
         >
           {letter.char}
