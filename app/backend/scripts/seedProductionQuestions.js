@@ -15,11 +15,27 @@ import { TOPIC_NAMES_BY_TEMPLATE, SEED_QUESTIONS_BY_TEMPLATE } from './seedData.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const projectRoot = join(__dirname, '../../../');
-const envPath = join(projectRoot, '.env');
+// Resolve .env in multiple contexts:
+// - Host: repo root (../../.. from scripts/)
+// - Backend container: /app/.env (copied in Dockerfile)
+// - Optional explicit mount: /.env
+const envCandidates = [
+  join(__dirname, '../../../.env'),
+  join('/app', '.env'),
+  join('/', '.env'),
+];
 
-if (!existsSync(envPath)) {
-  console.error('❌ .env not found at', envPath);
+let envPath = null;
+for (const candidate of envCandidates) {
+  if (existsSync(candidate)) {
+    envPath = candidate;
+    break;
+  }
+}
+
+if (!envPath) {
+  console.error('❌ .env not found in any candidate path.');
+  console.error('   Tried:', envCandidates);
   process.exit(1);
 }
 
@@ -34,12 +50,24 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
+// Only rewrite DATABASE_URL when running on the host, not inside Docker.
 if (process.env.DATABASE_URL.includes('@postgres:')) {
-  const isDocker = process.env.DOCKER === 'true' || process.env.COMPOSE_PROJECT_NAME;
-  if (!isDocker) {
+  const inDocker =
+    process.env.DOCKER === 'true' ||
+    !!process.env.COMPOSE_PROJECT_NAME ||
+    process.cwd().startsWith('/app');
+
+  if (!inDocker) {
     const hostPort = process.env.POSTGRES_HOST_PORT || '55432';
-    console.log(`ℹ️  Running on host - connecting to localhost:${hostPort} (set POSTGRES_HOST_PORT if different)`);
-    process.env.DATABASE_URL = process.env.DATABASE_URL.replace('@postgres:5432', `@localhost:${hostPort}`);
+    console.log(
+      `ℹ️  Running on host - connecting to localhost:${hostPort} (set POSTGRES_HOST_PORT if different)`
+    );
+    process.env.DATABASE_URL = process.env.DATABASE_URL.replace(
+      '@postgres:5432',
+      `@localhost:${hostPort}`
+    );
+  } else {
+    console.log('ℹ️  Running inside Docker - using postgres service hostname from DATABASE_URL');
   }
 }
 
