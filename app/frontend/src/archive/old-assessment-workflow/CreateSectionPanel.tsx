@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
 import { Tooltip } from '../../components/ui/tooltip';
-import { MultiSelectDropdown } from './MultiSelectDropdown';
+import { MultiSelectDropdown } from '../../pages/assessments/MultiSelectDropdown';
 import {
     sanitizeTopicGroups,
     extractTopicFiltersFromSection,
@@ -27,7 +27,7 @@ import {
     QUESTION_TYPES,
     QUESTION_TYPE_LABELS,
     defaultReasoningData
-} from './assessmentViewTypes';
+} from '../../pages/assessments/assessmentViewTypes';
 
 interface CreateSectionPanelProps {
     isSearching: boolean;

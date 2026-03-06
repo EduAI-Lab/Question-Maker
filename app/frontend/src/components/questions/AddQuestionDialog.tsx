@@ -23,9 +23,12 @@ import {
     QuestionType,
     QuestionVariantEntry,
     ReasoningLevel,
-    MCQChoice
+    MCQChoice,
+    questionTypeLabels
 } from '../../types/question';
-import { MCQChoicesField } from './MCQChoicesField';
+import { QuestionMetadataPanel } from './QuestionMetadataPanel';
+import { QuestionOutputPanel } from './QuestionOutputPanel';
+import { QuestionAIControls } from './QuestionAIControls';
 import { questionService } from '../../services/questionService';
 import { courseService } from '../../services/courseService';
 import assessmentService from '../../services/assessmentService';
@@ -37,8 +40,6 @@ import eduaiService, { EduAIModelOption, EduAICourseOption } from '../../service
 import { Course } from '../../types/question';
 import { apiKeyStorage } from '../../services/apiKeyStorage';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
-import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
-import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Tooltip } from '../ui/tooltip';
 import { ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
 
@@ -69,8 +70,6 @@ type FormState = {
     questionOrder: string;
     generationPrompt: string;
     generationModel: string;
-    generationDifficulty: QuestionDifficulty | 'balanced';
-    generationReasoningLevel: ReasoningLevel | 'balanced';
 };
 
 const defaultForm: FormState = {
@@ -88,9 +87,7 @@ const defaultForm: FormState = {
     primaryTopicId: '',
     questionOrder: '',
     generationPrompt: '',
-    generationModel: 'ollama:gpt-oss:120b',
-    generationDifficulty: 'balanced',
-    generationReasoningLevel: 'balanced'
+    generationModel: 'ollama:gpt-oss:120b'
 };
 
 const difficultyOptions: QuestionDifficulty[] = ['easy', 'medium', 'hard'];
@@ -101,11 +98,6 @@ const reasoningLevelLabels: Record<ReasoningLevel, string> = {
     application: 'Application'
 };
 const questionTypes: QuestionType[] = ['MCQ', 'SA', 'LA'];
-const questionTypeLabels: Record<QuestionType, string> = {
-    MCQ: 'Multiple Choice',
-    SA: 'Short Answer',
-    LA: 'Long Answer'
-};
 
 export const AddQuestionDialog = ({
     open,
@@ -138,14 +130,22 @@ export const AddQuestionDialog = ({
     const showNewUserHint = totalQuestionsInBank === 0;
 
     const modalTourSteps = useMemo<{ id: string; content: string }[]>(() => [
-        { id: 'aq-form-fields', content: 'To create a question manually, fill out the form on the left.' },
-        { id: 'aq-save-area', content: 'Mark as reviewed, then save.' },
-        { id: 'aq-eduai-panel', content: 'To create a question with AI, use the panel on the right.' },
-        { id: 'aq-ai-prompt', content: 'Write out your prompt for how you would like your variant.' },
-        { id: 'aq-model-picker', content: 'Select model, difficulty focus and reasoning level.' },
-        { id: 'aq-ai-generate', content: 'Click Generate, then wait 30–60 seconds for your question to be generated.' },
-        { id: 'aq-form-fields', content: 'Review the generated question.' },
-        { id: 'aq-save-area', content: 'Mark as reviewed, then save.' }
+        {
+            id: 'aq-metadata',
+            content: 'Step 1: Set the question type, primary topic, difficulty, and reasoning in Question Parameters.'
+        },
+        {
+            id: 'aq-form-fields',
+            content: 'Step 2: You can enter the full question  manually in the Question content box on the right.'
+        },
+        {
+            id: 'aq-ai-prompt',
+            content: 'Step 3: Or you can type a prompt and click Generate to have the AI create a question for you in about 15–60 seconds.'
+        },
+        {
+            id: 'aq-save-area',
+            content: 'Step 4: When you are happy with the question, mark it as reviewed (or leave as draft) and save.'
+        }
     ], []);
 
     const [tourHighlightRect, setTourHighlightRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
@@ -560,31 +560,44 @@ export const AddQuestionDialog = ({
                 description: 'Your request is being processed. This may take 30–60 seconds.',
             });
 
-            const difficultyDistribution = (() => {
-                if (form.generationDifficulty === 'balanced') {
-                    return { easy: 0, medium: 1, hard: 0 };
-                }
-                return {
-                    easy: form.generationDifficulty === 'easy' ? 1 : 0,
-                    medium: form.generationDifficulty === 'medium' ? 1 : 0,
-                    hard: form.generationDifficulty === 'hard' ? 1 : 0
-                };
-            })();
+            const difficultyDistribution = {
+                easy: form.variantDifficulty === 'easy' ? 1 : 0,
+                medium: form.variantDifficulty === 'medium' ? 1 : 0,
+                hard: form.variantDifficulty === 'hard' ? 1 : 0
+            };
 
-            const reasoningDistribution = (() => {
-                if (form.generationReasoningLevel === 'balanced') {
-                    return { factual: 33, analytical: 33, application: 34 };
+            const reasoningDistribution = {
+                factual: form.variantReasoningLevel === 'factual' ? 100 : 0,
+                analytical: form.variantReasoningLevel === 'analytical' ? 100 : 0,
+                application: form.variantReasoningLevel === 'application' ? 100 : 0
+            };
+
+            const questionParamsBlock = (() => {
+                const lines: string[] = [
+                    'Question parameters (use these in your response):',
+                    `- Type: ${questionTypeLabels[form.questionType]}`,
+                    `- Difficulty: ${form.variantDifficulty}`,
+                    `- Reasoning focus: ${form.variantReasoningLevel}`
+                ];
+                const primaryTopic = topics.find((t) => t.id.toString() === form.primaryTopicId);
+                if (primaryTopic) {
+                    lines.push(`- Primary topic: ${primaryTopic.name} (ID: ${primaryTopic.id})`);
                 }
-                return {
-                    factual: form.generationReasoningLevel === 'factual' ? 100 : 0,
-                    analytical: form.generationReasoningLevel === 'analytical' ? 100 : 0,
-                    application: form.generationReasoningLevel === 'application' ? 100 : 0
-                };
+                if (form.questionDescription.trim()) {
+                    lines.push(`- Description: ${form.questionDescription.trim()}`);
+                }
+                if (form.variantSecondaryTopics.length > 0) {
+                    const names = form.variantSecondaryTopics
+                        .map((id) => topics.find((t) => t.id === id)?.name ?? id)
+                        .join(', ');
+                    lines.push(`- Secondary topics: ${names}`);
+                }
+                return lines.join('\n');
             })();
 
             const promptWithTopics = (() => {
                 const trimmedPrompt = form.generationPrompt.trim();
-                const sections: string[] = [trimmedPrompt];
+                const sections: string[] = [trimmedPrompt, questionParamsBlock];
 
                 if (mode === 'variant') {
                     const contextLines: string[] = [];
@@ -600,7 +613,7 @@ export const AddQuestionDialog = ({
                     }
 
                     if (contextLines.length > 0) {
-                        sections.push(`Base question context:\n${contextLines.join('\n')}`);
+                        sections.splice(1, 0, `Base question context:\n${contextLines.join('\n')}`);
                     }
                 }
 
@@ -1007,493 +1020,188 @@ export const AddQuestionDialog = ({
                     </>
                 )}
 
-                <div className="flex gap-6 h-[65vh]">
-                    {/* LEFT PANEL: Question Details Form (75% width) */}
-                    <div className="flex-[3] overflow-hidden">
-                        <ScrollArea className="h-full pr-4">
-                            <div className="space-y-6">
-                                {mode === 'variant' && presetVariant && (
-                                    <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-                                        <h4 className="text-sm font-semibold text-foreground">Base Question Info</h4>
-                                        <p className="text-sm">
-                                            <span className="font-medium">Description:</span>{' '}
-                                            <span className="text-muted-foreground">{presetVariant.questionDescription ?? '—'}</span>
-                                        </p>
-                                        <p className="text-sm">
-                                            <span className="font-medium">Primary Topic:</span>{' '}
-                                            <span className="text-muted-foreground">
-                                                {topics.find((t) => t.id === presetVariant.primaryTopicId)?.name ?? `#${presetVariant.primaryTopicId}`}
-                                            </span>
-                                        </p>
-                                        <p className="text-sm">
-                                            <span className="font-medium">Type:</span>{' '}
-                                            <span className="text-muted-foreground">{questionTypeLabels[presetVariant.questionType]}</span>
-                                        </p>
-                                    </div>
-                                )}
+                <div className="grid gap-6 lg:grid-cols-[340px_1fr] h-[70vh] min-h-0">
+                    {/* LEFT: Question Parameters + Advanced */}
+                    <ScrollArea className="min-h-0">
+                        <div className="space-y-4 pr-4">
+                            {mode === 'variant' && presetVariant && (
+                                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                                    <h4 className="text-sm font-semibold text-foreground">Base Question Info</h4>
+                                    <p className="text-sm">
+                                        <span className="font-medium">Description:</span>{' '}
+                                        <span className="text-muted-foreground">{presetVariant.questionDescription ?? '—'}</span>
+                                    </p>
+                                    <p className="text-sm">
+                                        <span className="font-medium">Primary Topic:</span>{' '}
+                                        <span className="text-muted-foreground">
+                                            {topics.find((t) => t.id === presetVariant.primaryTopicId)?.name ?? `#${presetVariant.primaryTopicId}`}
+                                        </span>
+                                    </p>
+                                    <p className="text-sm">
+                                        <span className="font-medium">Type:</span>{' '}
+                                        <span className="text-muted-foreground">{questionTypeLabels[presetVariant.questionType]}</span>
+                                    </p>
+                                </div>
+                            )}
 
-                                {/* New Question Mode: Base section + collapsible Advanced */}
-                                {mode === 'new' && (
-                                    <>
-                                        <div className="space-y-4" data-tour-id="aq-metadata">
-                                            <Tabs
-                                                value={form.questionType}
-                                                onValueChange={(value) => handleFieldChange('questionType', value as QuestionType)}
-                                                className="w-full"
-                                            >
-                                                <TabsList className="grid w-full grid-cols-3 h-9">
-                                                    <TabsTrigger value="MCQ" className="text-xs sm:text-sm">MCQ</TabsTrigger>
-                                                    <TabsTrigger value="SA" className="text-xs sm:text-sm">Short Answer</TabsTrigger>
-                                                    <TabsTrigger value="LA" className="text-xs sm:text-sm">Long Answer</TabsTrigger>
-                                                </TabsList>
-                                            </Tabs>
-
-                                            <div className="space-y-4" data-tour-id="aq-form-fields">
-                                                <div className="space-y-2" data-field-id="field-variant-text">
-                                                    <Label htmlFor="variant-text">Question Text <span className="text-destructive">*</span></Label>
-                                                    <Textarea
-                                                        id="variant-text"
-                                                        value={form.variantText}
-                                                        onChange={(event) => handleFieldChange('variantText', event.target.value)}
-                                                        placeholder={form.questionType === 'MCQ' ? "Enter the question text (without choices)" : "Enter the full question text"}
-                                                        rows={6}
-                                                    />
-                                                </div>
-
-                                                {form.questionType === 'MCQ' && (
-                                                    <div data-field-id="field-mcq-choices">
-                                                        <MCQChoicesField
-                                                            choices={form.variantChoices ?? defaultForm.variantChoices}
-                                                            answer={form.variantAnswer}
-                                                            onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
-                                                            onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
-                                                            idPrefix="aq-mcq"
-                                                        />
-                                                    </div>
-                                                )}
-
-                                                <div className="space-y-2" data-field-id="field-primary-topic">
-                                                    <Label htmlFor="primary-topic">Primary Topic <span className="text-destructive">*</span></Label>
-                                                    <Select
-                                                    value={form.primaryTopicId}
-                                                    onValueChange={(value) => handleFieldChange('primaryTopicId', value)}
-                                                    disabled={topics.length === 0}
-                                                >
-                                                    <SelectTrigger id="primary-topic">
-                                                        <SelectValue placeholder={topics.length === 0 ? 'No topics available' : 'Select a topic'} />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {topics.length === 0 ? (
-                                                            <SelectItem value="__no_topics" disabled>
-                                                                {isAuxLoading ? 'Loading topics...' : 'No topics available'}
-                                                            </SelectItem>
-                                                        ) : (
-                                                            topics.map((topic) => (
-                                                                <SelectItem key={topic.id} value={topic.id.toString()}>
-                                                                    {topic.name} (#{topic.id})
-                                                                </SelectItem>
-                                                            ))
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="variant-difficulty">Difficulty</Label>
-                                                    <Select
-                                                        value={form.variantDifficulty}
-                                                        onValueChange={(value) => handleFieldChange('variantDifficulty', value as QuestionDifficulty)}
-                                                    >
-                                                        <SelectTrigger id="variant-difficulty">
-                                                            <SelectValue placeholder="Select difficulty" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {difficultyOptions.map((option) => (
-                                                                <SelectItem key={option} value={option} className="capitalize">
-                                                                    {option}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="variant-reasoning-level">Reasoning Focus</Label>
-                                                    <Select
-                                                        value={form.variantReasoningLevel}
-                                                        onValueChange={(value) => handleFieldChange('variantReasoningLevel', value as ReasoningLevel)}
-                                                    >
-                                                        <SelectTrigger id="variant-reasoning-level">
-                                                            <SelectValue placeholder="Select reasoning focus" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {reasoningLevelOptions.map((option) => (
-                                                                <SelectItem key={option} value={option}>
-                                                                    {reasoningLevelLabels[option]}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="border rounded-lg overflow-hidden">
-                                            <button
-                                                type="button"
-                                                onClick={() => setAdvancedOpen((o) => !o)}
-                                                className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left hover:bg-muted/50 transition-colors"
-                                            >
-                                                <span>Advanced Information</span>
-                                                {advancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                            </button>
-                                            {advancedOpen && (
-                                                <div className="space-y-4 px-4 pb-4 pt-0 border-t" data-tour-id="aq-variant">
-                                                    <div className="space-y-2 pt-4">
-                                                        <Label htmlFor="question-description">Question Description <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                        <Textarea
-                                                            id="question-description"
-                                                            value={form.questionDescription}
-                                                            onChange={(event) => handleFieldChange('questionDescription', event.target.value)}
-                                                            placeholder="Short description or leave blank"
-                                                            rows={2}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="variant-reference">Reference Variant ID <span className="text-xs text-muted-foreground">(dev only)</span></Label>
-                                                        <Input
-                                                            id="variant-reference"
-                                                            value={form.variantReferenceId}
-                                                            placeholder="Auto-assigned"
-                                                            readOnly
-                                                            className="bg-muted/50"
-                                                        />
-                                                    </div>
-                                                    {form.questionType !== 'MCQ' && (
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="variant-answer">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                            <Textarea
-                                                                id="variant-answer"
-                                                                value={form.variantAnswer}
-                                                                onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
-                                                                placeholder="Provide an answer or leave blank"
-                                                                rows={3}
-                                                            />
-                                                        </div>
-                                                    )}
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="variant-assessment">Assessment <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                            <Select
-                                                                value={form.variantAssessmentId}
-                                                                onValueChange={(value) => handleFieldChange('variantAssessmentId', value)}
-                                                            >
-                                                                <SelectTrigger id="variant-assessment">
-                                                                    <SelectValue placeholder="Select assessment" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="none">No assessment</SelectItem>
-                                                                    {assessmentOptions.length === 0 ? (
-                                                                        <SelectItem value="__no_assessments" disabled>
-                                                                            {isAuxLoading ? 'Loading...' : 'No assessments available'}
-                                                                        </SelectItem>
-                                                                    ) : (
-                                                                        assessmentOptions.map((assessment) => (
-                                                                            <SelectItem key={assessment.id} value={assessment.id.toString()}>
-                                                                                {assessment.name} ({assessment.type})
-                                                                            </SelectItem>
-                                                                        ))
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label>Secondary Topics <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                            <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-auto">
-                                                                {topics.length === 0 ? (
-                                                                    <p className="text-xs text-muted-foreground">
-                                                                        {isAuxLoading ? 'Loading topics...' : 'No topics available'}
-                                                                    </p>
-                                                                ) : (
-                                                                    topics.map((topic) => {
-                                                                        const checked = form.variantSecondaryTopics.includes(topic.id);
-                                                                        const isPrimary = form.primaryTopicId === topic.id.toString();
-                                                                        return (
-                                                                            <label
-                                                                                key={topic.id}
-                                                                                className={`flex items-center space-x-2 text-sm ${isPrimary ? 'text-muted-foreground/70' : 'text-foreground'}`}
-                                                                            >
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    className="h-4 w-4"
-                                                                                    checked={checked}
-                                                                                    disabled={isPrimary}
-                                                                                    onChange={(event) => toggleSecondaryTopic(topic.id, event.target.checked)}
-                                                                                />
-                                                                                <span>{topic.name}</span>
-                                                                            </label>
-                                                                        );
-                                                                    })
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </>
-                                )}
-
-                                {/* Variant mode: same layout as new — Base + collapsible Advanced */}
-                                {mode === 'variant' && (
-                                    <>
-                                        <div className="space-y-4" data-tour-id="aq-metadata">
-                                            <div className="space-y-4" data-tour-id="aq-form-fields">
-                                                <div className="space-y-2" data-field-id="field-variant-text">
-                                                    <Label htmlFor="variant-text">Question Text <span className="text-destructive">*</span></Label>
-                                                    <Textarea
-                                                        id="variant-text"
-                                                        value={form.variantText}
-                                                        onChange={(event) => handleFieldChange('variantText', event.target.value)}
-                                                        placeholder={form.questionType === 'MCQ' ? "Enter the question text" : "Enter the full question text"}
-                                                        rows={6}
-                                                    />
-                                                </div>
-
-                                                {form.questionType === 'MCQ' && (
-                                                    <div data-field-id="field-mcq-choices">
-                                                        <MCQChoicesField
-                                                            choices={form.variantChoices ?? defaultForm.variantChoices}
-                                                            answer={form.variantAnswer}
-                                                            onChoicesChange={(choices) => handleFieldChange('variantChoices', choices)}
-                                                            onAnswerChange={(answer) => handleFieldChange('variantAnswer', answer)}
-                                                            idPrefix="aq-mcq"
-                                                        />
-                                                    </div>
-                                                )}
-
-                                                {mode === 'variant' && form.questionType !== 'MCQ' && (
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="variant-answer-main">Answer <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                        <Textarea
-                                                            id="variant-answer-main"
-                                                            value={form.variantAnswer}
-                                                            onChange={(event) => handleFieldChange('variantAnswer', event.target.value)}
-                                                            placeholder="Provide an answer or leave blank"
-                                                            rows={3}
-                                                        />
-                                                    </div>
-                                                )}
-
-                                                {presetVariant && (
-                                                    <p className="text-sm text-muted-foreground">
-                                                        <span className="font-medium">Primary topic:</span>{' '}
-                                                        {topics.find((t) => t.id === presetVariant.primaryTopicId)?.name ?? `#${presetVariant.primaryTopicId}`}
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="variant-difficulty">Difficulty</Label>
-                                                    <Select
-                                                        value={form.variantDifficulty}
-                                                        onValueChange={(value) => handleFieldChange('variantDifficulty', value as QuestionDifficulty)}
-                                                    >
-                                                        <SelectTrigger id="variant-difficulty">
-                                                            <SelectValue placeholder="Select difficulty" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {difficultyOptions.map((option) => (
-                                                                <SelectItem key={option} value={option} className="capitalize">
-                                                                    {option}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="variant-reasoning-level">Reasoning Focus</Label>
-                                                    <Select
-                                                        value={form.variantReasoningLevel}
-                                                        onValueChange={(value) => handleFieldChange('variantReasoningLevel', value as ReasoningLevel)}
-                                                    >
-                                                        <SelectTrigger id="variant-reasoning-level">
-                                                            <SelectValue placeholder="Select reasoning focus" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {reasoningLevelOptions.map((option) => (
-                                                                <SelectItem key={option} value={option}>
-                                                                    {reasoningLevelLabels[option]}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="border rounded-lg overflow-hidden">
-                                            <button
-                                                type="button"
-                                                onClick={() => setAdvancedOpen((o) => !o)}
-                                                className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left hover:bg-muted/50 transition-colors"
-                                            >
-                                                <span>Advanced Information</span>
-                                                {advancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                                            </button>
-                                            {advancedOpen && (
-                                                <div className="space-y-4 px-4 pb-4 pt-0 border-t" data-tour-id="aq-variant">
-                                                    <div className="space-y-2 pt-4">
-                                                        <Label htmlFor="variant-reference">Reference Variant ID <span className="text-xs text-muted-foreground">(dev only)</span></Label>
-                                                        <Input
-                                                            id="variant-reference"
-                                                            value={form.variantReferenceId}
-                                                            placeholder="Auto-assigned"
-                                                            readOnly
-                                                            className="bg-muted/50"
-                                                        />
-                                                    </div>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="variant-assessment">Assessment <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                            <Select
-                                                                value={form.variantAssessmentId}
-                                                                onValueChange={(value) => handleFieldChange('variantAssessmentId', value)}
-                                                            >
-                                                                <SelectTrigger id="variant-assessment">
-                                                                    <SelectValue placeholder="Select assessment" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="none">No assessment</SelectItem>
-                                                                    {assessmentOptions.length === 0 ? (
-                                                                        <SelectItem value="__no_assessments" disabled>
-                                                                            {isAuxLoading ? 'Loading...' : 'No assessments available'}
-                                                                        </SelectItem>
-                                                                    ) : (
-                                                                        assessmentOptions.map((assessment) => (
-                                                                            <SelectItem key={assessment.id} value={assessment.id.toString()}>
-                                                                                {assessment.name} ({assessment.type})
-                                                                            </SelectItem>
-                                                                        ))
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <Label>Secondary Topics <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                                                            <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-auto">
-                                                                {topics.length === 0 ? (
-                                                                    <p className="text-xs text-muted-foreground">
-                                                                        {isAuxLoading ? 'Loading topics...' : 'No topics available'}
-                                                                    </p>
-                                                                ) : (
-                                                                    topics.map((topic) => {
-                                                                        const checked = form.variantSecondaryTopics.includes(topic.id);
-                                                                        const isPrimary = form.primaryTopicId === topic.id.toString();
-                                                                        return (
-                                                                            <label
-                                                                                key={topic.id}
-                                                                                className={`flex items-center space-x-2 text-sm ${isPrimary ? 'text-muted-foreground/70' : 'text-foreground'}`}
-                                                                            >
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    className="h-4 w-4"
-                                                                                    checked={checked}
-                                                                                    disabled={isPrimary}
-                                                                                    onChange={(event) => toggleSecondaryTopic(topic.id, event.target.checked)}
-                                                                                />
-                                                                                <span>{topic.name}</span>
-                                                                            </label>
-                                                                        );
-                                                                    })
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </>
-                                )}
-
-                                {error && <p className="text-sm text-destructive">{error}</p>}
+                            <div className="rounded-lg border border-border bg-card p-5" data-tour-id="aq-metadata">
+                                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                                    Question Parameters
+                                </h2>
+                                <QuestionMetadataPanel
+                                    value={{
+                                        questionType: form.questionType,
+                                        primaryTopicId: form.primaryTopicId,
+                                        questionDescription: form.questionDescription,
+                                        variantDifficulty: form.variantDifficulty,
+                                        variantReasoningLevel: form.variantReasoningLevel,
+                                        variantSecondaryTopics: form.variantSecondaryTopics
+                                    }}
+                                    onChange={(field, value) => handleFieldChange(field, value)}
+                                    topics={topics}
+                                    isAuxLoading={isAuxLoading}
+                                    disabled={isSubmitting}
+                                    mode={mode}
+                                    primaryTopicName={
+                                        mode === 'variant' && presetVariant
+                                            ? topics.find((t) => t.id === presetVariant!.primaryTopicId)?.name
+                                            : undefined
+                                    }
+                                    onToggleSecondaryTopic={toggleSecondaryTopic}
+                                />
                             </div>
-                        </ScrollArea>
-                    </div>
 
-                    {/* RIGHT PANEL: Helper Tools (25% width) */}
-                    <div className="flex-[1] overflow-hidden border-l pl-6">
-                        <ScrollArea className="h-full pr-2">
-                            <div className="space-y-4">
-                                <h4 className="text-sm font-semibold text-muted-foreground">How to Fill This Form</h4>
+                            <QuestionAIControls
+                                value={{
+                                    generationPrompt: form.generationPrompt,
+                                    generationModel: form.generationModel
+                                }}
+                                onChange={(field, value) => handleFieldChange(field, value)}
+                                onGenerate={handleGenerateWithAI}
+                                isGenerating={isGenerating}
+                                availableModels={availableModels}
+                                providerApiKey={providerApiKey}
+                                onProviderApiKeyChange={(value) => {
+                                    setProviderApiKey(value);
+                                    const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
+                                    if (provider && value) void apiKeyStorage.setApiKey(provider, value);
+                                }}
+                                status={eduaiStatus.status}
+                                statusMessage={eduaiStatus.message}
+                                onRefreshStatus={eduaiStatus.refresh}
+                                courseWarningMessage={courseWarningMessage}
+                                mode={mode}
+                                disabled={isSubmitting}
+                            />
 
-                                {/* Generate with AI service */}
-                                <div className="rounded-lg border-2 border-muted bg-card p-4 space-y-3" data-tour-id="aq-eduai-panel">
-                                    <div className="space-y-2">
-                                        <div className="flex items-start gap-2">
-                                            <div className="flex-1">
-                                                <h5 className="text-sm font-semibold">Generate with AI service</h5>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    {mode === 'variant'
-                                                        ? 'Let the AI service create a variant based on a prompt'
-                                                        : 'Let the AI service generate a question from a prompt'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <EduAIStatusBadge
-                                            status={eduaiStatus.status}
-                                            message={eduaiStatus.message}
-                                            onRefresh={eduaiStatus.refresh}
-                                            className="z-50"
-                                        />
-                                    </div>
-
-                                    {courseWarningMessage && (
-                                        <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
-                                            {courseWarningMessage}
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-3">
-                                        <div className="space-y-1.5" data-tour-id="aq-ai-prompt">
-                                            <Label htmlFor="ai-prompt" className="text-xs font-medium">Prompt</Label>
-                                            <Textarea
-                                                id="ai-prompt"
-                                                value={form.generationPrompt}
-                                                onChange={(event) => handleFieldChange('generationPrompt', event.target.value)}
-                                                placeholder={mode === 'variant'
-                                                    ? 'e.g., Make it harder and focus on edge cases'
-                                                    : 'e.g., Time complexity of quicksort'}
-                                                className="text-xs resize-none"
-                                                rows={form.generationPrompt.length > 50 ? 4 : 2}
-                                                onFocus={(e) => {
-                                                    if (e.target.rows === 2) {
-                                                        e.target.rows = 4;
-                                                    }
-                                                }}
-                                                onBlur={(e) => {
-                                                    if (form.generationPrompt.length <= 50) {
-                                                        e.target.rows = 2;
-                                                    }
-                                                }}
+                            <div className="border rounded-lg overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setAdvancedOpen((o) => !o)}
+                                    className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium text-left hover:bg-muted/50 transition-colors"
+                                >
+                                    <span>Advanced Information</span>
+                                    {advancedOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </button>
+                                {advancedOpen && (
+                                    <div className="space-y-4 px-4 pb-4 pt-0 border-t" data-tour-id="aq-variant">
+                                        <div className="space-y-2 pt-4">
+                                            <Label htmlFor="variant-reference">Reference Variant ID <span className="text-xs text-muted-foreground">(dev only)</span></Label>
+                                            <Input
+                                                id="variant-reference"
+                                                value={form.variantReferenceId}
+                                                placeholder="Auto-assigned"
+                                                readOnly
+                                                className="bg-muted/50"
                                             />
                                         </div>
 
-                                        <div className="space-y-1.5" data-tour-id="aq-model-picker">
-                                            <Label htmlFor="ai-model" className="text-xs font-medium">Model</Label>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="question-description-advanced">
+                                                Description <span className="text-xs text-muted-foreground">(optional)</span>
+                                            </Label>
+                                            <Textarea
+                                                id="question-description-advanced"
+                                                placeholder="Short label for this question"
+                                                value={form.questionDescription}
+                                                onChange={(event) => handleFieldChange('questionDescription', event.target.value)}
+                                                className="min-h-[4.5rem] resize-none"
+                                                rows={2}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>
+                                                Secondary Topics <span className="text-xs text-muted-foreground">(optional)</span>
+                                            </Label>
+                                            <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-auto">
+                                                {topics.length === 0 ? (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {isAuxLoading ? 'Loading topics...' : 'No topics available'}
+                                                    </p>
+                                                ) : (
+                                                    topics.map((topic) => {
+                                                        const checked = form.variantSecondaryTopics.includes(topic.id);
+                                                        const isPrimary = form.primaryTopicId === topic.id.toString();
+                                                        return (
+                                                            <label
+                                                                key={topic.id}
+                                                                className={`flex items-center space-x-2 text-sm ${isPrimary ? 'text-muted-foreground/70' : 'text-foreground'}`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="h-4 w-4"
+                                                                    checked={checked}
+                                                                    disabled={isPrimary}
+                                                                    onChange={(event) => toggleSecondaryTopic(topic.id, event.target.checked)}
+                                                                />
+                                                                <span>{topic.name}</span>
+                                                            </label>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="variant-assessment">Assessment <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                                            <Select
+                                                value={form.variantAssessmentId}
+                                                onValueChange={(value) => handleFieldChange('variantAssessmentId', value)}
+                                            >
+                                                <SelectTrigger id="variant-assessment">
+                                                    <SelectValue placeholder="Select assessment" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">No assessment</SelectItem>
+                                                    {assessmentOptions.length === 0 ? (
+                                                        <SelectItem value="__no_assessments" disabled>
+                                                            {isAuxLoading ? 'Loading...' : 'No assessments available'}
+                                                        </SelectItem>
+                                                    ) : (
+                                                        assessmentOptions.map((assessment) => (
+                                                            <SelectItem key={assessment.id} value={assessment.id.toString()}>
+                                                                {assessment.name} ({assessment.type})
+                                                            </SelectItem>
+                                                        ))
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-2" data-tour-id="aq-model-picker">
+                                            <Label htmlFor="ai-model-advanced">AI Model</Label>
                                             <Select
                                                 value={form.generationModel}
                                                 onValueChange={(value) => handleFieldChange('generationModel', value)}
                                                 disabled={availableModels.length === 0}
                                             >
-                                                <SelectTrigger id="ai-model" className="h-9 text-xs">
+                                                <SelectTrigger id="ai-model-advanced">
                                                     <SelectValue placeholder="Select model" />
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     {availableModels.length === 0 ? (
-                                                        <SelectItem value="__no_models" disabled className="text-xs">
+                                                        <SelectItem value="__no_models" disabled>
                                                             No models available
                                                         </SelectItem>
                                                     ) : (
@@ -1506,7 +1214,7 @@ export const AddQuestionDialog = ({
                                                             {availableModels
                                                                 .filter((model) => model.provider === 'ollama')
                                                                 .map((model) => (
-                                                                    <SelectItem key={model.id} value={model.id} className="text-xs">
+                                                                    <SelectItem key={model.id} value={model.id}>
                                                                         {model.label}
                                                                     </SelectItem>
                                                                 ))}
@@ -1518,7 +1226,7 @@ export const AddQuestionDialog = ({
                                                             {availableModels
                                                                 .filter((model) => model.provider !== 'ollama')
                                                                 .map((model) => (
-                                                                    <SelectItem key={model.id} value={model.id} className="text-xs">
+                                                                    <SelectItem key={model.id} value={model.id}>
                                                                         {model.label} {model.provider ? `(${model.provider})` : ''}
                                                                     </SelectItem>
                                                                 ))}
@@ -1527,119 +1235,41 @@ export const AddQuestionDialog = ({
                                                 </SelectContent>
                                             </Select>
                                         </div>
-
-                                        {isExternalGenerationModel && (
-                                            <div className="w-full rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                                                <span className="font-semibold">Warning:</span> External models send your prompts and course data to that provider. UBC-hosted models keep data within UBC systems.
-                                            </div>
-                                        )}
-
-                                        {apiKeyStorage.requiresApiKey(form.generationModel) && (
-                                            <div className="space-y-1.5">
-                                                <Label htmlFor="provider-api-key" className="text-xs font-medium">
-                                                    {apiKeyStorage.getProviderFromModel(form.generationModel)?.toUpperCase()} API Key
-                                                </Label>
-                                                {providerApiKey ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <Input
-                                                            id="provider-api-key"
-                                                            type="text"
-                                                            value={`${providerApiKey.substring(0, 8)}${'•'.repeat(Math.max(0, providerApiKey.length - 8))}`}
-                                                            disabled
-                                                            className="h-9 text-xs flex-1"
-                                                        />
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
-                                                                if (provider) {
-                                                                    apiKeyStorage.removeApiKey(provider);
-                                                                    setProviderApiKey('');
-                                                                }
-                                                            }}
-                                                        >
-                                                            Change
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <Input
-                                                        id="provider-api-key"
-                                                        type="password"
-                                                        placeholder={`Enter your ${apiKeyStorage.getProviderFromModel(form.generationModel)?.toUpperCase()} API key`}
-                                                        value={providerApiKey}
-                                                        className="h-9 text-xs"
-                                                        onChange={(event) => {
-                                                            const value = event.target.value;
-                                                            setProviderApiKey(value);
-                                                            const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
-                                                            if (provider && value) {
-                                                                void apiKeyStorage.setApiKey(provider, value);
-                                                            }
-                                                        }}
-                                                    />
-                                                )}
-                                                <p className="text-[11px] text-muted-foreground">
-                                                    Your API key is stored locally in your browser and never sent to our servers.
-                                                </p>
-                                            </div>
-                                        )}
-
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="ai-difficulty" className="text-xs font-medium">Difficulty</Label>
-                                            <Select
-                                                value={form.generationDifficulty}
-                                                onValueChange={(value) =>
-                                                    handleFieldChange('generationDifficulty', value as QuestionDifficulty | 'balanced')
-                                                }
-                                            >
-                                                <SelectTrigger id="ai-difficulty" className="h-9 text-xs">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="balanced" className="text-xs">Let AI service decide</SelectItem>
-                                                    <SelectItem value="easy" className="text-xs">Easy</SelectItem>
-                                                    <SelectItem value="medium" className="text-xs">Medium</SelectItem>
-                                                    <SelectItem value="hard" className="text-xs">Hard</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="ai-reasoning-level" className="text-xs font-medium">Reasoning Focus</Label>
-                                            <Select
-                                                value={form.generationReasoningLevel}
-                                                onValueChange={(value) =>
-                                                    handleFieldChange('generationReasoningLevel', value as ReasoningLevel | 'balanced')
-                                                }
-                                            >
-                                                <SelectTrigger id="ai-reasoning-level" className="h-9 text-xs">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="balanced" className="text-xs">Let AI service decide</SelectItem>
-                                                    <SelectItem value="factual" className="text-xs">Factual</SelectItem>
-                                                    <SelectItem value="analytical" className="text-xs">Analytical</SelectItem>
-                                                    <SelectItem value="application" className="text-xs">Application</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        <Button
-                                            type="button"
-                                            onClick={handleGenerateWithAI}
-                                            disabled={isGenerating}
-                                            className="w-full"
-                                            size="sm"
-                                            data-tour-id="aq-ai-generate"
-                                        >
-                                            {isGenerating ? 'Generating...' : 'Generate'}
-                                        </Button>
                                     </div>
-                                </div>
+                                )}
                             </div>
-                        </ScrollArea>
+
+                            {error && <p className="text-sm text-destructive">{error}</p>}
+                        </div>
+                    </ScrollArea>
+
+                    {/* RIGHT: Question content */}
+                    <div className="flex flex-col min-h-0 overflow-hidden">
+                        <div
+                            className="rounded-lg border border-border bg-card p-5 flex-1 min-h-0 overflow-auto flex flex-col"
+                            data-tour-id="aq-form-fields"
+                        >
+                            <QuestionOutputPanel
+                                questionType={form.questionType}
+                                variantText={form.variantText}
+                                variantChoices={form.variantChoices ?? defaultForm.variantChoices}
+                                variantAnswer={form.variantAnswer}
+                                onVariantTextChange={(v) => handleFieldChange('variantText', v)}
+                                onVariantChoicesChange={(c) => handleFieldChange('variantChoices', c)}
+                                onVariantAnswerChange={(v) => handleFieldChange('variantAnswer', v)}
+                                disabled={isSubmitting}
+                                isStreaming={isGenerating}
+                                onClear={() => {
+                                    setForm((prev) => ({
+                                        ...prev,
+                                        variantText: '',
+                                        variantChoices: [...defaultForm.variantChoices],
+                                        variantAnswer: ''
+                                    }));
+                                }}
+                                idPrefix="aq"
+                            />
+                        </div>
                     </div>
                 </div>
 

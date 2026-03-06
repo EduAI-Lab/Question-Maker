@@ -5,10 +5,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, Layers3, Plus, Upload, AlertTriangle, FileText } from 'lucide-react';
-import assessmentService from '../services/assessmentService';
-import { courseService } from '../services/courseService';
-import { questionService } from '../services/questionService';
-import { CanvasExportDialog } from '../components/canvas/CanvasExportDialog';
+import assessmentService from '../../services/assessmentService';
+import { courseService } from '../../services/courseService';
+import { questionService } from '../../services/questionService';
+import { CanvasExportDialog } from '../../components/canvas/CanvasExportDialog';
 import {
   Assessment,
   AssessmentSection,
@@ -16,24 +16,24 @@ import {
   Question,
   QuestionVariantEntry,
   MCQChoice
-} from '../types/question';
-import { Topic } from '../types/topic';
-import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { Separator } from '../components/ui/separator';
-import { Tooltip } from '../components/ui/tooltip';
-import { useToast } from '../components/ui/use-toast';
-import { AddQuestionDialog } from '../components/questions/AddQuestionDialog';
-import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
-import { SectionCard } from './assessments/SectionCard';
-import { CreateSectionPanel } from './assessments/CreateSectionPanel';
-import { MatchingQuestionsPanel } from './assessments/MatchingQuestionsPanel';
-import { QuestionSearchFilters, defaultReasoningData } from './assessments/assessmentViewTypes';
-import { questionMatchesFilters, buildDraftFromSection, getDefaultSectionDraft } from './assessments/assessmentViewUtils';
-import GenerateAssessmentModal from '../components/assessments/GenerateAssessmentModal';
-import { useGuidedTour } from '../contexts/GuidedTourContext';
+} from '../../types/question';
+import { Topic } from '../../types/topic';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Badge } from '../../components/ui/badge';
+import { Separator } from '../../components/ui/separator';
+import { Tooltip } from '../../components/ui/tooltip';
+import { useToast } from '../../components/ui/use-toast';
+import { AddQuestionDialog } from '../../components/questions/AddQuestionDialog';
+import { QuestionDetailView } from '../../components/question-detail/QuestionDetailView';
+import { DeleteConfirmationModal } from '../../components/ui/DeleteConfirmationModal';
+import { SectionCard } from './SectionCard';
+import { CreateSectionPanel } from './CreateSectionPanel';
+import { MatchingQuestionsPanel } from './MatchingQuestionsPanel';
+import { QuestionSearchFilters, defaultReasoningData } from '../../pages/assessments/assessmentViewTypes';
+import { questionMatchesFilters, buildDraftFromSection, getDefaultSectionDraft } from './assessmentViewUtils';
+import GenerateAssessmentModal from '../../components/assessments/GenerateAssessmentModal';
+import { useGuidedTour } from '../../contexts/GuidedTourContext';
 
 export const AssessmentViewPage = () => {
   const { id } = useParams<{ id: string }>();
