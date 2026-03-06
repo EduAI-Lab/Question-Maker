@@ -54,6 +54,7 @@ if (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('@postgres:'))
 
 // Import bcrypt (doesn't depend on env vars)
 import bcrypt from 'bcryptjs';
+import { TOPIC_NAMES_BY_TEMPLATE, SEED_QUESTIONS_BY_TEMPLATE } from './seedData.js';
 
 // Dynamically import modules that depend on environment variables
 // This ensures DATABASE_URL is modified before database.js is loaded
@@ -162,56 +163,15 @@ const populateDatabase = async () => {
     ]);
     console.log(`Created ${courses.length} courses.`);
 
-    // 3. Create Topics
+    // 3. Create Topics (from shared seed data)
     console.log('Creating topics...');
-    const topics = await Topics.bulkCreate([
-      // COSC 211 topics
-      { name: 'Instruction Set Architectures', courseId: courses[0].id },
-      { name: 'Pipeline Design', courseId: courses[0].id },
-      { name: 'Cache Coherence Strategies', courseId: courses[0].id },
-      { name: 'Memory Hierarchy', courseId: courses[0].id },
-      { name: 'Parallel Execution Models', courseId: courses[0].id },
-      { name: 'Performance Benchmarking', courseId: courses[0].id },
-      { name: 'Other', courseId: courses[0].id },
-      
-      // COSC 121 topics
-      { name: 'Object-Oriented Design', courseId: courses[1].id },
-      { name: 'Data Structures Fundamentals', courseId: courses[1].id },
-      { name: 'Algorithm Analysis', courseId: courses[1].id },
-      { name: 'Testing and Debugging', courseId: courses[1].id },
-      { name: 'File I/O and Persistence', courseId: courses[1].id },
-      { name: 'Recursion Patterns', courseId: courses[1].id },
-      { name: 'Other', courseId: courses[1].id },
-
-      // Introduction to Statistics topics
-      { name: 'Probability', courseId: courses[2].id },
-      { name: 'Random Variables', courseId: courses[2].id },
-      { name: 'Expectation', courseId: courses[2].id },
-      { name: 'Other', courseId: courses[2].id },
-
-      // Discrete Math topics
-      { name: 'Logic and proofs', courseId: courses[3].id },
-      { name: 'Graph theory', courseId: courses[3].id },
-      { name: 'Other', courseId: courses[3].id },
-
-      // Introduction to Psychology topics
-      { name: 'Introduction', courseId: courses[4].id },
-      { name: 'Human brain', courseId: courses[4].id },
-      { name: 'Social learning', courseId: courses[4].id },
-      { name: 'Other', courseId: courses[4].id },
-
-      // Introduction to Nursing topics
-      { name: 'Determinants of Health & Health‑Equity', courseId: courses[5].id },
-      { name: 'Trauma', courseId: courses[5].id },
-      { name: 'Health promotion', courseId: courses[5].id },
-      { name: 'Other', courseId: courses[5].id },
-
-      // Scientific Research Methods topics
-      { name: 'Research design', courseId: courses[6].id },
-      { name: 'Data collection and analysis', courseId: courses[6].id },
-      { name: 'Ethics in research', courseId: courses[6].id },
-      { name: 'Other', courseId: courses[6].id }
-    ]);
+    const topicRows = [];
+    for (let c = 0; c < courses.length; c++) {
+      for (const name of TOPIC_NAMES_BY_TEMPLATE[c]) {
+        topicRows.push({ name, courseId: courses[c].id });
+      }
+    }
+    const topics = await Topics.bulkCreate(topicRows);
     console.log(`Created ${topics.length} topics.`);
 
     // 4. Create Assessments
