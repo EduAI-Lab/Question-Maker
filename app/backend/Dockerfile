@@ -13,8 +13,9 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy source code
+# Copy source code and scripts (for seed:production inside container)
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 
 # Copy environment file (if it exists)
 COPY .env* ./
