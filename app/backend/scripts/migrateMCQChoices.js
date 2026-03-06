@@ -42,12 +42,12 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-// If running locally (not in Docker), replace 'postgres' hostname with 'localhost'
+// If running on host (not in Docker), use localhost and host-published port (default 55432)
 if (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('@postgres:')) {
   const isDocker = process.env.DOCKER === 'true' || process.env.COMPOSE_PROJECT_NAME;
   if (!isDocker) {
-    console.log('ℹ️  Running locally - replacing "postgres" hostname with "localhost"');
-    process.env.DATABASE_URL = process.env.DATABASE_URL.replace('@postgres:', '@localhost:');
+    const hostPort = process.env.POSTGRES_HOST_PORT || '55432';
+    process.env.DATABASE_URL = process.env.DATABASE_URL.replace('@postgres:5432', `@localhost:${hostPort}`);
   }
 }
 

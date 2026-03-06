@@ -40,14 +40,14 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-// If running locally (not in Docker), replace 'postgres' hostname with 'localhost'
-// Docker service names only work inside Docker containers
+// If running on host (not in Docker), replace 'postgres' with 'localhost' and use host-published port.
+// Docker publishes postgres as 55432:5432 in production; from the host we must use 55432.
 if (process.env.DATABASE_URL && process.env.DATABASE_URL.includes('@postgres:')) {
   const isDocker = process.env.DOCKER === 'true' || process.env.COMPOSE_PROJECT_NAME;
-  
   if (!isDocker) {
-    console.log('ℹ️  Running locally - replacing "postgres" hostname with "localhost"');
-    process.env.DATABASE_URL = process.env.DATABASE_URL.replace('@postgres:', '@localhost:');
+    const hostPort = process.env.POSTGRES_HOST_PORT || '55432';
+    console.log(`ℹ️  Running on host - connecting to localhost:${hostPort} (set POSTGRES_HOST_PORT if different)`);
+    process.env.DATABASE_URL = process.env.DATABASE_URL.replace('@postgres:5432', `@localhost:${hostPort}`);
     console.log(`   Using DATABASE_URL: ${process.env.DATABASE_URL.replace(/:[^:@]+@/, ':****@')}`);
   }
 }
