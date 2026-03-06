@@ -12,8 +12,7 @@ import { AlertCircle, Loader2, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { FloatingLetters } from '../components/FloatingLetters';
 
-// Replace with your actual demo video embed URL when available
-const VIDEO_URL = 'https://www.youtube.com/embed/dQw4w9WgXcQ';
+const VIDEO_URL = 'https://www.youtube.com/embed/zaKLdf8DmfU';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
