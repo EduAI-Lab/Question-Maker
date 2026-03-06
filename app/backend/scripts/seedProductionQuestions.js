@@ -1,16 +1,16 @@
 /**
- * Production-safe seed: adds sample questions (and topics/assessments if missing) to every
- * existing course. Does NOT clear or destroy any data.
+ * Production-safe seed: adds the same topics and questions as the development seed
+ * to every existing course. Does NOT clear or destroy any data.
+ * Uses shared seed data (seedData.js) so dev and production stay in sync.
  *
  * Usage (from project root): npm run seed:production
  * Or from app/backend: node scripts/seedProductionQuestions.js
- *
- * Requires: DATABASE_URL in .env (same as populate). Uses same postgres→localhost rewrite when not in Docker.
  */
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
+import { TOPIC_NAMES_BY_TEMPLATE, SEED_QUESTIONS_BY_TEMPLATE } from './seedData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -48,34 +48,8 @@ const schemaModule = await import('../src/schema/index.js');
 const { sequelize } = dbModule;
 const { Course, Topics, Question_Metadata, Assessments, Variants } = schemaModule;
 
-/** Generic sample questions added to each course (SA, MCQ, LA) */
-const SAMPLE_QUESTIONS = [
-  {
-    description: 'Key concept short answer',
-    type: 'SA',
-    questionText: 'In your own words, explain one important concept from this course and why it matters.',
-    answer: 'Answers will vary. The concept should be correctly identified and a reasonable justification given.'
-  },
-  {
-    description: 'Multiple choice sample',
-    type: 'MCQ',
-    questionText: 'Which of the following best describes applying course material in a new context?',
-    answer: 'B',
-    choices: [
-      { letter: 'A', text: 'Memorizing definitions only' },
-      { letter: 'B', text: 'Using concepts to analyze a new problem or situation' },
-      { letter: 'C', text: 'Copying solutions from the textbook' },
-      { letter: 'D', text: 'Skipping practice problems' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    description: 'Long answer sample',
-    type: 'LA',
-    questionText: 'Discuss how two main ideas from this course connect. Give an example to support your explanation.',
-    answer: 'Answers will vary. The response should reference two course ideas and provide a concrete example.'
-  }
-];
+const NUM_TEMPLATES = TOPIC_NAMES_BY_TEMPLATE.length;
+const QUESTIONS_PER_TEMPLATE = 5;
 
 const run = async () => {
   try {
@@ -89,69 +63,81 @@ const run = async () => {
       return;
     }
 
-    console.log(`Found ${courses.length} course(s). Adding sample questions to each...\n`);
+    console.log(`Found ${courses.length} course(s). Adding dev-seed topics and questions to each...\n`);
 
     let totalTopics = 0;
     let totalAssessments = 0;
     let totalQuestions = 0;
     let totalVariants = 0;
 
-    for (const course of courses) {
+    for (let courseIndex = 0; courseIndex < courses.length; courseIndex++) {
+      const course = courses[courseIndex];
+      const templateIndex = courseIndex % NUM_TEMPLATES;
+      const topicNames = TOPIC_NAMES_BY_TEMPLATE[templateIndex];
+      const questions = SEED_QUESTIONS_BY_TEMPLATE[templateIndex];
       const courseLabel = `${course.name} (${course.code || course.id})`;
-      console.log(`  Course: ${courseLabel}`);
+      console.log(`  Course: ${courseLabel} (template ${templateIndex}: ${topicNames.length} topics, ${questions.length} questions)`);
 
-      let topic = (await Topics.findOne({ where: { courseId: course.id }, order: [['id', 'ASC']] })) || null;
-      if (!topic) {
-        topic = await Topics.create({ name: 'General', courseId: course.id });
-        totalTopics++;
-        console.log(`    Created topic "General"`);
+      // Ensure all template topics exist for this course (find or create by name)
+      const courseTopics = [];
+      for (const name of topicNames) {
+        let topic = await Topics.findOne({ where: { courseId: course.id, name } });
+        if (!topic) {
+          topic = await Topics.create({ name, courseId: course.id });
+          totalTopics++;
+        }
+        courseTopics.push(topic);
       }
 
-      let assessment = (await Assessments.findOne({ where: { courseId: course.id }, order: [['id', 'ASC']] })) || null;
+      let assessment = await Assessments.findOne({ where: { courseId: course.id }, order: [['id', 'ASC']] });
       if (!assessment) {
         assessment = await Assessments.create({
           courseId: course.id,
           type: 'Quiz',
-          name: 'Sample assessment',
-          semester: 'Sample'
+          name: 'Practice Exam',
+          semester: 'Fall 2026'
         });
         totalAssessments++;
-        console.log(`    Created assessment "Sample assessment"`);
+        console.log(`    Created assessment "Practice Exam"`);
       }
 
-      for (let i = 0; i < SAMPLE_QUESTIONS.length; i++) {
-        const q = SAMPLE_QUESTIONS[i];
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const topicIndex = Math.min(q.topicIndex ?? 0, courseTopics.length - 1);
+        const primaryTopic = courseTopics[topicIndex];
         const order = { [assessment.id]: i + 1 };
+
         const meta = await Question_Metadata.create({
           description: q.description,
           type: q.type,
           courseId: course.id,
-          primaryTopicId: topic.id,
+          primaryTopicId: primaryTopic.id,
           questionOrder: order
         });
         totalQuestions++;
 
+        const difficulties = ['easy', 'medium', 'hard'];
+        const reasoningLevels = ['factual', 'analytical', 'application'];
         const variantPayload = {
           questionText: q.questionText,
-          difficulty: 'medium',
-          reasoningLevel: 'application',
+          difficulty: difficulties[i % 3],
+          reasoningLevel: reasoningLevels[i % 3],
           questionMetadataId: meta.id,
           assessmentId: assessment.id,
-          answer: q.answer,
+          answer: q.type === 'MCQ' && q.correctAnswer ? q.correctAnswer : q.answer,
           isDraft: false,
           isAiGenerated: false
         };
         if (q.type === 'MCQ' && Array.isArray(q.choices) && q.correctAnswer) {
           variantPayload.choices = q.choices.map((c) => ({ letter: c.letter, text: c.text }));
-          variantPayload.answer = q.correctAnswer;
         }
         await Variants.create(variantPayload);
         totalVariants++;
       }
-      console.log(`    Added ${SAMPLE_QUESTIONS.length} sample questions.`);
+      console.log(`    Added ${topicNames.length} topics, ${questions.length} questions.`);
     }
 
-    console.log('\n✅ Production seed completed.');
+    console.log('\n✅ Production seed completed (same topics & questions as development).');
     console.log(`   Topics created: ${totalTopics}`);
     console.log(`   Assessments created: ${totalAssessments}`);
     console.log(`   Question metadata created: ${totalQuestions}`);
