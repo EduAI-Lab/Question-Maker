@@ -389,14 +389,20 @@ curl -f http://questionmaker.ok.ubc.ca/  # Test website
 
 ## Seeding sample questions on production
 
-To add sample questions to every existing course **without** wiping data (production-safe):
+To add sample questions to every existing course **without** wiping data (production-safe), run from the **project root on the server** (same machine where Docker is running):
 
 ```bash
-# From project root on the server
+cd /srv/www/questionmaker.ok.ubc.ca
 npm run seed:production
 ```
 
-This creates a "General" topic and "Sample assessment" per course only if they don't exist, then adds three sample questions (short answer, MCQ, long answer) per course. Do **not** use `npm run populate` in production—it clears all data first.
+The script connects to Postgres via the host-published port **55432** (Docker maps `55432:5432`). If your compose uses a different host port, set it before running:
+
+```bash
+POSTGRES_HOST_PORT=5432 npm run seed:production   # example if you use 5432:5432
+```
+
+This creates a "General" topic and "Sample assessment" per course only if they don't exist, then adds three sample questions per course. Do **not** use `npm run populate` in production—it clears all data first.
 
 ## Backup and Recovery
 
