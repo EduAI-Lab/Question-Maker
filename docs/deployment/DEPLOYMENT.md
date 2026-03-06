@@ -387,6 +387,17 @@ curl -f http://questionmaker.ok.ubc.ca/  # Test website
 - Database connection pooling
 - Container health checks (when working)
 
+## Seeding sample questions on production
+
+To add sample questions to every existing course **without** wiping data (production-safe):
+
+```bash
+# From project root on the server
+npm run seed:production
+```
+
+This creates a "General" topic and "Sample assessment" per course only if they don't exist, then adds three sample questions (short answer, MCQ, long answer) per course. Do **not** use `npm run populate` in production—it clears all data first.
+
 ## Backup and Recovery
 
 ```bash
