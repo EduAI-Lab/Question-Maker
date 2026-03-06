@@ -4,6 +4,12 @@
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionType = 'MCQ' | 'SA' | 'LA';
 export type ReasoningLevel = 'factual' | 'analytical' | 'application';
+
+export const questionTypeLabels: Record<QuestionType, string> = {
+    MCQ: 'Multiple Choice',
+    SA: 'Short Answer',
+    LA: 'Long Answer'
+};
 export type AssessmentType = 'Assignment' | 'Lab' | 'Quiz' | 'Mid' | 'Final';
 
 // MCQ Choice interface

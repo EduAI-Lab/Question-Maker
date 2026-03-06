@@ -282,7 +282,7 @@ const populateDatabase = async () => {
 
     // 5. Create Question_Metadata – 5 real questions per course for all 7 courses
     console.log('Creating question metadata...');
-
+    
     const generateQuestionOrder = (questionIndex, totalQuestions) => {
       const order = {};
       const assessmentIndex = questionIndex % assessments.length;
@@ -811,13 +811,13 @@ const populateDatabase = async () => {
 
     // 6. Create Variants (at least 1 per question) using seeded question text, choices, and answers when available
     console.log('Creating variants...');
-
+    
     const generateVariant = (qMeta, assessmentId, variantNum = 0, seedOverride = null) => {
       const difficulties = ['easy', 'medium', 'hard'];
       const reasoningLevels = ['factual', 'analytical', 'application'];
       const difficulty = difficulties[qMeta.id % difficulties.length];
       const reasoningLevel = reasoningLevels[qMeta.id % reasoningLevels.length];
-
+      
       let questionText;
       let answer = null;
       let choices = null;
@@ -825,8 +825,8 @@ const populateDatabase = async () => {
       // Prefer explicit seed override when provided
       if (seedOverride && seedOverride.questionText && seedOverride.answer) {
         questionText = seedOverride.questionText;
-
-        if (qMeta.type === 'MCQ') {
+      
+      if (qMeta.type === 'MCQ') {
           // For seeded MCQs we expect structured choices + correctAnswer
           if (Array.isArray(seedOverride.choices) && seedOverride.correctAnswer) {
             choices = seedOverride.choices.map((c) => ({
