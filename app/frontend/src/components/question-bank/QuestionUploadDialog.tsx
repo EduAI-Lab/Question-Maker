@@ -3,7 +3,6 @@
  * Manages draft review, topic selection, optional assessment creation, and save flows.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Tesseract from 'tesseract.js';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker?url';
@@ -174,7 +173,6 @@ export const QuestionUploadDialog = ({
     initialDraftQuestions
 }: QuestionUploadDialogProps) => {
     const { toast } = useToast();
-    const navigate = useNavigate();
 
     const [topics, setTopics] = useState<Topic[]>(providedTopics);
     const [primaryTopicId, setPrimaryTopicId] = useState<string>('');
@@ -613,11 +611,6 @@ export const QuestionUploadDialog = ({
                 duration: Number.POSITIVE_INFINITY,
             });
             onClose();
-
-            // Navigate to the newly created assessment
-            if (result.assessmentId) {
-                navigate(`/assessments/${result.assessmentId}`);
-            }
         } catch (err: any) {
             console.error('Failed to save extracted questions', err);
             const message = err?.response?.data?.error || err?.message || 'Failed to save questions.';
