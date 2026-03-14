@@ -392,7 +392,8 @@ export const QuestionUploadDialog = ({
 
         toast({
             title: 'Questions extracted',
-            description: `Parsed ${drafts.length} question${drafts.length === 1 ? '' : 's'} from the upload.`
+            description: `Parsed ${drafts.length} question${drafts.length === 1 ? '' : 's'} from the upload.`,
+            duration: Number.POSITIVE_INFINITY,
         });
     }, [courseId, toast, aiModel]);
 
@@ -418,7 +419,8 @@ export const QuestionUploadDialog = ({
             toast({
                 variant: 'destructive',
                 title: 'Question extraction failed',
-                description: message
+                description: message,
+                duration: Number.POSITIVE_INFINITY,
             });
         }
     }, [courseId, handleExtractQuestions, performOcr, toast, onExtractInBackground, onClose, aiModel]);
@@ -538,13 +540,15 @@ export const QuestionUploadDialog = ({
             await navigator.clipboard.writeText(lines.join('\n\n'));
             toast({
                 title: 'Copied',
-                description: 'Extracted questions copied to clipboard.'
+                description: 'Extracted questions copied to clipboard.',
+                duration: Number.POSITIVE_INFINITY,
             });
         } catch (err) {
             toast({
                 variant: 'destructive',
                 title: 'Copy failed',
-                description: 'Could not copy questions to clipboard.'
+                description: 'Could not copy questions to clipboard.',
+                duration: Number.POSITIVE_INFINITY,
             });
         }
     }, [draftQuestions, toast]);
@@ -605,7 +609,8 @@ export const QuestionUploadDialog = ({
             onQuestionsSaved(result.questions);
             toast({
                 title: 'Questions added',
-                description: `${result.questions.length} question${result.questions.length === 1 ? '' : 's'} saved successfully.`
+                description: `${result.questions.length} question${result.questions.length === 1 ? '' : 's'} saved successfully.`,
+                duration: Number.POSITIVE_INFINITY,
             });
             onClose();
 
@@ -620,7 +625,8 @@ export const QuestionUploadDialog = ({
             toast({
                 variant: 'destructive',
                 title: 'Save failed',
-                description: message
+                description: message,
+                duration: Number.POSITIVE_INFINITY,
             });
             setProcessingStage('review');
         }
