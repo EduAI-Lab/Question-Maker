@@ -165,6 +165,8 @@ class EduAIService {
       numQuestions = 5,
       difficultyDistribution = { easy: 1, medium: 2, hard: 2 },
       reasoningDistribution = { factual: 40, analytical: 30, application: 30 },
+      systemPromptOverride,
+      userPromptOverride,
     } = params;
 
     if (!prompt || !courseCode) {
@@ -173,7 +175,7 @@ class EduAIService {
       );
     }
 
-    const systemPrompt = `You are an expert question generator for educational assessments. Generate exactly ${numQuestions} high-quality questions based on the course material.
+    const defaultSystemPrompt = `You are an expert question generator for educational assessments. Generate exactly ${numQuestions} high-quality questions based on the course material.
 
 Requirements:
 - Generate exactly ${numQuestions} questions
@@ -221,9 +223,12 @@ IMPORTANT:
 - If you can generate the question(s), return ONLY a valid JSON array of question objects. Do NOT wrap the array in an object (e.g. do not use {"questions": [...]}). Return the array directly, e.g. [{...}, {...}]. No other text, no markdown, no code fence.
 - If you cannot generate the question(s), return ONLY the error object above. No other text.`;
 
-    const userPrompt = `Generate questions about: ${prompt}
+    const defaultUserPrompt = `Generate questions about: ${prompt}
 
 Please ensure the questions are appropriate for the course level and cover the key concepts comprehensively.`;
+
+    const systemPrompt = systemPromptOverride ?? defaultSystemPrompt;
+    const userPrompt = userPromptOverride ?? defaultUserPrompt;
 
     try {
       const genStartMs = Date.now();
@@ -233,6 +238,7 @@ Please ensure the questions are appropriate for the course level and cover the k
         numQuestions,
         systemPromptLength: systemPrompt.length,
         userPromptLength: userPrompt.length,
+        usingOverrides: Boolean(systemPromptOverride || userPromptOverride),
       });
 
       // Extraction/generation can take longer than default 60s (large prompts, multiple questions)

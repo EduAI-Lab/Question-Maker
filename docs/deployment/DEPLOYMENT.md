@@ -387,6 +387,21 @@ curl -f http://questionmaker.ok.ubc.ca/  # Test website
 - Database connection pooling
 - Container health checks (when working)
 
+## Seeding sample questions on production
+
+To add the same topics and sample questions as development to every existing course **without** wiping data (production-safe), run the seed **inside the backend container** so it can reach Postgres on the Docker network:
+
+```bash
+cd /srv/www/questionmaker.ok.ubc.ca
+docker compose run --rm backend node scripts/seedProductionQuestions.js
+```
+
+This uses the same `DATABASE_URL` as the app (host `postgres`), so it works even when Postgres is not published to the host. Ensure containers are up (`docker compose up -d`) before running.
+
+**Alternative (host):** If Postgres is published to the host (e.g. `55432:5432`) and the stack is running, you can run from the project root: `npm run seed:production`. If you get connection refused, use the `docker compose run` command above.
+
+Do **not** use `npm run populate` in production—it clears all data first.
+
 ## Backup and Recovery
 
 ```bash

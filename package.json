@@ -12,7 +12,8 @@
     "prod:down": "docker-compose down",
     "setup": "./setup.sh",
     "populate": "node scripts/populateDatabase.js",
-    "populate:backend": "cd app/backend && npm run populate"
+    "populate:backend": "cd app/backend && npm run populate",
+    "seed:production": "node scripts/seedProductionQuestions.js"
   },
   "keywords": ["education", "ai", "questions", "react", "nodejs"],
   "author": "Your Name",

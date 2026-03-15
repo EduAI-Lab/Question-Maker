@@ -179,6 +179,7 @@ export const ApiTestPage = () => {
             status={eduaiStatus.status}
             message={eduaiStatus.message}
             onRefresh={eduaiStatus.refresh}
+            questionGenerationPhase={eduaiStatus.questionGenerationPhase}
           />
         </header>
 
