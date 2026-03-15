@@ -185,6 +185,61 @@ const chunkText = (text, chunkSize = 6000) => {
   return chunks;
 };
 
+/**
+ * Detects question-block boundaries: numbered items (1. 2) 3.), "Question N", "Part A".
+ * Sub-parts like (a), (b), (i), (ii) do NOT start a new block; they belong to the previous question.
+ * Used so we never split a multipart question across chunks.
+ * @param {string} text - Normalized extraction text
+ * @returns {string[]} Array of question-block strings (may be single element if no boundaries found)
+ */
+const splitIntoQuestionBlocks = (text) => {
+  if (!text || !text.trim()) return [];
+  const trimmed = text.trim();
+  // New block starts at: newline + optional space + ( digit(s). or digit(s)) OR "Question" + space + digits OR "Part" + space + letter )
+  // Sub-parts (a) (b) (i) (ii) do not match: they use letters/parens, not leading digits or "Question"/"Part"
+  const blockStartRe = /\n\s*(?=(?:\d+[.)]\s|Question\s+\d+\s|Part\s+[A-Z]\s*[:.]?\s))/im;
+  const parts = trimmed.split(blockStartRe).map((s) => s.trim()).filter(Boolean);
+  if (parts.length <= 1) return trimmed ? [trimmed] : [];
+  return parts;
+};
+
+/**
+ * Chunks text by question blocks so no multipart question is split across chunks.
+ * If no block boundaries are found, falls back to fixed-size chunking (same behavior in all environments).
+ * @param {string} text - Normalized extraction text
+ * @param {number} maxChunkSize - Max characters per chunk (default 5000)
+ * @returns {{ chunks: string[], blockCountsPerChunk: number[] }}
+ */
+const chunkByQuestionBlocks = (text, maxChunkSize = 5000) => {
+  if (!text || !text.trim()) return { chunks: [], blockCountsPerChunk: [] };
+  const blocks = splitIntoQuestionBlocks(text);
+  if (blocks.length <= 1) {
+    const chunks = chunkText(text, maxChunkSize);
+    const blockCountsPerChunk = chunks.map((chunk) => calculateQuestionTarget(chunk));
+    return { chunks, blockCountsPerChunk };
+  }
+  const chunks = [];
+  const blockCountsPerChunk = [];
+  let current = [];
+  let currentLen = 0;
+  for (const block of blocks) {
+    const blockLen = block.length + (current.length ? 2 : 0); // +2 for \n\n
+    if (current.length > 0 && currentLen + blockLen > maxChunkSize) {
+      chunks.push(current.join("\n\n"));
+      blockCountsPerChunk.push(current.length);
+      current = [];
+      currentLen = 0;
+    }
+    current.push(block);
+    currentLen += blockLen;
+  }
+  if (current.length > 0) {
+    chunks.push(current.join("\n\n"));
+    blockCountsPerChunk.push(current.length);
+  }
+  return { chunks, blockCountsPerChunk };
+};
+
 /** Derives a short summary/label from question text, capping at ~12 words. */
 const summarizeQuestion = (text) => {
   if (!text) return "Question";
@@ -311,6 +366,38 @@ const sanitizeEduAIQuestion = (question) => {
   };
 };
 
+/**
+ * Builds a stable dedupe key from question text so distinct questions are not collapsed.
+ * Uses normalized prefix + length to avoid false positives from summary-only matches.
+ */
+const extractedQuestionDedupeKey = (question) => {
+  const q = typeof question?.question === "string" ? question.question : "";
+  const normalized = q.replace(/\s+/g, " ").trim().toLowerCase();
+  return normalized.slice(0, 150);
+};
+
+/**
+ * Deduplicates extracted questions by stable key, preserves source order, and when
+ * two items share a key keeps the one with longer question text (more context).
+ */
+const deduplicateExtractedQuestions = (questions) => {
+  if (!Array.isArray(questions) || questions.length === 0) return [];
+  const byKey = new Map();
+  const keyOrder = new Map();
+  let index = 0;
+  for (const q of questions) {
+    const key = extractedQuestionDedupeKey(q);
+    if (!keyOrder.has(key)) keyOrder.set(key, index++);
+    const existing = byKey.get(key);
+    if (!existing || (typeof q.question === "string" && q.question.length > (existing.question?.length ?? 0))) {
+      byKey.set(key, q);
+    }
+  }
+  return [...byKey.entries()]
+    .sort((a, b) => (keyOrder.get(a[0]) ?? 0) - (keyOrder.get(b[0]) ?? 0))
+    .map(([, q]) => q);
+};
+
 /** Uses EduAI to extract questions from OCR’d text, chunking input and deduplicating outputs. */
 const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:120b", apiKeys = {}) => {
   if (!eduaiService.isConfigured()) {
@@ -322,7 +409,7 @@ const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:1
   const rawCode =
     (course?.code && course.code.trim()) || `COURSE-${course?.id ?? "UNKNOWN"}`;
   const courseCode = rawCode.replace(/\s+/g, "").toUpperCase();
-  const chunks = chunkText(text, 4000);
+  const { chunks, blockCountsPerChunk } = chunkByQuestionBlocks(text, 5000);
   const extracted = [];
 
   // Fetch topics for the course to include in the prompt
@@ -345,8 +432,12 @@ const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:1
     ? `\n\nCourse topics:\n${topics.map(t => `- ID ${t.id}: ${t.name}`).join('\n')}\n`
     : '';
 
-  for (const chunk of chunks) {
-    const numQuestions = calculateQuestionTarget(chunk);
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const blockCount = blockCountsPerChunk[i];
+    const numQuestions = blockCount != null && blockCount > 0
+      ? Math.max(1, Math.min(blockCount, 15))
+      : calculateQuestionTarget(chunk);
     const difficultyDistribution = buildDifficultyCounts(numQuestions);
     const reasoningDistribution = {
       factual: 40,
@@ -354,15 +445,21 @@ const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:1
       application: 30,
     };
 
-    const prompt = `You are an assistant that extracts exam-ready questions from source material.
-The following text may contain multiple questions, sub-parts, and instructions. Identify complete question blocks and return ONLY high-quality student-ready questions.
+    const continuationNote = i > 0
+      ? " This segment continues from the previous one; do not treat content as a new \"Question 1\" unless the source explicitly starts a new numbered question.\n\n"
+      : "";
 
-Requirements:
-- Preserve numbering, sub-parts, and important instructions.
-- If a question has parts (a), (b), etc., keep them together in a single prompt using \\n for new lines.
+    const prompt = `You are an assistant that EXTRACTS exam-ready questions from source material. Your job is to list every complete question block that appears in the text—do not generate new content or merge separate questions.
+
+CRITICAL — multipart questions:
+- One output question = one logical question block. A block includes ALL its sub-parts: (a), (b), (c), (i), (ii), etc.
+- Do NOT split a single numbered question into multiple entries. Example: "1. (a) ... (b) ... (c) ..." must become ONE question with the full text including (a), (b), and (c).
+- Do NOT merge two different numbered questions (e.g. "1. ..." and "2. ...") into one entry.
+${continuationNote}Requirements:
+- Preserve numbering, sub-parts, and instructions exactly as in the source. Use \\n for line breaks inside the question text.
 - Provide a concise "description" (<= 12 words) that summarizes the question without repeating it verbatim.
-- Format answers as null (omit if unknown). Do NOT fabricate answers.
-- Assign appropriate primary_topic_id and secondary_topic_ids based on the question content and the course topics provided below.${topicsSection}
+- Set answer to null if unknown. Do NOT fabricate answers.
+- Assign primary_topic_id and secondary_topic_ids from the course topics below when relevant.${topicsSection}
 Source material:
 """
 ${chunk}
@@ -388,15 +485,7 @@ ${chunk}
     }
   }
 
-  const seen = new Set();
-  const deduped = [];
-  extracted.forEach((question) => {
-    const key = `${question.summary.toLowerCase()}::${question.question.toLowerCase()}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      deduped.push(question);
-    }
-  });
+  const deduped = deduplicateExtractedQuestions(extracted);
   return deduped;
 };
 
@@ -752,4 +841,10 @@ export const generateQuestions = async (prompt, provider, params) => {
   }
 };
 
-export { AI_PROVIDERS };
+export {
+  AI_PROVIDERS,
+  splitIntoQuestionBlocks,
+  chunkByQuestionBlocks,
+  extractedQuestionDedupeKey,
+  deduplicateExtractedQuestions,
+};

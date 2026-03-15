@@ -8,7 +8,7 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "build": "echo 'No build step required'",
-    "test": "jest",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:coverage": "jest --coverage",
     "lint": "eslint . --max-warnings=0",
     "populate": "node scripts/populateDatabase.js",

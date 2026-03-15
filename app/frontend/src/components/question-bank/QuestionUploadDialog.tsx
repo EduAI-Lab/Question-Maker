@@ -175,6 +175,61 @@ const isImageFile = (file: File) =>
 const isTextFile = (file: File) =>
     file.type === 'text/plain' || file.name.toLowerCase().endsWith('.txt');
 
+/** PDF.js text item: str and optional hasEOL, transform (matrix with x=transform[4], y=transform[5]). */
+type PdfTextItem = { str?: string; hasEOL?: boolean; transform?: number[] };
+
+/**
+ * Converts PDF.js getTextContent() items to plain text with line breaks preserved.
+ * Uses hasEOL when present; otherwise groups by Y position so "Question 1" and "(a)" stay on separate lines.
+ */
+function pdfItemsToTextWithLineBreaks(items: PdfTextItem[]): string {
+    if (!items?.length) return '';
+    const parts: string[] = [];
+    let hadEOL = false;
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const str = typeof item?.str === 'string' ? item.str : '';
+        if (str) parts.push(str);
+        const useEOL = Boolean(item?.hasEOL);
+        if (useEOL) {
+            parts.push('\n');
+            hadEOL = true;
+        } else if (str) {
+            parts.push(' ');
+        }
+    }
+    if (hadEOL) return parts.join('').replace(/\n+/g, '\n').replace(/\s+$/gm, '').trim();
+    return pdfItemsToTextByPosition(items);
+}
+
+function pdfItemsToTextByPosition(items: PdfTextItem[]): string {
+    const withPos = items
+        .filter((item) => typeof item?.str === 'string' && item.str.length > 0)
+        .map((item) => {
+            const y = Array.isArray(item.transform) && item.transform.length >= 6 ? item.transform[5] : 0;
+            const x = Array.isArray(item.transform) && item.transform.length >= 5 ? item.transform[4] : 0;
+            return { str: (item as { str: string }).str, x, y };
+        });
+    if (withPos.length === 0) return '';
+    const tol = 2;
+    const lines: { y: number; chunks: { x: number; str: string }[] }[] = [];
+    for (const { str, x, y } of withPos) {
+        const line = lines.find((l) => Math.abs(l.y - y) <= tol);
+        if (line) {
+            line.chunks.push({ x, str });
+        } else {
+            lines.push({ y, chunks: [{ x, str }] });
+        }
+    }
+    lines.sort((a, b) => b.y - a.y);
+    return lines
+        .map((line) => {
+            line.chunks.sort((a, b) => a.x - b.x);
+            return line.chunks.map((c) => c.str).join(' ');
+        })
+        .join('\n');
+}
+
 export const QuestionUploadDialog = ({
     open,
     onClose,
@@ -341,19 +396,17 @@ export const QuestionUploadDialog = ({
     const performPdfOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await getDocument({ data: arrayBuffer }).promise;
-        let combinedText = '';
+        const pageTexts: string[] = [];
 
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
             const page = await pdf.getPage(pageNumber);
             const content = await page.getTextContent();
-            const pageText = content.items
-                .map((item: any) => ('str' in item ? item.str : ''))
-                .join(' ');
-            combinedText += `${pageText}\n`;
+            const pageText = pdfItemsToTextWithLineBreaks(content.items);
+            pageTexts.push(pageText);
             onProgress(Math.round((pageNumber / pdf.numPages) * 70));
         }
 
-        return combinedText;
+        return pageTexts.join('\n');
     }, []);
 
     const performImageOcr = useCallback(async (file: File, onProgress: (value: number) => void) => {

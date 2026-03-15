@@ -182,7 +182,22 @@ This document identifies **potential failing points** in the current OCR → ext
 
 ---
 
-## 4. Suggested Implementation Order
+## 4. Implementation status
+
+| Item | Status |
+|------|--------|
+| **§6 Production parity** | Documented; single code path, no env gating. |
+| **3.1** Block-aware chunking | Done in `aiService.js`: `splitIntoQuestionBlocks`, `chunkByQuestionBlocks`. |
+| **3.2** Stronger extraction prompt | Done: multipart rules, one-block example, continuation note for chunk 2+. |
+| **3.4** Block count for `numQuestions` | Done: per-chunk `blockCountsPerChunk` used when > 0. |
+| **Unit tests** | `app/backend/test/extraction.test.js` — block split and chunk tests; Jest ESM via `jest.config.js` + `node --experimental-vm-modules`. |
+| **3.3** PDF line-break preservation | Done in `QuestionUploadDialog.tsx`: `pdfItemsToTextWithLineBreaks` (uses `hasEOL`; fallback `pdfItemsToTextByPosition` by Y). |
+| **3.5** Deduplication and ordering | Done in `aiService.js`: `extractedQuestionDedupeKey` (normalized prefix 150 chars), `deduplicateExtractedQuestions` (preserves order, keeps longer when same key). |
+| **3.6–3.7** | Not yet implemented. |
+
+---
+
+## 5. Suggested Implementation Order
 
 | Priority | Item | Impact | Effort |
 |----------|------|--------|--------|
@@ -196,7 +211,7 @@ This document identifies **potential failing points** in the current OCR → ext
 
 ---
 
-## 5. Testing
+## 6. Testing
 
 - **Regression:** Run extraction on existing test PDFs (and TXT samples) and compare question count and that multipart questions stay in one piece.
 - **Target:** Use `Java_PriorityQueue_Bank_Client_Assignment.pdf` (or a similar multipart assignment) as the main test: after changes, expect one extracted “question” per numbered question, with (a), (b), (c) etc. preserved in a single question text.
@@ -206,7 +221,23 @@ This document identifies **potential failing points** in the current OCR → ext
 
 ---
 
-## 6. References
+## 7. Production parity: OCR robustness in production
+
+**Requirement:** Production OCR must be **at least as robust** as development. The same extraction pipeline (block-aware chunking, extraction prompt, EduAI config) must run in all environments.
+
+**Principles:**
+
+- **Single code path:** Do not gate the robust extraction logic (semantic chunking, multipart handling) behind `NODE_ENV` or feature flags. Production and development must use the same `extractQuestionsWithEduAI` flow.
+- **Config parity:** Production must have `EDUAI_API_URL` and `EDUAI_API_KEY` set so extraction uses the same EduAI service. Rely on existing config validation (e.g. encryption key required in production); ensure EduAI is documented for deploy.
+- **No silent fallbacks in production:** If block detection fails, fall back to legacy fixed-size chunking so extraction still runs; do not skip extraction or return empty in production only.
+- **Testing:** Run the same extraction tests (e.g. against `Java_PriorityQueue_Bank_Client_Assignment.pdf` or equivalent) in CI or staging so regressions are caught before production. Prefer running backend extraction tests in the same way in dev and CI.
+- **Deployment checklist:** Document in deployment/runbooks that OCR/extraction depends on EduAI being reachable and that the extraction pipeline is identical in production and development.
+
+**References:** `app/backend/src/config/settings.js` (EduAI env vars), `app/backend/src/services/aiService.js` (extraction entry point).
+
+---
+
+## 8. References
 
 - Extraction entry: `POST /api/questions/extract` — `app/backend/src/routes/questions.js`
 - Extraction logic: `app/backend/src/services/aiService.js` — `extractQuestionsFromText`, `extractQuestionsWithEduAI`, `chunkText`, `normalizeExtractText`
