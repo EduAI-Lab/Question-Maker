@@ -6,6 +6,15 @@ import axios from "axios";
 import { config } from "../config/settings.js";
 import { Question_Metadata, Topics, Course } from "../schema/index.js";
 import eduaiService from "./eduaiService.js";
+import {
+  normalizeExtractText,
+  chunkText,
+  splitIntoQuestionBlocks,
+  chunkByQuestionBlocks,
+  calculateQuestionTarget,
+  extractedQuestionDedupeKey,
+  deduplicateExtractedQuestions,
+} from "./extractionUtils.js";
 
 const AI_PROVIDERS = {
   GROQ: "groq",
@@ -159,86 +168,6 @@ const callDeepSeekAPI = async (prompt, params) => {
   }
 };
 
-/** Normalizes OCR text by trimming whitespace, collapsing blank lines, and removing tabs. */
-const normalizeExtractText = (text) => {
-  if (!text) return "";
-  return (
-    text
-      .replace(/\r\n/g, "\n")
-      .replace(/\t/g, " ")
-      .replace(/\u00a0/g, " ")
-      // collapse runs of more than two newlines to a double newline
-      .replace(/\n{3,}/g, "\n\n")
-      // collapse excessive spaces while preserving newlines
-      .replace(/[ ]{2,}/g, " ")
-      .trim()
-  );
-};
-
-/** Splits long extraction text into chunkSize-safe segments so API prompts stay bounded. */
-const chunkText = (text, chunkSize = 6000) => {
-  if (!text) return [];
-  const chunks = [];
-  for (let i = 0; i < text.length; i += chunkSize) {
-    chunks.push(text.slice(i, i + chunkSize));
-  }
-  return chunks;
-};
-
-/**
- * Detects question-block boundaries: numbered items (1. 2) 3.), "Question N", "Part A/1", "Task 1", "Exercise 1", "Section 1".
- * Sub-parts like (a), (b), (i), (ii) do NOT start a new block; they belong to the previous question.
- * Used so we never split a multipart question across chunks.
- * @param {string} text - Normalized extraction text
- * @returns {string[]} Array of question-block strings (may be single element if no boundaries found)
- */
-const splitIntoQuestionBlocks = (text) => {
-  if (!text || !text.trim()) return [];
-  const trimmed = text.trim();
-  // New block: newline + optional space + ( 1. or 2) | Question N | Part A or Part 1 | Task 1 | Exercise 1 | Section 1 )
-  const blockStartRe = /\n\s*(?=(?:\d+[.)]\s|Question\s+\d+\s|Part\s+[A-Z0-9]\s*[:.]?\s|Task\s+\d+\s|Exercise\s+\d+\s|Section\s+\d+\s))/im;
-  const parts = trimmed.split(blockStartRe).map((s) => s.trim()).filter(Boolean);
-  if (parts.length <= 1) return trimmed ? [trimmed] : [];
-  return parts;
-};
-
-/**
- * Chunks text by question blocks so no multipart question is split across chunks.
- * If no block boundaries are found, falls back to fixed-size chunking (same behavior in all environments).
- * @param {string} text - Normalized extraction text
- * @param {number} maxChunkSize - Max characters per chunk (default 5000)
- * @returns {{ chunks: string[], blockCountsPerChunk: number[] }}
- */
-const chunkByQuestionBlocks = (text, maxChunkSize = 5000) => {
-  if (!text || !text.trim()) return { chunks: [], blockCountsPerChunk: [] };
-  const blocks = splitIntoQuestionBlocks(text);
-  if (blocks.length <= 1) {
-    const chunks = chunkText(text, maxChunkSize);
-    const blockCountsPerChunk = chunks.map((chunk) => calculateQuestionTarget(chunk));
-    return { chunks, blockCountsPerChunk };
-  }
-  const chunks = [];
-  const blockCountsPerChunk = [];
-  let current = [];
-  let currentLen = 0;
-  for (const block of blocks) {
-    const blockLen = block.length + (current.length ? 2 : 0); // +2 for \n\n
-    if (current.length > 0 && currentLen + blockLen > maxChunkSize) {
-      chunks.push(current.join("\n\n"));
-      blockCountsPerChunk.push(current.length);
-      current = [];
-      currentLen = 0;
-    }
-    current.push(block);
-    currentLen += blockLen;
-  }
-  if (current.length > 0) {
-    chunks.push(current.join("\n\n"));
-    blockCountsPerChunk.push(current.length);
-  }
-  return { chunks, blockCountsPerChunk };
-};
-
 /** Derives a short summary/label from question text, capping at ~12 words. */
 const summarizeQuestion = (text) => {
   if (!text) return "Question";
@@ -249,13 +178,6 @@ const summarizeQuestion = (text) => {
     return sanitized.replace(/\?+$/, "");
   }
   return `${words.slice(0, 12).join(" ")}…`;
-};
-
-/** Estimates how many questions to request for a chunk based on its length. */
-const calculateQuestionTarget = (chunk) => {
-  if (!chunk) return 3;
-  const estimated = Math.round(chunk.length / 900);
-  return Math.max(3, Math.min(12, estimated));
 };
 
 /** Splits a total count into easy/medium/hard buckets with guardrails. */
@@ -363,38 +285,6 @@ const sanitizeEduAIQuestion = (question) => {
     secondaryTopicIds,
     choices,
   };
-};
-
-/**
- * Builds a stable dedupe key from question text so distinct questions are not collapsed.
- * Uses normalized prefix + length to avoid false positives from summary-only matches.
- */
-const extractedQuestionDedupeKey = (question) => {
-  const q = typeof question?.question === "string" ? question.question : "";
-  const normalized = q.replace(/\s+/g, " ").trim().toLowerCase();
-  return normalized.slice(0, 150);
-};
-
-/**
- * Deduplicates extracted questions by stable key, preserves source order, and when
- * two items share a key keeps the one with longer question text (more context).
- */
-const deduplicateExtractedQuestions = (questions) => {
-  if (!Array.isArray(questions) || questions.length === 0) return [];
-  const byKey = new Map();
-  const keyOrder = new Map();
-  let index = 0;
-  for (const q of questions) {
-    const key = extractedQuestionDedupeKey(q);
-    if (!keyOrder.has(key)) keyOrder.set(key, index++);
-    const existing = byKey.get(key);
-    if (!existing || (typeof q.question === "string" && q.question.length > (existing.question?.length ?? 0))) {
-      byKey.set(key, q);
-    }
-  }
-  return [...byKey.entries()]
-    .sort((a, b) => (keyOrder.get(a[0]) ?? 0) - (keyOrder.get(b[0]) ?? 0))
-    .map(([, q]) => q);
 };
 
 /** Uses EduAI to extract questions from OCR’d text, chunking input and deduplicating outputs. */

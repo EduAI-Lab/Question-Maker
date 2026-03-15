@@ -9,7 +9,7 @@ import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PDFParse } from 'pdf-parse';
-import { splitIntoQuestionBlocks, chunkByQuestionBlocks, normalizeExtractText } from '../src/services/aiService.js';
+import { splitIntoQuestionBlocks, chunkByQuestionBlocks, normalizeExtractText } from '../src/services/extractionUtils.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const ocrTestsDir = resolve(__dirname, '../test/ocr_tests');
