@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TourId, TourStep } from '../tour/tourTypes';
 import { tourSteps } from '../tour/tourSteps';
@@ -33,9 +33,33 @@ type HighlightPosition = {
 const getTarget = (step: TourStep | undefined) =>
   step ? (document.querySelector(`[data-tour-id="${step.id}"]`) as HTMLElement | null) : null;
 
+const PADDING = 24;
+const TOOLTIP_WIDTH = 320;
+
+const rectsOverlap = (a: { top: number; left: number; width: number; height: number }, b: DOMRect) =>
+  !(a.left > b.right || a.left + a.width < b.left || a.top > b.bottom || a.top + a.height < b.top);
+
+type TooltipPlacement = 'bottom-left' | 'top-left' | 'bottom-right' | 'top-right';
+
+const getTooltipRect = (placement: TooltipPlacement, tooltipHeight: number): { top: number; left: number; width: number; height: number } => {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  switch (placement) {
+    case 'bottom-left':
+      return { top: h - PADDING - tooltipHeight, left: PADDING, width: TOOLTIP_WIDTH, height: tooltipHeight };
+    case 'top-left':
+      return { top: PADDING, left: PADDING, width: TOOLTIP_WIDTH, height: tooltipHeight };
+    case 'bottom-right':
+      return { top: h - PADDING - tooltipHeight, left: w - PADDING - TOOLTIP_WIDTH, width: TOOLTIP_WIDTH, height: tooltipHeight };
+    case 'top-right':
+      return { top: PADDING, left: w - PADDING - TOOLTIP_WIDTH, width: TOOLTIP_WIDTH, height: tooltipHeight };
+  }
+};
+
 const Tooltip = ({
   step,
   position,
+  targetEl,
   onNext,
   onPrev,
   onClose,
@@ -44,18 +68,52 @@ const Tooltip = ({
 }: {
   step: TourStep;
   position: HighlightPosition;
+  targetEl: HTMLElement | null;
   onNext: () => void;
   onPrev: () => void;
   onClose: () => void;
   isFirst: boolean;
   isLast: boolean;
 }) => {
-  const padding = 24; // fixed offset from viewport top and right
+  const [placement, setPlacement] = useState<TooltipPlacement>('bottom-right');
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!targetEl || !boxRef.current) {
+      setPlacement('bottom-right');
+      return;
+    }
+    const tooltipHeight = boxRef.current.getBoundingClientRect().height;
+    const targetRect = targetEl.getBoundingClientRect();
+    const order: TooltipPlacement[] = ['bottom-right', 'bottom-left', 'top-right', 'top-left'];
+    for (const p of order) {
+      const tr = getTooltipRect(p, tooltipHeight);
+      if (!rectsOverlap(tr, targetRect)) {
+        setPlacement(p);
+        return;
+      }
+    }
+    setPlacement('bottom-right');
+  }, [step.id, targetEl]);
+
+  const style = useMemo(() => {
+    switch (placement) {
+      case 'bottom-left':
+        return { bottom: PADDING, left: PADDING };
+      case 'top-left':
+        return { top: PADDING, left: PADDING };
+      case 'bottom-right':
+        return { bottom: PADDING, right: PADDING };
+      case 'top-right':
+        return { top: PADDING, right: PADDING };
+    }
+  }, [placement]);
 
   return (
     <div
+      ref={boxRef}
       className="fixed z-[10002] w-[320px] pointer-events-auto"
-      style={{ top: padding, right: padding }}
+      style={style}
       onClick={(event) => event.stopPropagation()}
       onMouseDown={(event) => event.stopPropagation()}
     >
@@ -132,11 +190,9 @@ const GuidedTourOverlay = ({
 
     const updatePosition = () => {
       const rect = target.getBoundingClientRect();
-      const top = rect.top + window.scrollY;
-      const left = rect.left + window.scrollX;
       setPosition({
-        top: top - 8,
-        left: left - 8,
+        top: rect.top - 8,
+        left: rect.left - 8,
         width: rect.width + 16,
         height: rect.height + 16
       });
@@ -179,6 +235,7 @@ const GuidedTourOverlay = ({
       <Tooltip
         step={step}
         position={position}
+        targetEl={getTarget(step)}
         onNext={onNext}
         onPrev={onPrev}
         onClose={onClose}

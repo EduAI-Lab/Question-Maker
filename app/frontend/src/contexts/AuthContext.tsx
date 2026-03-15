@@ -108,6 +108,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setIsAuthenticated(true);
       setIsInitialized(true);
       void refreshEduAIStatus();
+      try {
+        sessionStorage.setItem('newUserTourPending', '1');
+      } catch (_) {}
       console.log('AuthProvider: Registration successful');
       return { success: true };
     } catch (error: any) {
