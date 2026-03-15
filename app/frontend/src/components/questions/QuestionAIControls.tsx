@@ -16,6 +16,7 @@ import {
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 import { apiKeyStorage } from '../../services/apiKeyStorage';
 import type { EduAIModelOption } from '../../services/eduaiService';
+import type { QuestionGenerationPhase } from '../../hooks/useEduAIStatus';
 
 export interface QuestionAIControlsValue {
     generationPrompt: string;
@@ -36,6 +37,7 @@ interface QuestionAIControlsProps {
     status: 'loading' | 'ok' | 'error';
     statusMessage?: string;
     onRefreshStatus: () => void;
+    questionGenerationPhase?: QuestionGenerationPhase;
     courseWarningMessage: string | null;
     mode: 'new' | 'variant';
     disabled?: boolean;
@@ -52,6 +54,7 @@ export function QuestionAIControls({
     status,
     statusMessage,
     onRefreshStatus,
+    questionGenerationPhase,
     courseWarningMessage,
     mode,
     disabled = false
@@ -71,6 +74,7 @@ export function QuestionAIControls({
                         status={status}
                         message={statusMessage}
                         onRefresh={onRefreshStatus}
+                        questionGenerationPhase={questionGenerationPhase}
                         className="z-50"
                     />
                 </div>

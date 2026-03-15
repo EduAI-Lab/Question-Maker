@@ -748,6 +748,7 @@ export const QuestionUploadDialog = ({
                                                     status={eduaiStatus.status}
                                                     message={eduaiStatus.message}
                                                     onRefresh={eduaiStatus.refresh}
+                                                    questionGenerationPhase={eduaiStatus.questionGenerationPhase}
                                                     className="z-50"
                                                 />
                                             </div>
@@ -1034,6 +1035,7 @@ export const QuestionUploadDialog = ({
                                     status={eduaiStatus.status}
                                     message={eduaiStatus.message}
                                     onRefresh={eduaiStatus.refresh}
+                                    questionGenerationPhase={eduaiStatus.questionGenerationPhase}
                                     className="z-50"
                                 />
                             </div>
