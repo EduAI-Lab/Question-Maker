@@ -38,17 +38,22 @@ export function UnsavedChangesDialog({
             </div>
             <AlertDialogTitle>Unsaved Questions</AlertDialogTitle>
           </div>
-          <AlertDialogDescription className="pt-2">
-            You have{' '}
-            <span className="font-medium text-foreground">
-              {questionsCount} extracted question{questionsCount !== 1 ? 's' : ''}
-            </span>{' '}
-            that haven&apos;t been saved yet. What would you like to do?
+          <AlertDialogDescription className="pt-2 space-y-1">
+            <p>
+              You have{' '}
+              <span className="font-medium text-foreground">
+                {questionsCount} extracted question{questionsCount !== 1 ? 's' : ''}
+              </span>{' '}
+              that haven&apos;t been saved yet. What would you like to do?
+            </p>
+            <p className="text-xs text-muted-foreground/90">
+              Discarding keeps them in the History panel so you can restore later.
+            </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         <AlertDialogFooter className="sm:flex-row gap-2">
-          <Button variant="ghost" onClick={onCancel} disabled={isSaving}>
+          <Button variant="ghost" onClick={onCancel} disabled={isSaving} title="Return to the dialog and keep editing">
             Keep Editing
           </Button>
           <Button
@@ -56,10 +61,11 @@ export function UnsavedChangesDialog({
             onClick={onDiscard}
             disabled={isSaving}
             className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            title="Close without saving; questions stay in History for later"
           >
             Discard
           </Button>
-          <Button onClick={onSave} disabled={!canSave || isSaving}>
+          <Button onClick={onSave} disabled={!canSave || isSaving} title={canSave ? 'Save now and close' : 'Add at least one question and assessment details to save'}>
             {isSaving ? 'Saving...' : 'Save Questions'}
           </Button>
         </AlertDialogFooter>

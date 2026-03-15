@@ -144,12 +144,27 @@ export function OCRJobCard({
       </div>
 
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          <StatusIcon className={cn('size-3.5', config.className)} />
-          <Badge variant={config.badgeVariant} className="text-[10px] px-1.5 py-0">
-            {config.label}
-          </Badge>
-        </div>
+        <Tooltip
+          content={
+            job.status === 'pending' || job.status === 'processing'
+              ? 'Upload in progress. Wait for it to complete before you can restore.'
+              : job.status === 'error'
+                ? 'This upload failed. Remove from history or try uploading again.'
+                : isClickable && isCurrentCourse
+                  ? 'Click to load these questions into the review area.'
+                  : isClickable && !isCurrentCourse
+                    ? 'This upload was for a different course. Switch course to restore.'
+                    : `${config.label}.`
+          }
+          side="top"
+        >
+          <div className="flex items-center gap-1.5">
+            <StatusIcon className={cn('size-3.5', config.className)} />
+            <Badge variant={config.badgeVariant} className="text-[10px] px-1.5 py-0">
+              {config.label}
+            </Badge>
+          </div>
+        </Tooltip>
         <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
       </div>
 

@@ -3,6 +3,7 @@ import { History, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
+import { Tooltip } from '../ui/tooltip';
 import { OCRJobCard } from './OCRJobCard';
 import type { OCRJob } from '../../types/ocr';
 
@@ -181,15 +182,17 @@ export function OCRHistoryPanel({
 
           {hasJobs && (
             <div className="border-t p-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full text-muted-foreground hover:text-destructive"
-                onClick={onClearHistory}
-              >
-                <Trash2 className="size-3.5 mr-1.5" />
-                Clear History
-              </Button>
+              <Tooltip content="Remove all jobs from the list. Does not affect questions you already saved." side="top" className="block w-full">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-muted-foreground hover:text-destructive"
+                  onClick={onClearHistory}
+                >
+                  <Trash2 className="size-3.5 mr-1.5" />
+                  Clear History
+                </Button>
+              </Tooltip>
             </div>
           )}
         </>
