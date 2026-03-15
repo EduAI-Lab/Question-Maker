@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Tesseract from 'tesseract.js';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf';
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker?url';
-import { UploadCloud, FileText, Loader2, Trash2, Copy as CopyIcon, RefreshCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { UploadCloud, FileText, Loader2, Trash2, Copy as CopyIcon, RefreshCcw, ChevronDown, ChevronUp, History } from 'lucide-react';
 
 import {
     Dialog,
@@ -35,6 +35,10 @@ import { Topic } from '../../types/topic';
 import { questionService } from '../../services/questionService';
 import { eduaiService, EduAIModelOption } from '../../services/eduaiService';
 import { apiKeyStorage } from '../../services/apiKeyStorage';
+import { useOCRHistory } from '../../hooks/use-ocr-history';
+import { OCRHistoryPanel } from '../ocr/OCRHistoryPanel';
+import { UnsavedChangesDialog } from '../ocr/UnsavedChangesDialog';
+import type { OCRJob, StoredQuestion } from '../../types/ocr';
 
 // Configure PDF.js worker
 // In production, use CDN to avoid issues with worker file path resolution
@@ -193,6 +197,18 @@ export const QuestionUploadDialog = ({
     const [aiModel, setAiModel] = useState('ollama:gpt-oss:120b');
     const [providerApiKey, setProviderApiKey] = useState('');
     const [uploadSectionCollapsed, setUploadSectionCollapsed] = useState(true);
+    const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+    const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+    const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+
+    const {
+        jobs: ocrJobs,
+        addJob,
+        updateJobStatus,
+        removeJob,
+        clearHistory,
+    } = useOCRHistory();
+
     const eduaiStatus = useEduAIStatus();
     const selectedModel = useMemo(
         () => availableModels.find((model) => model.id === aiModel),
@@ -399,7 +415,24 @@ export const QuestionUploadDialog = ({
         setError(null);
         setDraftQuestions([]);
         setLastFileName(file.name);
+
+        const jobId = addJob({
+            fileName: file.name,
+            fileSize: file.size,
+            courseId: courseId!,
+            courseName: courseName ?? 'Unknown Course',
+            model: aiModel,
+            status: 'pending',
+            assessmentDetails: {
+                type: assessmentType,
+                name: assessmentName,
+                semester: assessmentSemester,
+            },
+        });
+        setCurrentJobId(jobId);
+
         try {
+            updateJobStatus(jobId, 'processing');
             const text = await performOcr(file);
             if (onExtractInBackground && courseId) {
                 const apiKeys = await apiKeyStorage.buildApiKeysForModel(aiModel);
@@ -414,6 +447,7 @@ export const QuestionUploadDialog = ({
             setError(message);
             setProcessingStage('idle');
             setProgress(0);
+            updateJobStatus(jobId, 'error', { error: message });
             toast({
                 variant: 'destructive',
                 title: 'Question extraction failed',
@@ -421,7 +455,7 @@ export const QuestionUploadDialog = ({
                 duration: Number.POSITIVE_INFINITY,
             });
         }
-    }, [courseId, handleExtractQuestions, performOcr, toast, onExtractInBackground, onClose, aiModel]);
+    }, [courseId, courseName, handleExtractQuestions, performOcr, toast, onExtractInBackground, onClose, aiModel, addJob, updateJobStatus, assessmentType, assessmentName, assessmentSemester]);
 
     const handleFileChange = useCallback(
         (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -517,6 +551,99 @@ export const QuestionUploadDialog = ({
     };
 
     const disabledReason = getDisabledReason();
+
+    // Update OCR job when drafts change (after successful extraction)
+    useEffect(() => {
+        if (currentJobId && draftQuestions.length > 0 && processingStage === 'review') {
+            const storedQuestions: StoredQuestion[] = draftQuestions.map((draft) => ({
+                id: draft.id,
+                text: draft.question.slice(0, 200),
+                type: draft.type === 'MCQ' ? 'mcq' : draft.type === 'SA' ? 'short_answer' : 'fill_in_blank',
+                summary: draft.summary,
+                ...(draft.type === 'MCQ' && draft.choices && draft.choices.length >= 2 && { choices: draft.choices }),
+                ...(draft.answer != null && draft.answer !== '' && { answer: draft.answer }),
+            }));
+            updateJobStatus(currentJobId, 'success', {
+                questionsCount: draftQuestions.length,
+                storedQuestions,
+            });
+        }
+    }, [currentJobId, draftQuestions, processingStage, updateJobStatus]);
+
+    const handleCloseAttempt = useCallback(() => {
+        if (draftQuestions.length > 0 && processingStage === 'review') {
+            setShowUnsavedDialog(true);
+        } else {
+            onClose();
+        }
+    }, [draftQuestions.length, processingStage, onClose]);
+
+    const handleDiscardUnsaved = useCallback(() => {
+        if (currentJobId) {
+            const storedQuestions: StoredQuestion[] = draftQuestions.map((draft) => ({
+                id: draft.id,
+                text: draft.question.slice(0, 200),
+                type: draft.type === 'MCQ' ? 'mcq' : draft.type === 'SA' ? 'short_answer' : 'fill_in_blank',
+                summary: draft.summary,
+                ...(draft.type === 'MCQ' && draft.choices && draft.choices.length >= 2 && { choices: draft.choices }),
+                ...(draft.answer != null && draft.answer !== '' && { answer: draft.answer }),
+            }));
+            updateJobStatus(currentJobId, 'discarded', {
+                questionsCount: draftQuestions.length,
+                storedQuestions,
+            });
+        }
+        setShowUnsavedDialog(false);
+        onClose();
+    }, [currentJobId, draftQuestions, updateJobStatus, onClose]);
+
+    const handleSelectHistoryJob = useCallback((job: OCRJob) => {
+        if (job.courseId !== courseId) {
+            toast({
+                title: 'Different course',
+                description: `This upload was for "${job.courseName}". Switch courses to view these questions.`,
+                variant: 'destructive',
+            });
+            return;
+        }
+        if (job.storedQuestions && job.storedQuestions.length > 0) {
+            const defaultMcqChoices: MCQChoice[] = [
+                { letter: 'A', text: '' },
+                { letter: 'B', text: '' },
+                { letter: 'C', text: '' },
+                { letter: 'D', text: '' },
+            ];
+            const restoredDrafts: DraftQuestion[] = job.storedQuestions.map((sq) => ({
+                id: sq.id,
+                question: sq.text,
+                summary: sq.summary ?? '',
+                difficulty: 'medium' as QuestionDifficulty,
+                type: (sq.type === 'mcq' ? 'MCQ' : sq.type === 'short_answer' ? 'SA' : 'LA') as QuestionType,
+                primaryTopicId: null,
+                secondaryTopicIds: [],
+                include: true,
+                choices: sq.type === 'mcq'
+                    ? (sq.choices && sq.choices.length >= 2 ? sq.choices as MCQChoice[] : defaultMcqChoices)
+                    : null,
+                instructions: '',
+                answer: sq.answer ?? null,
+            }));
+            setDraftQuestions(restoredDrafts);
+            setProcessingStage('review');
+            setProgress(100);
+            setLastFileName(job.fileName);
+            setCurrentJobId(job.id);
+            if (job.assessmentDetails) {
+                setAssessmentType(job.assessmentDetails.type as typeof assessmentTypes[number]);
+                setAssessmentName(job.assessmentDetails.name);
+                setAssessmentSemester(job.assessmentDetails.semester);
+            }
+            toast({
+                title: 'Questions restored',
+                description: `Restored ${restoredDrafts.length} question(s) from history with choices and answers.`,
+            });
+        }
+    }, [courseId, toast]);
 
     const handleCopyAll = useCallback(async () => {
         const lines = draftQuestions.map((draft, index) => {
@@ -659,17 +786,34 @@ export const QuestionUploadDialog = ({
     }
 
     return (
-        <Dialog open={open} onOpenChange={(value) => { if (!value) onClose(); }}>
-            <DialogContent className="max-w-6xl sm:max-w-7xl w-[95vw] max-h-[92vh] overflow-y-auto">
+        <>
+        <Dialog open={open} onOpenChange={(value) => { if (!value) handleCloseAttempt(); }}>
+            <DialogContent className={`max-h-[92vh] overflow-y-auto transition-all duration-200 ${showHistoryPanel ? 'max-w-[95vw] sm:max-w-[1400px]' : 'max-w-6xl sm:max-w-7xl w-[95vw]'}`}>
                 <DialogHeader>
-                    <div>
-                        <DialogTitle>Upload Questions</DialogTitle>
-                        <DialogDescription>
-                            Upload a PDF, image, or TXT file containing questions for{' '}
-                            <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
-                            {' '}
-                            We&apos;ll extract them with OCR (or use text as-is for TXT) and AI so you can review before saving.
-                        </DialogDescription>
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <DialogTitle>Upload Questions</DialogTitle>
+                            <DialogDescription>
+                                Upload a PDF, image, or TXT file containing questions for{' '}
+                                <span className="font-medium text-foreground">{courseName ?? 'the selected course'}</span>.
+                                {' '}
+                                We&apos;ll extract them with OCR (or use text as-is for TXT) and AI so you can review before saving.
+                            </DialogDescription>
+                        </div>
+                        <Button
+                            variant={showHistoryPanel ? 'secondary' : 'outline'}
+                            size="sm"
+                            onClick={() => setShowHistoryPanel(!showHistoryPanel)}
+                            className="shrink-0"
+                        >
+                            <History className="h-4 w-4 mr-1.5" />
+                            History
+                            {ocrJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length > 0 && (
+                                <span className="ml-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-[10px] font-medium text-white">
+                                    {ocrJobs.filter((j) => j.status === 'processing' || j.status === 'pending').length}
+                                </span>
+                            )}
+                        </Button>
                     </div>
                 </DialogHeader>
 
@@ -1189,6 +1333,16 @@ export const QuestionUploadDialog = ({
                     </Card>
                     )}
                     </div>
+
+                    <OCRHistoryPanel
+                        jobs={ocrJobs}
+                        currentCourseId={courseId}
+                        isOpen={showHistoryPanel}
+                        onToggle={() => setShowHistoryPanel(false)}
+                        onSelectJob={handleSelectHistoryJob}
+                        onRemoveJob={removeJob}
+                        onClearHistory={clearHistory}
+                    />
                 </div>
 
                 <DialogFooter className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1196,7 +1350,7 @@ export const QuestionUploadDialog = ({
                         {includedDrafts.length} question{includedDrafts.length === 1 ? '' : 's'} ready to save.
                     </div>
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={onClose}>
+                        <Button variant="outline" onClick={handleCloseAttempt}>
                             Cancel
                         </Button>
                         {disabledReason ? (
@@ -1218,5 +1372,19 @@ export const QuestionUploadDialog = ({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+
+        <UnsavedChangesDialog
+            open={showUnsavedDialog}
+            questionsCount={draftQuestions.length}
+            canSave={canSave}
+            isSaving={processingStage === 'saving'}
+            onSave={() => {
+                setShowUnsavedDialog(false);
+                void handleSave();
+            }}
+            onDiscard={handleDiscardUnsaved}
+            onCancel={() => setShowUnsavedDialog(false)}
+        />
+        </>
     );
 };
