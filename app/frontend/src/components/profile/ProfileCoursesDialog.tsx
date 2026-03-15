@@ -301,6 +301,7 @@ export const ProfileCoursesDialog = ({
                                 status={eduaiStatus.status}
                                 message={eduaiStatus.message}
                                 onRefresh={eduaiStatus.refresh}
+                                questionGenerationPhase={eduaiStatus.questionGenerationPhase}
                                 className="z-50"
                             />
                         </div>

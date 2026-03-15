@@ -411,19 +411,26 @@ export const LandingPage = () => {
   };
 
   const handleExtractInBackground = useCallback(
-    (params: { text: string; courseId: number; model: string; apiKeys: Record<string, unknown> }) => {
+    (params: {
+      text: string;
+      courseId: number;
+      model: string;
+      apiKeys: Record<string, unknown>;
+      jobId?: string;
+      onExtractionComplete?: (status: 'success' | 'error', extras?: { error?: string; questionsCount?: number }) => void;
+    }) => {
       setIsUploadOpen(false);
 
       const processingToast = toast({
         title: 'Extraction in progress',
         description: 'Your upload is being processed. Feel free to navigate the site—we’ll notify you when it’s ready.',
+        duration: Number.POSITIVE_INFINITY,
       });
       const dismissProcessing = () => {
         try {
           processingToast.dismiss();
         } catch (_) {}
       };
-      const processingTimer = window.setTimeout(dismissProcessing, 8000);
 
       questionService
         .extractQuestionsFromText({
@@ -433,17 +440,19 @@ export const LandingPage = () => {
           apiKeys: params.apiKeys,
         })
         .then((response) => {
-          window.clearTimeout(processingTimer);
           dismissProcessing();
           const drafts = mapExtractedToDraftQuestions(response || []);
           if (drafts.length === 0) {
+            params.onExtractionComplete?.('error', { error: 'No questions extracted' });
             toast({
               variant: 'destructive',
               title: 'No questions extracted',
               description: 'The content could not be parsed into questions. Try adjusting the file or try again.',
+              duration: Number.POSITIVE_INFINITY,
             });
             return;
           }
+          params.onExtractionComplete?.('success', { questionsCount: drafts.length });
           setPendingExtractionDrafts(drafts);
           toast({
             title: 'Your extraction is ready',
@@ -457,13 +466,14 @@ export const LandingPage = () => {
           });
         })
         .catch((err: any) => {
-          window.clearTimeout(processingTimer);
           dismissProcessing();
           const message = err?.response?.data?.error || err?.message || 'Extraction failed.';
+          params.onExtractionComplete?.('error', { error: message });
           toast({
             variant: 'destructive',
             title: 'Extraction failed',
             description: message,
+            duration: Number.POSITIVE_INFINITY,
           });
         });
     },

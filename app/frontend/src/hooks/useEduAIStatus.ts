@@ -7,12 +7,16 @@ import eduaiService from '../services/eduaiService';
 
 type Status = 'loading' | 'ok' | 'error';
 
+/** When set, the AI service badge shows this phase for question generation (overrides status label). */
+export type QuestionGenerationPhase = 'generating' | 'review' | null;
+
 type EduAIState = {
     status: Status;
     message?: string;
+    questionGenerationPhase: QuestionGenerationPhase;
 };
 
-let state: EduAIState = { status: 'loading', message: 'Checking AI service status' };
+let state: EduAIState = { status: 'loading', message: 'Checking AI service status', questionGenerationPhase: null };
 const listeners = new Set<() => void>();
 let inflight: Promise<void> | null = null;
 let heartbeatTimeout: number | null = null;
@@ -20,8 +24,8 @@ let backoffStep = 0; // 0 → 1s, 1 → 2s, 2 → 4s, 3+ → 8s
 
 const notify = () => listeners.forEach((l) => l());
 
-const setState = (next: EduAIState) => {
-    state = next;
+const setState = (next: Partial<EduAIState>) => {
+    state = { ...state, ...next };
     notify();
 };
 
@@ -80,6 +84,12 @@ const fetchStatus = async () => {
     }
 };
 
+export const setQuestionGenerationPhase = (phase: QuestionGenerationPhase) => {
+    if (state.questionGenerationPhase === phase) return;
+    state = { ...state, questionGenerationPhase: phase };
+    notify();
+};
+
 export const refreshEduAIStatus = async () => {
     if (inflight) return inflight;
     setState({ status: 'loading', message: 'Checking AI service status. Connect to UBC wifi or VPN.' });
@@ -107,11 +117,13 @@ export const useEduAIStatus = () => {
 
     const getSnapshot = () => state;
 
-    const { status, message } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+    const { status, message, questionGenerationPhase } = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
     return {
         status,
         message,
+        questionGenerationPhase,
+        setQuestionGenerationPhase,
         refresh: refreshEduAIStatus,
     };
 };

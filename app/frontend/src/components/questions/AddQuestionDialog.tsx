@@ -2,7 +2,7 @@
  * Dialog for creating questions (manual or AI-assisted) and managing initial variants.
  * Handles course/topic selection, validation, assessment linkage, and optional AI generation hooks.
  */
-import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -128,6 +128,7 @@ export const AddQuestionDialog = ({
     const [modalTourStepIndex, setModalTourStepIndex] = useState(0);
     const { toast } = useToast();
     const showNewUserHint = totalQuestionsInBank === 0;
+    const isDialogOpenRef = useRef(open);
 
     const modalTourSteps = useMemo<{ id: string; content: string }[]>(() => [
         {
@@ -183,6 +184,11 @@ export const AddQuestionDialog = ({
         };
     }, [modalTourOpen, currentStepId]);
     const eduaiStatus = useEduAIStatus();
+    const { setQuestionGenerationPhase } = eduaiStatus;
+
+    useEffect(() => {
+        isDialogOpenRef.current = open;
+    }, [open]);
     const selectedGenerationModel = useMemo(
         () => availableModels.find((model) => model.id === form.generationModel),
         [availableModels, form.generationModel]
@@ -207,6 +213,7 @@ export const AddQuestionDialog = ({
             setMarkAsReviewed(false);
             setModalTourOpen(false);
             setModalTourStepIndex(0);
+            setQuestionGenerationPhase(null);
             return;
         }
 
@@ -554,6 +561,7 @@ export const AddQuestionDialog = ({
         try {
             setIsGenerating(true);
             setError(null);
+            setQuestionGenerationPhase('generating');
 
             processingToast = toast({
                 title: mode === 'variant' ? 'Variant generation in progress' : 'Question generation in progress',
@@ -740,6 +748,11 @@ export const AddQuestionDialog = ({
             });
 
             setIsAiGenerated(true);
+            if (isDialogOpenRef.current) {
+                setQuestionGenerationPhase('review');
+            } else {
+                setQuestionGenerationPhase(null);
+            }
             processingToast?.dismiss();
             toast({
                 title: mode === 'variant' ? 'Variant generated' : 'Question generated',
@@ -758,10 +771,11 @@ export const AddQuestionDialog = ({
                 generateError?.message ||
                 'Failed to generate question.';
             setError(message);
-            
+            setQuestionGenerationPhase(null);
+
             // Store the error message for the modal
             setErrorModalMessage(message);
-            
+
             processingToast?.dismiss();
             // Show a persistent toast with a click action to view details
             toast({
@@ -1089,6 +1103,7 @@ export const AddQuestionDialog = ({
                                 status={eduaiStatus.status}
                                 statusMessage={eduaiStatus.message}
                                 onRefreshStatus={eduaiStatus.refresh}
+                                questionGenerationPhase={eduaiStatus.questionGenerationPhase}
                                 courseWarningMessage={courseWarningMessage}
                                 mode={mode}
                                 disabled={isSubmitting}

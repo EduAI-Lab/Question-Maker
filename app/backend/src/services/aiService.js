@@ -6,6 +6,15 @@ import axios from "axios";
 import { config } from "../config/settings.js";
 import { Question_Metadata, Topics, Course } from "../schema/index.js";
 import eduaiService from "./eduaiService.js";
+import {
+  normalizeExtractText,
+  chunkText,
+  splitIntoQuestionBlocks,
+  chunkByQuestionBlocks,
+  calculateQuestionTarget,
+  extractedQuestionDedupeKey,
+  deduplicateExtractedQuestions,
+} from "./extractionUtils.js";
 
 const AI_PROVIDERS = {
   GROQ: "groq",
@@ -159,32 +168,6 @@ const callDeepSeekAPI = async (prompt, params) => {
   }
 };
 
-/** Normalizes OCR text by trimming whitespace, collapsing blank lines, and removing tabs. */
-const normalizeExtractText = (text) => {
-  if (!text) return "";
-  return (
-    text
-      .replace(/\r\n/g, "\n")
-      .replace(/\t/g, " ")
-      .replace(/\u00a0/g, " ")
-      // collapse runs of more than two newlines to a double newline
-      .replace(/\n{3,}/g, "\n\n")
-      // collapse excessive spaces while preserving newlines
-      .replace(/[ ]{2,}/g, " ")
-      .trim()
-  );
-};
-
-/** Splits long extraction text into chunkSize-safe segments so API prompts stay bounded. */
-const chunkText = (text, chunkSize = 6000) => {
-  if (!text) return [];
-  const chunks = [];
-  for (let i = 0; i < text.length; i += chunkSize) {
-    chunks.push(text.slice(i, i + chunkSize));
-  }
-  return chunks;
-};
-
 /** Derives a short summary/label from question text, capping at ~12 words. */
 const summarizeQuestion = (text) => {
   if (!text) return "Question";
@@ -195,13 +178,6 @@ const summarizeQuestion = (text) => {
     return sanitized.replace(/\?+$/, "");
   }
   return `${words.slice(0, 12).join(" ")}…`;
-};
-
-/** Estimates how many questions to request for a chunk based on its length. */
-const calculateQuestionTarget = (chunk) => {
-  if (!chunk) return 3;
-  const estimated = Math.round(chunk.length / 900);
-  return Math.max(3, Math.min(12, estimated));
 };
 
 /** Splits a total count into easy/medium/hard buckets with guardrails. */
@@ -322,7 +298,7 @@ const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:1
   const rawCode =
     (course?.code && course.code.trim()) || `COURSE-${course?.id ?? "UNKNOWN"}`;
   const courseCode = rawCode.replace(/\s+/g, "").toUpperCase();
-  const chunks = chunkText(text, 4000);
+  const { chunks, blockCountsPerChunk } = chunkByQuestionBlocks(text, 5000);
   const extracted = [];
 
   // Fetch topics for the course to include in the prompt
@@ -345,8 +321,12 @@ const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:1
     ? `\n\nCourse topics:\n${topics.map(t => `- ID ${t.id}: ${t.name}`).join('\n')}\n`
     : '';
 
-  for (const chunk of chunks) {
-    const numQuestions = calculateQuestionTarget(chunk);
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    const blockCount = blockCountsPerChunk[i];
+    const numQuestions = blockCount != null && blockCount > 0
+      ? Math.max(1, Math.min(blockCount, 15))
+      : calculateQuestionTarget(chunk);
     const difficultyDistribution = buildDifficultyCounts(numQuestions);
     const reasoningDistribution = {
       factual: 40,
@@ -354,15 +334,40 @@ const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:1
       application: 30,
     };
 
-    const prompt = `You are an assistant that extracts exam-ready questions from source material.
-The following text may contain multiple questions, sub-parts, and instructions. Identify complete question blocks and return ONLY high-quality student-ready questions.
+    const continuationNote = i > 0
+      ? " This segment continues from the previous one; do not treat content as a new \"Question 1\" unless the source explicitly starts a new numbered question.\n\n"
+      : "";
 
-Requirements:
-- Preserve numbering, sub-parts, and important instructions.
-- If a question has parts (a), (b), etc., keep them together in a single prompt using \\n for new lines.
+    const extractionSystemPrompt = `You are an assistant that EXTRACTS exam-ready questions from source material. Your job is to list every complete question block that appears in the text. Do NOT generate new questions or improvise—only extract or paraphrase what is actually in the source.
+
+CRITICAL — extraction only:
+- EXTRACT or preserve the exact wording of tasks/questions from the source. Do not invent new questions (e.g. do not turn assignment instructions into MCQs about time complexity).
+- One output question = one logical question block. A block includes ALL its sub-parts: (a), (b), (c), (i), (ii), etc.
+- Treat assignment parts as question blocks even when not in classic "1. (a)(b)(c)" form: e.g. "Part 1", "Task 1", "Exercise 1", "Section 1" or prose instructions are valid blocks—extract each as one question with full text.
+- Do NOT split a single numbered question into multiple entries. Do NOT merge two different questions into one entry.
+${continuationNote}Requirements:
+- Preserve numbering, sub-parts, and instructions exactly as in the source. Use \\n for line breaks inside the question text.
 - Provide a concise "description" (<= 12 words) that summarizes the question without repeating it verbatim.
-- Format answers as null (omit if unknown). Do NOT fabricate answers.
-- Assign appropriate primary_topic_id and secondary_topic_ids based on the question content and the course topics provided below.${topicsSection}
+- Set answer to null if unknown. Do NOT fabricate answers.
+- Assign primary_topic_id and secondary_topic_ids from the course topics in the user message when relevant.
+
+Format each question as a JSON object with these exact fields:
+  {
+    "content": "Full question/task text as in source (for MCQ: question only, put options in choices)",
+    "description": "Brief summary (<= 12 words)",
+    "difficulty": "easy/medium/hard",
+    "reasoning_level": "factual/analytical/application",
+    "type": "MCQ/SA/LA",
+    "answer": null or "answer text",
+    "primary_topic_id": number | null,
+    "secondary_topic_ids": number[],
+    "choices": [{"letter": "A", "text": "..."}, ...]  // REQUIRED for MCQ only
+  }
+
+ERROR HANDLING: If the source has no extractable question/task blocks at all, return: {"error": true, "reason": "Brief explanation"}. Otherwise return ONLY a valid JSON array of question objects. No markdown, no code fence.`;
+
+    const extractionUserPrompt = `Extract every complete question or task block from the source material below. Preserve wording; do not generate new questions.${topicsSection}
+
 Source material:
 """
 ${chunk}
@@ -370,13 +375,15 @@ ${chunk}
 
     try {
       const questions = await eduaiService.generateQuestions({
-        prompt,
+        prompt: chunk,
         courseCode,
         model,
         apiKeys,
         numQuestions,
         difficultyDistribution,
         reasoningDistribution,
+        systemPromptOverride: extractionSystemPrompt,
+        userPromptOverride: extractionUserPrompt,
       });
       const sanitized = questions
         .map((question) => sanitizeEduAIQuestion(question))
@@ -388,15 +395,7 @@ ${chunk}
     }
   }
 
-  const seen = new Set();
-  const deduped = [];
-  extracted.forEach((question) => {
-    const key = `${question.summary.toLowerCase()}::${question.question.toLowerCase()}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      deduped.push(question);
-    }
-  });
+  const deduped = deduplicateExtractedQuestions(extracted);
   return deduped;
 };
 
@@ -752,4 +751,11 @@ export const generateQuestions = async (prompt, provider, params) => {
   }
 };
 
-export { AI_PROVIDERS };
+export {
+  AI_PROVIDERS,
+  splitIntoQuestionBlocks,
+  chunkByQuestionBlocks,
+  extractedQuestionDedupeKey,
+  deduplicateExtractedQuestions,
+  normalizeExtractText,
+};
