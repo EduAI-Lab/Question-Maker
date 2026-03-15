@@ -1,6 +1,6 @@
 /**
  * Login/Registration page with dark hero, floating letters, and below-fold info + video.
- * Redirects authenticated users to the landing page.
+ * Redirects authenticated users to the homepage.
  */
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';

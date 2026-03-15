@@ -1,7 +1,7 @@
 /**
  * Top navigation bar providing course selection, tab switching, and profile/help entrypoints.
  * Accepts course data and callbacks to propagate tab/course changes to parent layouts.
- * Supports variant "course-selection" (no selector/tabs) and optional back button for landing.
+ * Supports variant "course-selection" (no selector/tabs) and optional back button for homepage.
  */
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -33,7 +33,7 @@ type TopNavigationProps = (
       courses: Course[];
       isLoadingCourses?: boolean;
       onProfileClick?: () => void;
-      /** When set, Guided tour button calls this instead of startTour (e.g. navigate to landing with test course and start tour there). */
+      /** When set, Guided tour button calls this instead of startTour (e.g. navigate to homepage with test course and start tour there). */
       onGuidedTourClick?: () => void;
     }
 );
@@ -67,7 +67,7 @@ export const TopNavigation = (props: TopNavigationProps) => {
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Left: Back button (when on landing) + Logo */}
+        {/* Left: Back button (when on homepage) + Logo */}
         <div className="flex items-center space-x-4">
           {showBackButton && onBackClick && (
             <Tooltip content="Return to course selection" side="bottom">

@@ -1,6 +1,6 @@
 /**
  * Course selection page shown after login. User must select a course card to continue to Question Bank / Assessments.
- * Same header as landing; content shows "Your Courses", "Add new course" card, and available course cards.
+ * Same header as homepage; content shows "Your Courses", "Add new course" card, and available course cards.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -33,7 +33,7 @@ export const CourseSelectionPage = () => {
   const { startTour, registerStepAction } = useGuidedTour();
 
   const handleSelectCourse = (course: Course) => {
-    navigate('/landing', { state: { courseId: course.id }, replace: true });
+    navigate('/home', { state: { courseId: course.id }, replace: true });
   };
 
   const handleProfileClick = () => {
@@ -72,7 +72,7 @@ export const CourseSelectionPage = () => {
     }
   }, [courses, fetchCourses, isStartingTour, startTour]);
 
-  // When arriving from Landing (e.g. user clicked Guided tour on Assessments tab), start the tour here and register step 1 to return to their course on questions tab.
+  // When arriving from homepage (e.g. user clicked Guided tour on Assessments tab), start the tour here and register step 1 to return to their course on questions tab.
   useEffect(() => {
     const state = location.state as { startGuidedTour?: boolean; returnCourseId?: number } | null;
     if (!state?.startGuidedTour || state.returnCourseId == null) return;
@@ -80,7 +80,7 @@ export const CourseSelectionPage = () => {
     const returnCourseId = state.returnCourseId;
     startTour('main');
     const unregister = registerStepAction('course-select', () => {
-      navigate('/landing?tab=questions', {
+      navigate('/home?tab=questions', {
         state: { courseId: returnCourseId },
         replace: true
       });
