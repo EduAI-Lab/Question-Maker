@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { User } from '../schema/index.js';
 import { config } from '../config/settings.js';
+import { seedCoursesForNewUser } from './seedNewUserService.js';
 
 /** Creates a user with hashed credentials and returns a JWT/user payload. */
 async function registerUser(userData) {
@@ -26,6 +27,9 @@ async function registerUser(userData) {
     email,
     passwordHash,
   });
+
+  // Seed default courses with topics and sample questions for the new user
+  await seedCoursesForNewUser(user.id);
 
   // Generate JWT token
   const token = jwt.sign(
