@@ -53,6 +53,21 @@ Question 2 Single part.`;
     expect(blocks[1]).toContain('Question 2');
   });
 
+  it('splits on Part 1, Task 1, Exercise 1, Section 1', () => {
+    const text = `Instructions.
+Part 1 Implement the Client class.
+Task 2 Add the comparator.
+Exercise 3 Test the queue.
+Section 4 Write a short report.`;
+    const blocks = splitIntoQuestionBlocks(text);
+    expect(blocks.length).toBe(5);
+    expect(blocks[0]).toBe('Instructions.');
+    expect(blocks[1]).toContain('Part 1');
+    expect(blocks[2]).toContain('Task 2');
+    expect(blocks[3]).toContain('Exercise 3');
+    expect(blocks[4]).toContain('Section 4');
+  });
+
   it('returns empty array for empty or whitespace-only input', () => {
     expect(splitIntoQuestionBlocks('')).toEqual([]);
     expect(splitIntoQuestionBlocks('   \n  ')).toEqual([]);

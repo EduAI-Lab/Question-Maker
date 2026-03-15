@@ -411,7 +411,14 @@ export const LandingPage = () => {
   };
 
   const handleExtractInBackground = useCallback(
-    (params: { text: string; courseId: number; model: string; apiKeys: Record<string, unknown> }) => {
+    (params: {
+      text: string;
+      courseId: number;
+      model: string;
+      apiKeys: Record<string, unknown>;
+      jobId?: string;
+      onExtractionComplete?: (status: 'success' | 'error', extras?: { error?: string; questionsCount?: number }) => void;
+    }) => {
       setIsUploadOpen(false);
 
       const processingToast = toast({
@@ -436,6 +443,7 @@ export const LandingPage = () => {
           dismissProcessing();
           const drafts = mapExtractedToDraftQuestions(response || []);
           if (drafts.length === 0) {
+            params.onExtractionComplete?.('error', { error: 'No questions extracted' });
             toast({
               variant: 'destructive',
               title: 'No questions extracted',
@@ -444,6 +452,7 @@ export const LandingPage = () => {
             });
             return;
           }
+          params.onExtractionComplete?.('success', { questionsCount: drafts.length });
           setPendingExtractionDrafts(drafts);
           toast({
             title: 'Your extraction is ready',
@@ -459,6 +468,7 @@ export const LandingPage = () => {
         .catch((err: any) => {
           dismissProcessing();
           const message = err?.response?.data?.error || err?.message || 'Extraction failed.';
+          params.onExtractionComplete?.('error', { error: message });
           toast({
             variant: 'destructive',
             title: 'Extraction failed',

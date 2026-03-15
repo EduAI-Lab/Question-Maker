@@ -186,7 +186,7 @@ const chunkText = (text, chunkSize = 6000) => {
 };
 
 /**
- * Detects question-block boundaries: numbered items (1. 2) 3.), "Question N", "Part A".
+ * Detects question-block boundaries: numbered items (1. 2) 3.), "Question N", "Part A/1", "Task 1", "Exercise 1", "Section 1".
  * Sub-parts like (a), (b), (i), (ii) do NOT start a new block; they belong to the previous question.
  * Used so we never split a multipart question across chunks.
  * @param {string} text - Normalized extraction text
@@ -195,9 +195,8 @@ const chunkText = (text, chunkSize = 6000) => {
 const splitIntoQuestionBlocks = (text) => {
   if (!text || !text.trim()) return [];
   const trimmed = text.trim();
-  // New block starts at: newline + optional space + ( digit(s). or digit(s)) OR "Question" + space + digits OR "Part" + space + letter )
-  // Sub-parts (a) (b) (i) (ii) do not match: they use letters/parens, not leading digits or "Question"/"Part"
-  const blockStartRe = /\n\s*(?=(?:\d+[.)]\s|Question\s+\d+\s|Part\s+[A-Z]\s*[:.]?\s))/im;
+  // New block: newline + optional space + ( 1. or 2) | Question N | Part A or Part 1 | Task 1 | Exercise 1 | Section 1 )
+  const blockStartRe = /\n\s*(?=(?:\d+[.)]\s|Question\s+\d+\s|Part\s+[A-Z0-9]\s*[:.]?\s|Task\s+\d+\s|Exercise\s+\d+\s|Section\s+\d+\s))/im;
   const parts = trimmed.split(blockStartRe).map((s) => s.trim()).filter(Boolean);
   if (parts.length <= 1) return trimmed ? [trimmed] : [];
   return parts;
@@ -449,17 +448,36 @@ const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:1
       ? " This segment continues from the previous one; do not treat content as a new \"Question 1\" unless the source explicitly starts a new numbered question.\n\n"
       : "";
 
-    const prompt = `You are an assistant that EXTRACTS exam-ready questions from source material. Your job is to list every complete question block that appears in the text—do not generate new content or merge separate questions.
+    const extractionSystemPrompt = `You are an assistant that EXTRACTS exam-ready questions from source material. Your job is to list every complete question block that appears in the text. Do NOT generate new questions or improvise—only extract or paraphrase what is actually in the source.
 
-CRITICAL — multipart questions:
+CRITICAL — extraction only:
+- EXTRACT or preserve the exact wording of tasks/questions from the source. Do not invent new questions (e.g. do not turn assignment instructions into MCQs about time complexity).
 - One output question = one logical question block. A block includes ALL its sub-parts: (a), (b), (c), (i), (ii), etc.
-- Do NOT split a single numbered question into multiple entries. Example: "1. (a) ... (b) ... (c) ..." must become ONE question with the full text including (a), (b), and (c).
-- Do NOT merge two different numbered questions (e.g. "1. ..." and "2. ...") into one entry.
+- Treat assignment parts as question blocks even when not in classic "1. (a)(b)(c)" form: e.g. "Part 1", "Task 1", "Exercise 1", "Section 1" or prose instructions are valid blocks—extract each as one question with full text.
+- Do NOT split a single numbered question into multiple entries. Do NOT merge two different questions into one entry.
 ${continuationNote}Requirements:
 - Preserve numbering, sub-parts, and instructions exactly as in the source. Use \\n for line breaks inside the question text.
 - Provide a concise "description" (<= 12 words) that summarizes the question without repeating it verbatim.
 - Set answer to null if unknown. Do NOT fabricate answers.
-- Assign primary_topic_id and secondary_topic_ids from the course topics below when relevant.${topicsSection}
+- Assign primary_topic_id and secondary_topic_ids from the course topics in the user message when relevant.
+
+Format each question as a JSON object with these exact fields:
+  {
+    "content": "Full question/task text as in source (for MCQ: question only, put options in choices)",
+    "description": "Brief summary (<= 12 words)",
+    "difficulty": "easy/medium/hard",
+    "reasoning_level": "factual/analytical/application",
+    "type": "MCQ/SA/LA",
+    "answer": null or "answer text",
+    "primary_topic_id": number | null,
+    "secondary_topic_ids": number[],
+    "choices": [{"letter": "A", "text": "..."}, ...]  // REQUIRED for MCQ only
+  }
+
+ERROR HANDLING: If the source has no extractable question/task blocks at all, return: {"error": true, "reason": "Brief explanation"}. Otherwise return ONLY a valid JSON array of question objects. No markdown, no code fence.`;
+
+    const extractionUserPrompt = `Extract every complete question or task block from the source material below. Preserve wording; do not generate new questions.${topicsSection}
+
 Source material:
 """
 ${chunk}
@@ -467,13 +485,15 @@ ${chunk}
 
     try {
       const questions = await eduaiService.generateQuestions({
-        prompt,
+        prompt: chunk,
         courseCode,
         model,
         apiKeys,
         numQuestions,
         difficultyDistribution,
         reasoningDistribution,
+        systemPromptOverride: extractionSystemPrompt,
+        userPromptOverride: extractionUserPrompt,
       });
       const sanitized = questions
         .map((question) => sanitizeEduAIQuestion(question))
@@ -847,4 +867,5 @@ export {
   chunkByQuestionBlocks,
   extractedQuestionDedupeKey,
   deduplicateExtractedQuestions,
+  normalizeExtractText,
 };

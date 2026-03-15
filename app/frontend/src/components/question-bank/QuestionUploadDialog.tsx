@@ -87,12 +87,22 @@ const questionTypeLabels: Record<QuestionType, string> = {
 };
 const assessmentTypes = ['Assignment', 'Lab', 'Quiz', 'Midterm', 'Final'] as const;
 
+/** Callback when background extraction finishes (so the parent can update OCR job status). */
+export type OnExtractionComplete = (
+    status: 'success' | 'error',
+    extras?: { error?: string; questionsCount?: number }
+) => void;
+
 /** Params for starting extraction in the background (modal closes, parent runs API and shows toasts). */
 export interface BackgroundExtractionParams {
     text: string;
     courseId: number;
     model: string;
     apiKeys: Record<string, unknown>;
+    /** OCR history job id — parent should call onExtractionComplete so the job is marked success/error. */
+    jobId: string;
+    /** Called with outcome so the dialog can update the job (e.g. mark failed when API errors). */
+    onExtractionComplete?: OnExtractionComplete;
 }
 
 interface QuestionUploadDialogProps {
@@ -501,7 +511,19 @@ export const QuestionUploadDialog = ({
             const text = await performOcr(file);
             if (onExtractInBackground && courseId) {
                 const apiKeys = await apiKeyStorage.buildApiKeysForModel(aiModel);
-                onExtractInBackground({ text, courseId, model: aiModel, apiKeys });
+                onExtractInBackground({
+                    text,
+                    courseId,
+                    model: aiModel,
+                    apiKeys,
+                    jobId,
+                    onExtractionComplete: (status, extras) => {
+                        updateJobStatus(jobId, status === 'error' ? 'error' : 'success', {
+                            error: extras?.error,
+                            questionsCount: extras?.questionsCount,
+                        });
+                    },
+                });
                 onClose();
                 return;
             }
