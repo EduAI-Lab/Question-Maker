@@ -244,7 +244,7 @@ sudo nano /etc/httpd/conf.d/question-maker.conf
     Require all granted
 </LocationMatch>
 
-# Handle all other requests - send to frontend (includes /help, /login, /landing, etc.)
+# Handle all other requests - send to frontend (includes /help, /login, /home, etc.)
 # This regex matches everything EXCEPT /api/ routes
 <LocationMatch "^(?!\/api\/).*">
     ProxyPass http://localhost:3005

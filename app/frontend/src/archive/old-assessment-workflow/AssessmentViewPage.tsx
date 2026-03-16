@@ -803,7 +803,7 @@ export const AssessmentViewPage = () => {
         title: 'Assessment deleted',
         description: `"${assessment.name}" has been removed.`
       });
-      navigate('/landing');
+      navigate('/home');
     } catch (_error) {
       toast({
         title: 'Failed to delete assessment',
@@ -1123,9 +1123,9 @@ export const AssessmentViewPage = () => {
   const handleBack = () => {
     const fromTab = (location.state as any)?.fromTab;
     if (fromTab === 'assessments') {
-      navigate('/landing?tab=assessments', { replace: true });
+      navigate('/home?tab=assessments', { replace: true });
     } else {
-      navigate('/landing', { replace: true });
+      navigate('/home', { replace: true });
     }
   };
 

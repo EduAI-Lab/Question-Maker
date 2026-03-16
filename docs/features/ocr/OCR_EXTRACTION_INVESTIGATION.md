@@ -65,13 +65,13 @@ The system prompt dominates the framing (“generate … based on course materia
 1. User drops file in the upload dialog → **`addJob`** (status `pending`) → **`updateJobStatus(jobId, 'processing')`**.
 2. OCR runs (PDF → text).
 3. If **background extraction** is used: dialog calls **`onExtractInBackground({ text, courseId, model, apiKeys })`** and **closes**. The **jobId is not passed** to the parent.
-4. **LandingPage** runs `questionService.extractQuestionsFromText(...)` in **`handleExtractInBackground`**. On success it shows a toast and sets `pendingExtractionDrafts`. On **failure** it only **dismisses the processing toast** and shows an error toast; it has **no jobId and no reference to OCR history**, so it **never** calls `updateJobStatus(jobId, 'error', { error })`.
+4. **Homepage** runs `questionService.extractQuestionsFromText(...)` in **`handleExtractInBackground`**. On success it shows a toast and sets `pendingExtractionDrafts`. On **failure** it only **dismisses the processing toast** and shows an error toast; it has **no jobId and no reference to OCR history**, so it **never** calls `updateJobStatus(jobId, 'error', { error })`.
 5. The job remains in **`processing`** because nothing ever updates it to `error` (or `success` when extraction succeeds in background).
 
 ### Where it’s implemented
 
 - **Dialog:** `app/frontend/src/components/question-bank/QuestionUploadDialog.tsx` — `processFile` creates the job, sets `processing`, calls `onExtractInBackground` **without jobId**.
-- **LandingPage:** `app/frontend/src/pages/LandingPage.tsx` — `handleExtractInBackground` has no `jobId` and does not use `useOCRHistory`, so it cannot update the job.
+- **Homepage:** `app/frontend/src/pages/Homepage.tsx` — `handleExtractInBackground` has no `jobId` and does not use `useOCRHistory`, so it cannot update the job.
 
 ### Recommended fix
 
@@ -79,10 +79,10 @@ The system prompt dominates the framing (“generate … based on course materia
   - **`jobId: string`**
   - **`onExtractionComplete: (status: 'success' | 'error', extras?: { error?: string; questionsCount?: number }) => void`**
 - In **`processFile`**, when calling `onExtractInBackground`, pass `jobId` and a callback that invokes **`updateJobStatus(jobId, status, extras)`** (the dialog already has `updateJobStatus` from `useOCRHistory`).
-- In **LandingPage** `handleExtractInBackground`:
+- In **Homepage** `handleExtractInBackground`:
   - In **`.then()`**: if drafts.length > 0, call `params.onExtractionComplete?.('success', { questionsCount: drafts.length })`; if drafts.length === 0, call `params.onExtractionComplete?.('error', { error: 'No questions extracted' })`.
   - In **`.catch()`**: call `params.onExtractionComplete?.('error', { error: message })`.
-- No need for LandingPage to use `useOCRHistory`; the dialog owns the job and passes a callback that updates that job. Result: on extraction failure (including EduAI error object), the history entry is set to **Failed** and can show the error message.
+- No need for Homepage to use `useOCRHistory`; the dialog owns the job and passes a callback that updates that job. Result: on extraction failure (including EduAI error object), the history entry is set to **Failed** and can show the error message.
 
 ---
 
@@ -100,6 +100,6 @@ The system prompt dominates the framing (“generate … based on course materia
 
 - Extraction flow: `app/backend/src/services/aiService.js` → `extractQuestionsWithEduAI` (builds prompt, calls `eduaiService.generateQuestions`).
 - EduAI generator: `app/backend/src/services/eduaiService.js` → `generateQuestions` (fixed system prompt, error object handling at ~293–296).
-- Background extraction: `QuestionUploadDialog.tsx` → `processFile`, `onExtractInBackground`; `LandingPage.tsx` → `handleExtractInBackground`.
+- Background extraction: `QuestionUploadDialog.tsx` → `processFile`, `onExtractInBackground`; `Homepage.tsx` → `handleExtractInBackground`.
 - OCR history: `app/frontend/src/hooks/use-ocr-history.ts`, `app/frontend/src/types/ocr.ts` (status: `pending` | `processing` | `success` | `error` | `discarded`).
 - OCR improvement plan: `docs/troubleshooting/OCR_IMPROVEMENT_PLAN.md`.

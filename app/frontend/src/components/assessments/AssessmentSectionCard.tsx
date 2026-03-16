@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Tooltip } from '../ui/tooltip';
 import { Trash2, X, Plus, AlertTriangle } from 'lucide-react';
 import type { AssessmentSection, SectionVariantLink, QuestionVariantEntry } from '../../types/question';
-
-const RENAME_DEBOUNCE_MS = 400;
 
 interface AssessmentSectionCardProps {
     section: AssessmentSection;
@@ -35,25 +33,20 @@ export function AssessmentSectionCard({
     onCreateVariant
 }: AssessmentSectionCardProps) {
     const [localName, setLocalName] = useState(section.name);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         setLocalName(section.name);
     }, [section.name]);
 
-    useEffect(() => {
-        return () => {
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-        };
-    }, []);
-
     const handleTitleChange = (value: string) => {
         setLocalName(value);
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => {
-            debounceRef.current = null;
-            if (value.trim() !== section.name) onUpdateTitle(value.trim() || section.name);
-        }, RENAME_DEBOUNCE_MS);
+    };
+
+    const handleTitleBlur = () => {
+        const trimmed = localName.trim() || section.name;
+        if (trimmed !== section.name) {
+            onUpdateTitle(trimmed);
+        }
     };
 
     const questions = React.useMemo(
@@ -78,6 +71,7 @@ export function AssessmentSectionCard({
                 <Input
                     value={localName}
                     onChange={(event) => handleTitleChange(event.target.value)}
+                    onBlur={handleTitleBlur}
                     placeholder={`Section ${sectionIndex + 1}`}
                     className="h-8 flex-1 min-w-0 border-0 bg-white text-gray-900 font-medium placeholder:text-gray-500 focus-visible:ring-1 focus-visible:ring-white"
                 />
