@@ -1,8 +1,8 @@
 /**
  * Course selection page shown after login. User must select a course card to continue to Question Bank / Assessments.
- * Same header as landing; content shows "Your Courses", "Add new course" card, and available course cards.
+ * Same header as homepage; content shows "Your Courses", "Add new course" card, and available course cards.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TopNavigation } from '../components/navigation/TopNavigation';
 import { useCourses } from '../hooks/useCourses';
@@ -30,10 +30,12 @@ export const CourseSelectionPage = () => {
   const { courses, isLoading: isCoursesLoading, fetchCourses } = useCourses();
   const [profileOpen, setProfileOpen] = useState(false);
   const [isStartingTour, setIsStartingTour] = useState(false);
-  const { startTour, registerStepAction } = useGuidedTour();
+  const { startTour, registerStepAction, isActive: isTourActive } = useGuidedTour();
+  const coursesRef = useRef(courses);
+  coursesRef.current = courses;
 
   const handleSelectCourse = (course: Course) => {
-    navigate('/landing', { state: { courseId: course.id }, replace: true });
+    navigate('/home', { state: { courseId: course.id }, replace: true });
   };
 
   const handleProfileClick = () => {
@@ -72,7 +74,23 @@ export const CourseSelectionPage = () => {
     }
   }, [courses, fetchCourses, isStartingTour, startTour]);
 
-  // When arriving from Landing (e.g. user clicked Guided tour on Assessments tab), start the tour here and register step 1 to return to their course on questions tab.
+  // Auto-start guided tour for new users (just registered and landed on /courses).
+  // Wait for courses to finish loading so the first step's target (course-select) exists in the DOM and the highlight can render.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('newUserTourPending') !== '1') return;
+      if (isCoursesLoading) return;
+      const t = setTimeout(() => {
+        try {
+          sessionStorage.removeItem('newUserTourPending');
+          startTour('main');
+        } catch (_) {}
+      }, 400);
+      return () => clearTimeout(t);
+    } catch (_) {}
+  }, [startTour, isCoursesLoading]);
+
+  // When arriving from homepage (e.g. user clicked Guided tour on Assessments tab), start the tour here and register step 1 to return to their course on questions tab.
   useEffect(() => {
     const state = location.state as { startGuidedTour?: boolean; returnCourseId?: number } | null;
     if (!state?.startGuidedTour || state.returnCourseId == null) return;
@@ -80,13 +98,60 @@ export const CourseSelectionPage = () => {
     const returnCourseId = state.returnCourseId;
     startTour('main');
     const unregister = registerStepAction('course-select', () => {
-      navigate('/landing?tab=questions', {
+      navigate('/home?tab=questions', {
         state: { courseId: returnCourseId },
         replace: true
       });
     });
     return unregister;
   }, [location.state, startTour, registerStepAction, navigate]);
+
+  // When tour is active on this page (e.g. auto-started for new user), register step 1 to navigate to homepage with a course so steps 2+ show the correct targets and highlights.
+  useEffect(() => {
+    if (!isTourActive) return;
+
+    const unregister = registerStepAction('course-select', () => {
+      const state = location.state as { startGuidedTour?: boolean; returnCourseId?: number } | null;
+      if (state?.startGuidedTour && state?.returnCourseId != null) {
+        navigate('/home?tab=questions', { state: { courseId: state.returnCourseId }, replace: true });
+        return;
+      }
+      const currentCourses = coursesRef.current;
+      if (currentCourses.length > 0) {
+        navigate('/home?tab=questions', {
+          state: { courseId: currentCourses[0].id },
+          replace: true
+        });
+        return;
+      }
+      (async () => {
+        try {
+          const created = await courseService.createCourse({
+            name: TEST_COURSE_NAME,
+            courseCode: TEST_COURSE_CODE
+          });
+          try {
+            await courseService.createTopic(created.id, 'General');
+          } catch {
+            // ignore
+          }
+          try {
+            await assessmentService.createPracticeExamForCourse(created.id);
+          } catch {
+            // ignore
+          }
+          await fetchCourses();
+          navigate('/home?tab=questions', {
+            state: { courseId: created.id },
+            replace: true
+          });
+        } catch (err) {
+          console.error('Failed to ensure course for tour', err);
+        }
+      })();
+    });
+    return unregister;
+  }, [isTourActive, registerStepAction, navigate, location.state, fetchCourses]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,10 +167,11 @@ export const CourseSelectionPage = () => {
         <h1 className="text-2xl font-bold text-foreground mb-6">Your Courses</h1>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
-          {/* Add new course card */}
+          {/* Add new course card - used as tour target when there are no courses yet */}
           <Tooltip content="Add or link a course from the AI service to get started" side="top">
             <Card
               className="border-2 border-dashed border-muted-foreground/30 bg-muted/30 hover:border-primary hover:bg-muted/50 cursor-pointer transition-colors flex min-h-[140px]"
+              data-tour-id={courses.length === 0 ? 'course-select' : undefined}
               onClick={() => setProfileOpen(true)}
             >
               <CardContent className="flex flex-col items-center justify-center flex-1 p-6">

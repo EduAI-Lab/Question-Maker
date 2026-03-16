@@ -132,12 +132,14 @@ export const QuestionBank = ({
         disableUpload={disableUpload}
       />
 
-      <SearchAndFilters
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        filters={filters}
-        onFiltersChange={setFilters}
-      />
+      {variants.length > 0 && (
+        <SearchAndFilters
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          filters={filters}
+          onFiltersChange={setFilters}
+        />
+      )}
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16 text-muted-foreground">

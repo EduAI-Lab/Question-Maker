@@ -1,5 +1,5 @@
 /**
- * Main product landing page showing questions and assessments with creation/import/export flows.
+ * Main product homepage showing questions and assessments with creation/import/export flows.
  * Handles course/topic loading, tab state, and orchestrates dialogs for questions, variants, Canvas, and uploads.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -24,8 +24,8 @@ import { useToast } from '../components/ui/use-toast';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 
-export const LandingPage = () => {
-  const LAST_SELECTED_COURSE_KEY = 'landing:last-selected-course';
+export const Homepage = () => {
+  const LAST_SELECTED_COURSE_KEY = 'home:last-selected-course';
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -119,7 +119,7 @@ export const LandingPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, courses]);
 
-  // Update tab based on URL query (e.g., /landing?tab=assessments)
+  // Update tab based on URL query (e.g., /home?tab=assessments)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tab = params.get('tab');
@@ -212,7 +212,7 @@ export const LandingPage = () => {
     }
   }, []);
 
-  /** When starting the tour from landing, go to course-select page first; step 1 Next will return here to this course on questions tab. */
+  /** When starting the tour from homepage, go to course-select page first; step 1 Next will return here to this course on questions tab. */
   const handleGuidedTourClick = useCallback(() => {
     if (!selectedCourse?.id) return;
     navigate('/courses', {
