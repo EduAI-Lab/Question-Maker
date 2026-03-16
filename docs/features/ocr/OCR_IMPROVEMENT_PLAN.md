@@ -195,7 +195,7 @@ This document identifies **potential failing points** in the current OCR → ext
 | **3.5** Deduplication and ordering | Done in `aiService.js`: `extractedQuestionDedupeKey` (normalized prefix 150 chars), `deduplicateExtractedQuestions` (preserves order, keeps longer when same key). |
 | **Extraction prompt vs generate** | Done: EduAI `generateQuestions` accepts `systemPromptOverride` and `userPromptOverride`; extraction uses extraction-specific system/user prompts (extract only, assignment parts as blocks). |
 | **Block detection (Part/Task/Exercise/Section)** | Done: `splitIntoQuestionBlocks` regex includes Part 1, Task N, Exercise N, Section N; unit test added. |
-| **OCR history on background extraction** | Done: `BackgroundExtractionParams` has `jobId` and `onExtractionComplete`; LandingPage calls callback on success/error so job status is updated. |
+| **OCR history on background extraction** | Done: `BackgroundExtractionParams` has `jobId` and `onExtractionComplete`; Homepage calls callback on success/error so job status is updated. |
 | **Test script (ocr_tests PDFs)** | Done: `npm run test:ocr` (or `node scripts/testOcrExtraction.js [path]`) uses pdf-parse to extract text and runs block detection on PDFs in `test/ocr_tests`. |
 | **3.6–3.7** | Not yet implemented. |
 

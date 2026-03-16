@@ -1,18 +1,27 @@
 /**
- * Login/Registration page with dark hero, floating letters, and below-fold info + video.
- * Redirects authenticated users to the landing page.
+ * Login/Registration page with 50/50 split: left = form, right = description + video.
+ * Uses same dark background and FloatingLetters animation. Redirects authenticated users to the homepage.
  */
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '../components/ui/card';
+import { Card, CardHeader, CardDescription, CardContent, CardFooter } from '../components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { AlertCircle, Loader2, ChevronDown } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { Tooltip } from '../components/ui/tooltip';
 import { useAuth } from '../contexts/AuthContext';
 import { FloatingLetters } from '../components/FloatingLetters';
 
 const VIDEO_URL = 'https://www.youtube.com/embed/zaKLdf8DmfU';
+
+const CAROUSEL_LINES = [
+  'Store and organize questions with topics and metadata.',
+  'Create new question variants without rewriting.',
+  'Build exams from your question bank and export to Canvas.',
+  'Import your existing assesments from canvas.',
+  'Manage drafts and review status.',
+];
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -20,18 +29,28 @@ export const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [scrollOpacity, setScrollOpacity] = useState(1);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [displayIndex, setDisplayIndex] = useState(0);
+  const [carouselVisible, setCarouselVisible] = useState(true);
   const { login, register, isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    const handleScroll = () => {
-      const fadeDistance = 200;
-      const opacity = Math.max(0, 1 - window.scrollY / fadeDistance);
-      setScrollOpacity(opacity);
-    };
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    const id = setInterval(() => {
+      setCarouselIndex((i) => (i + 1) % CAROUSEL_LINES.length);
+    }, 6000);
+    return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (carouselIndex === displayIndex) return;
+    setCarouselVisible(false);
+    const t = setTimeout(() => {
+      setDisplayIndex(carouselIndex);
+      setCarouselVisible(true);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [carouselIndex, displayIndex]);
 
   if (authLoading) {
     return (
@@ -65,134 +84,160 @@ export const LoginPage = () => {
     }
   };
 
-  const scrollToInfo = () => {
-    window.scrollTo({ top: window.innerHeight, behavior: 'smooth' });
-  };
-
   return (
     <main className="relative min-h-screen bg-[#10151c] overflow-hidden">
       <FloatingLetters letterClassName="text-slate-500 font-mono" />
 
-      {/* Hero Section - Login (full viewport) */}
-      <section className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4">
-        <Card className="w-full max-w-sm border-gray-200 bg-white text-gray-900 shadow-xl">
-          <CardHeader className="text-center">
-            <CardTitle className="text-xl text-gray-800">Question Maker</CardTitle>
-            <CardDescription className="text-gray-500">
+      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-2">
+        {/* Left: Login / Register form */}
+        <section className="flex flex-col items-center justify-center bg-white px-6 py-12 lg:px-12">
+          <div className="w-full max-w-sm origin-center scale-[1.15]">
+            <Card className="w-full border border-gray-200 rounded-lg bg-white shadow-sm">
+            <CardHeader className="space-y-1.5 text-center">
+              <div className="text-2xl font-bold text-blue-600">Question Maker</div>
+              <CardDescription className="text-gray-500">
+                {isLogin
+                  ? 'Enter your email below to login to your account'
+                  : 'Enter your email below to create your account'}
+              </CardDescription>
+            </CardHeader>
+            <form onSubmit={handleSubmit}>
+              <CardContent className="mt-6 space-y-4">
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                <div className="space-y-2">
+                  <label htmlFor="email" className="text-sm font-medium text-gray-700">
+                    Email
+                  </label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                    disabled={isLoading}
+                    className="border-gray-300 bg-gray-100 text-gray-900 placeholder:text-gray-500 focus-visible:ring-gray-400"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="password" className="text-sm font-medium text-gray-700">
+                      Password
+                    </label>
+                    <Tooltip content="Coming soon" side="top">
+                      <span className="cursor-not-allowed text-xs text-gray-400 no-underline">
+                        Forgot your password?
+                      </span>
+                    </Tooltip>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
+                    disabled={isLoading}
+                    minLength={6}
+                    className="border-gray-300 bg-gray-100 text-gray-900 placeholder:text-gray-500 focus-visible:ring-gray-400"
+                    required
+                  />
+                </div>
+                {isLogin && (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      id="remember-me"
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      disabled={isLoading}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <label htmlFor="remember-me" className="text-sm text-gray-700">
+                      Remember me
+                    </label>
+                  </div>
+                )}
+              </CardContent>
+              <CardFooter className="mt-6 flex flex-col gap-3">
+                <Button
+                  type="submit"
+                  className="w-full bg-[#384654] text-white hover:bg-[#455563]"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {isLogin ? 'Login' : 'Register'}
+                </Button>
+                <p className="text-center text-sm text-gray-600">
+                  {isLogin ? (
+                    <>
+                      Don&apos;t have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => setIsLogin(false)}
+                        className="font-medium text-gray-900 underline hover:no-underline"
+                      >
+                        Sign up
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      Have an account?{' '}
+                      <button
+                        type="button"
+                        onClick={() => setIsLogin(true)}
+                        className="font-medium text-gray-900 underline hover:no-underline"
+                      >
+                        Login
+                      </button>
+                    </>
+                  )}
+                </p>
+              </CardFooter>
+            </form>
+          </Card>
+          </div>
+        </section>
+
+        {/* Right: Welcome, tagline, carousel, video — subtle gradient so FloatingLetters stand out */}
+        <section className="relative flex flex-col items-center justify-center overflow-y-auto bg-gradient-to-b from-[#10151c]/20 via-transparent to-[#10151c]/30 px-6 py-12 lg:px-12">
+          <div className="mx-auto flex max-w-lg flex-col items-center justify-center space-y-6 text-center">
+            <h1 className="text-2xl font-bold text-slate-100 lg:text-3xl">
+              Welcome to Question Maker
+            </h1>
+
+            <p className="text-slate-300 text-base lg:text-lg pb-5">
               AI-Powered Question and Assessment Management
-            </CardDescription>
-          </CardHeader>
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              <Input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-                disabled={isLoading}
-                className="border-[#2C3A48]/30 bg-[#2C3A48] text-white placeholder:text-gray-400 focus-visible:ring-[#384654]"
-                required
-              />
-              <Input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-                disabled={isLoading}
-                minLength={6}
-                className="border-[#2C3A48]/30 bg-[#2C3A48] text-white placeholder:text-gray-400 focus-visible:ring-[#384654]"
-                required
-              />
-            </CardContent>
-            <CardFooter className="flex flex-col gap-2">
-              <Button
-                type="submit"
-                className="w-full bg-[#384654] text-white hover:bg-[#455563]"
-                disabled={isLoading}
+            </p>
+
+            <div className="w-full max-w-sm min-h-[4.5rem] flex flex-col justify-center">
+              <p
+                className="text-slate-300 text-sm leading-relaxed text-center transition-opacity duration-300 ease-in-out"
+                style={{ opacity: carouselVisible ? 1 : 0 }}
               >
-                {isLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {isLogin ? 'Login' : 'Register'}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-[#6D7B89] bg-[#6D7B89] text-white hover:bg-[#7d8b99] hover:text-white"
-                onClick={() => setIsLogin(!isLogin)}
-                disabled={isLoading}
-              >
-                {isLogin ? 'Need an account? Register' : 'Already have an account? Login'}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
+                {CAROUSEL_LINES[displayIndex]}
+              </p>
+            </div>
 
-        <button
-          type="button"
-          onClick={scrollToInfo}
-          className="absolute bottom-8 flex flex-col items-center gap-2 text-slate-400 transition-opacity hover:text-slate-300"
-          style={{ opacity: scrollOpacity }}
-          aria-label="Scroll to learn more"
-        >
-          <span className="text-sm font-medium">Learn more</span>
-          <ChevronDown className="h-6 w-6 animate-bounce" />
-        </button>
-      </section>
-
-      {/* Info Section - Below the fold */}
-      <section className="relative z-10 px-4 pb-16 pt-8">
-        <div className="mx-auto max-w-3xl text-center text-slate-100">
-          <h1 className="mb-8 text-3xl font-bold text-balance lg:text-4xl">
-            Welcome to Question Maker
-          </h1>
-
-          <div className="mb-10 space-y-4 text-left text-slate-300 leading-relaxed">
-            <p>
-              Question Maker is a platform for organizing and managing your assessment
-              questions in one place. Instead of searching through past assignments and
-              files, you can store questions in a structured question bank and easily
-              reuse them across courses and assessments.
-            </p>
-
-            <p>
-              The platform includes built-in{' '}
-              <strong className="text-slate-100">question variant generation</strong>,
-              allowing you to quickly create new versions of existing questions without
-              manually rewriting them. Questions can be tagged with topics and metadata,
-              making them easy to search, filter, and reuse when building assessments.
-            </p>
-
-            <p>
-              You can also upload questions or past assessments directly into the system,
-              organize them within your question bank, and assemble new assessments using
-              the search and filtering tools. Once completed, assessments can be exported
-              to <strong className="text-slate-100">Canvas</strong> or{' '}
-              <strong className="text-slate-100">TXT format</strong>, enabling smooth
-              integration with your existing assessment workflow.
-            </p>
-
-            <p className="text-center">Watch the short video below to see how the platform works.</p>
+            <div className="w-full max-w-xl overflow-hidden rounded-lg border border-slate-700/50 bg-slate-900/50 aspect-video">
+              <iframe
+                src={VIDEO_URL}
+                title="Question Maker Demo Video"
+                className="h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
           </div>
-
-          <div className="mx-auto aspect-video w-full max-w-2xl overflow-hidden rounded-lg border border-slate-700/50 bg-slate-900/50">
-            <iframe
-              src={VIDEO_URL}
-              title="Question Maker Demo Video"
-              className="h-full w-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 };
