@@ -69,7 +69,7 @@ export const HelpPage = () => {
                     <h2 className="text-xl font-semibold">2. Onboarding: Add Courses and Topics</h2>
                     <p className="text-sm text-muted-foreground">Flow: Top nav profile icon (👤) → “Link courses from AI service”.</p>
                     <ol className="list-decimal list-inside space-y-1">
-                        <li>Open the profile button in the top-right of the Home page.</li>
+                        <li>Open the profile button in the top-right of the Landing page.</li>
                         <li>In “Link courses from AI service”, pick the courses you teach.
                             <ul className="list-disc list-inside pl-4 space-y-1">
                                 <li>“Already added” badge means it’s already in your library.</li>

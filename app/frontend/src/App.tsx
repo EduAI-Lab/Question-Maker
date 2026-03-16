@@ -1,6 +1,6 @@
 /**
  * Root app component: wires theme/auth providers, router, and top-level pages.
- * Defines navigation for login, homepage, assessments, help, and an optional API test route.
+ * Defines navigation for login, landing, assessments, help, and an optional API test route.
  */
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from './components/ui/toaster';
@@ -8,7 +8,7 @@ import { ThemeProvider } from './components/theme-provider';
 import { AuthProvider } from './contexts/AuthContext';
 import { LoginPage } from './pages/LoginPage';
 import { CourseSelectionPage } from './pages/CourseSelectionPage';
-import { Homepage } from './pages/Homepage';
+import { LandingPage } from './pages/LandingPage';
 import { ApiTestPage } from './pages/ApiTestPage';
 import AssessmentBuilderPage from './pages/AssessmentBuilderPage';
 import { HelpPage } from './pages/HelpPage';
@@ -16,7 +16,7 @@ import { GuidedTourProvider } from './contexts/GuidedTourContext';
 
 function RedirectAssessmentToBuilder() {
   const { id } = useParams<{ id: string }>();
-  return <Navigate to={id ? `/assessments/${id}/builder` : '/home'} replace />;
+  return <Navigate to={id ? `/assessments/${id}/builder` : '/landing'} replace />;
 }
 
 function App() {
@@ -29,8 +29,7 @@ function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/courses" element={<CourseSelectionPage />} />
-                <Route path="/home" element={<Homepage />} />
-                <Route path="/landing" element={<Navigate to="/home" replace />} />
+                <Route path="/landing" element={<LandingPage />} />
                 {process.env.NODE_ENV === 'development' && (
                   <Route path="/api-test" element={<ApiTestPage />} />
                 )}

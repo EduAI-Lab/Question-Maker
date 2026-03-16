@@ -1035,58 +1035,81 @@ export const AddQuestionDialog = ({
                 )}
 
                 <div className="grid gap-6 lg:grid-cols-[340px_1fr] h-[70vh] min-h-0">
-                    {/* LEFT: scrollable params + sticky AI Configuration at bottom */}
-                    <div className="flex flex-col min-h-0 gap-4">
-                        <ScrollArea className="flex-1 min-h-0">
-                            <div className="space-y-4 pr-4">
-                                {mode === 'variant' && presetVariant && (
-                                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                                        <h4 className="text-sm font-semibold text-foreground">Base Question Info</h4>
-                                        <p className="text-sm">
-                                            <span className="font-medium">Description:</span>{' '}
-                                            <span className="text-muted-foreground">{presetVariant.questionDescription ?? '—'}</span>
-                                        </p>
-                                        <p className="text-sm">
-                                            <span className="font-medium">Primary Topic:</span>{' '}
-                                            <span className="text-muted-foreground">
-                                                {topics.find((t) => t.id === presetVariant.primaryTopicId)?.name ?? `#${presetVariant.primaryTopicId}`}
-                                            </span>
-                                        </p>
-                                        <p className="text-sm">
-                                            <span className="font-medium">Type:</span>{' '}
-                                            <span className="text-muted-foreground">{questionTypeLabels[presetVariant.questionType]}</span>
-                                        </p>
-                                    </div>
-                                )}
-
-                                <div className="rounded-lg border border-border bg-card p-5" data-tour-id="aq-metadata">
-                                    <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-                                        Question Parameters
-                                    </h2>
-                                    <QuestionMetadataPanel
-                                        value={{
-                                            questionType: form.questionType,
-                                            primaryTopicId: form.primaryTopicId,
-                                            questionDescription: form.questionDescription,
-                                            variantDifficulty: form.variantDifficulty,
-                                            variantReasoningLevel: form.variantReasoningLevel,
-                                            variantSecondaryTopics: form.variantSecondaryTopics
-                                        }}
-                                        onChange={(field, value) => handleFieldChange(field, value)}
-                                        topics={topics}
-                                        isAuxLoading={isAuxLoading}
-                                        disabled={isSubmitting}
-                                        mode={mode}
-                                        primaryTopicName={
-                                            mode === 'variant' && presetVariant
-                                                ? topics.find((t) => t.id === presetVariant!.primaryTopicId)?.name
-                                                : undefined
-                                        }
-                                        onToggleSecondaryTopic={toggleSecondaryTopic}
-                                    />
+                    {/* LEFT: Question Parameters + Advanced */}
+                    <ScrollArea className="min-h-0">
+                        <div className="space-y-4 pr-4">
+                            {mode === 'variant' && presetVariant && (
+                                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                                    <h4 className="text-sm font-semibold text-foreground">Base Question Info</h4>
+                                    <p className="text-sm">
+                                        <span className="font-medium">Description:</span>{' '}
+                                        <span className="text-muted-foreground">{presetVariant.questionDescription ?? '—'}</span>
+                                    </p>
+                                    <p className="text-sm">
+                                        <span className="font-medium">Primary Topic:</span>{' '}
+                                        <span className="text-muted-foreground">
+                                            {topics.find((t) => t.id === presetVariant.primaryTopicId)?.name ?? `#${presetVariant.primaryTopicId}`}
+                                        </span>
+                                    </p>
+                                    <p className="text-sm">
+                                        <span className="font-medium">Type:</span>{' '}
+                                        <span className="text-muted-foreground">{questionTypeLabels[presetVariant.questionType]}</span>
+                                    </p>
                                 </div>
+                            )}
 
-                                <div className="border rounded-lg overflow-hidden">
+                            <div className="rounded-lg border border-border bg-card p-5" data-tour-id="aq-metadata">
+                                <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                                    Question Parameters
+                                </h2>
+                                <QuestionMetadataPanel
+                                    value={{
+                                        questionType: form.questionType,
+                                        primaryTopicId: form.primaryTopicId,
+                                        questionDescription: form.questionDescription,
+                                        variantDifficulty: form.variantDifficulty,
+                                        variantReasoningLevel: form.variantReasoningLevel,
+                                        variantSecondaryTopics: form.variantSecondaryTopics
+                                    }}
+                                    onChange={(field, value) => handleFieldChange(field, value)}
+                                    topics={topics}
+                                    isAuxLoading={isAuxLoading}
+                                    disabled={isSubmitting}
+                                    mode={mode}
+                                    primaryTopicName={
+                                        mode === 'variant' && presetVariant
+                                            ? topics.find((t) => t.id === presetVariant!.primaryTopicId)?.name
+                                            : undefined
+                                    }
+                                    onToggleSecondaryTopic={toggleSecondaryTopic}
+                                />
+                            </div>
+
+                            <QuestionAIControls
+                                value={{
+                                    generationPrompt: form.generationPrompt,
+                                    generationModel: form.generationModel
+                                }}
+                                onChange={(field, value) => handleFieldChange(field, value)}
+                                onGenerate={handleGenerateWithAI}
+                                isGenerating={isGenerating}
+                                availableModels={availableModels}
+                                providerApiKey={providerApiKey}
+                                onProviderApiKeyChange={(value) => {
+                                    setProviderApiKey(value);
+                                    const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
+                                    if (provider && value) void apiKeyStorage.setApiKey(provider, value);
+                                }}
+                                status={eduaiStatus.status}
+                                statusMessage={eduaiStatus.message}
+                                onRefreshStatus={eduaiStatus.refresh}
+                                questionGenerationPhase={eduaiStatus.questionGenerationPhase}
+                                courseWarningMessage={courseWarningMessage}
+                                mode={mode}
+                                disabled={isSubmitting}
+                            />
+
+                            <div className="border rounded-lg overflow-hidden">
                                 <button
                                     type="button"
                                     onClick={() => setAdvancedOpen((o) => !o)}
@@ -1120,6 +1143,39 @@ export const AddQuestionDialog = ({
                                                 className="min-h-[4.5rem] resize-none"
                                                 rows={2}
                                             />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>
+                                                Secondary Topics <span className="text-xs text-muted-foreground">(optional)</span>
+                                            </Label>
+                                            <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-auto">
+                                                {topics.length === 0 ? (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {isAuxLoading ? 'Loading topics...' : 'No topics available'}
+                                                    </p>
+                                                ) : (
+                                                    topics.map((topic) => {
+                                                        const checked = form.variantSecondaryTopics.includes(topic.id);
+                                                        const isPrimary = form.primaryTopicId === topic.id.toString();
+                                                        return (
+                                                            <label
+                                                                key={topic.id}
+                                                                className={`flex items-center space-x-2 text-sm ${isPrimary ? 'text-muted-foreground/70' : 'text-foreground'}`}
+                                                            >
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="h-4 w-4"
+                                                                    checked={checked}
+                                                                    disabled={isPrimary}
+                                                                    onChange={(event) => toggleSecondaryTopic(topic.id, event.target.checked)}
+                                                                />
+                                                                <span>{topic.name}</span>
+                                                            </label>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
                                         </div>
 
                                         <div className="space-y-2">
@@ -1201,34 +1257,6 @@ export const AddQuestionDialog = ({
                             {error && <p className="text-sm text-destructive">{error}</p>}
                         </div>
                     </ScrollArea>
-
-                    {/* AI Configuration: sticky at bottom of left column so it stays visible on small screens */}
-                    <div className="flex-shrink-0">
-                        <QuestionAIControls
-                            value={{
-                                generationPrompt: form.generationPrompt,
-                                generationModel: form.generationModel
-                            }}
-                            onChange={(field, value) => handleFieldChange(field, value)}
-                            onGenerate={handleGenerateWithAI}
-                            isGenerating={isGenerating}
-                            availableModels={availableModels}
-                            providerApiKey={providerApiKey}
-                            onProviderApiKeyChange={(value) => {
-                                setProviderApiKey(value);
-                                const provider = apiKeyStorage.getProviderFromModel(form.generationModel);
-                                if (provider && value) void apiKeyStorage.setApiKey(provider, value);
-                            }}
-                            status={eduaiStatus.status}
-                            statusMessage={eduaiStatus.message}
-                            onRefreshStatus={eduaiStatus.refresh}
-                            questionGenerationPhase={eduaiStatus.questionGenerationPhase}
-                            courseWarningMessage={courseWarningMessage}
-                            mode={mode}
-                            disabled={isSubmitting}
-                        />
-                    </div>
-                </div>
 
                     {/* RIGHT: Question content */}
                     <div className="flex flex-col min-h-0 overflow-hidden">

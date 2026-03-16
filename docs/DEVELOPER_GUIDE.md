@@ -42,7 +42,7 @@ flowchart LR
 
 ## Frontend (app/frontend)
 
-- Entry: `src/main.tsx`, `src/App.tsx` (React Router: login, home, assessment view, help, optional API test).
+- Entry: `src/main.tsx`, `src/App.tsx` (React Router: login, landing, assessment view, help, optional API test).
 - Auth state: `contexts/AuthContext.tsx` (stores token/user, verifies `/api/auth/me`).
 - API client: `services/api.ts` (axios with token injector + 401 handling).
 - Domain services: `services/authService.ts`, `questionService.ts`, `assessmentService.ts`, `courseService.ts`, `eduaiService.ts`, `canvasService.ts`, `apiKeyStorage.ts` (local encryption of provider API keys).
@@ -63,7 +63,7 @@ flowchart LR
 - EduAI import of courses/topics: frontend `eduaiService.listCourses()/listCourseTopics()`, backend proxy `routes/eduai.js` → `services/eduaiService.js`.
 
 ### 3) Create Questions Manually
-- UI: `components/questions/AddQuestionDialog.tsx`; rendered from `pages/Homepage.tsx`.
+- UI: `components/questions/AddQuestionDialog.tsx`; rendered from `pages/LandingPage.tsx`.
 - Backend: POST `/api/questions` → `questionService.createQuestion`; variants created via `/api/questions/:id/variants` → `createVariant`.
 - Data: `Question_Metadata` + at least one `Variant`.
 
@@ -87,7 +87,7 @@ flowchart LR
   - Topic fallback/creation handled in `saveExtractedQuestions`.
 
 ### 7) Build Assessments (Blueprints, Sections, Matching)
-- UI: Assessments tab in `pages/Homepage.tsx`; detailed builder `pages/AssessmentViewPage.tsx` with panels `pages/assessments/*` and components `components/assessments/*` (GenerateAssessmentModal, SectionCard, CreateSectionPanel, MatchingQuestionsPanel).
+- UI: Assessments tab in `pages/LandingPage.tsx`; detailed builder `pages/AssessmentViewPage.tsx` with panels `pages/assessments/*` and components `components/assessments/*` (GenerateAssessmentModal, SectionCard, CreateSectionPanel, MatchingQuestionsPanel).
 - Backend:
   - Assessments CRUD: `routes/assessments.js` → `assessmentService`.
   - Sections & variant links: `routes/assessments.js` → `assessmentSectionService` (create/update/delete sections, add/remove variants, order).
@@ -103,7 +103,7 @@ flowchart LR
   - Test mode uses mock data.
 
 ### 9) Export to TXT
-- UI: `Homepage.tsx` and `AssessmentViewPage.tsx` contain TXT export logic (client-side blob download) with draft gating.
+- UI: `LandingPage.tsx` and `AssessmentViewPage.tsx` contain TXT export logic (client-side blob download) with draft gating.
 - Backend: Not required (performed client-side using loaded assessment data).
 
 ## Integrations

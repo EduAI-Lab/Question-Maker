@@ -251,7 +251,7 @@ const AssessmentBuilderPage = () => {
                 title: 'Assessment deleted',
                 description: `"${assessment.name}" has been removed.`
             });
-            navigate('/home');
+            navigate('/landing');
         } catch (_err) {
             toast({
                 title: 'Failed to delete assessment',

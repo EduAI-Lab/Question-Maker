@@ -157,7 +157,7 @@ export function QuestionAIControls({
             <Button
                 type="button"
                 onClick={onGenerate}
-                disabled={disabled || isGenerating || !value.generationPrompt.trim()}
+                disabled={disabled || isGenerating}
                 className="w-full"
                 size="sm"
                 data-tour-id="aq-ai-generate"
