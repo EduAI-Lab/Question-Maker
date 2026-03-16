@@ -537,7 +537,6 @@ export const Homepage = () => {
   const handleAddQuestion = () => {
     setPresetVariant(null);
     setIsAddQuestionOpen(true);
-    setAutoStartAddQuestionTour(false);
   };
 
   const handleQuestionCreated = (question: Question) => {
@@ -564,7 +563,6 @@ export const Homepage = () => {
       void loadTopicsForCourse(selectedCourse.id);
     }
     setIsUploadOpen(true);
-    setAutoStartUploadTour(false);
   };
 
   const handleDeleteAssessment = (assessmentId: number, assessmentName: string) => {
