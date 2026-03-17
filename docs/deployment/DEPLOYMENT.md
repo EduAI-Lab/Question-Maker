@@ -332,6 +332,23 @@ Internet → Apache (Reverse Proxy) → Docker Containers
    - Restart containers: `docker compose restart`
    - Rebuild if needed: `docker compose build`
 
+6. **502 on OCR / document extraction (works on dev, fails on production)**
+   - **Cause:** OCR extraction calls EduAI and can take 2–5+ minutes. The reverse proxy (Apache) often uses a 60s default timeout and closes the connection before the backend responds, so you get 502 Bad Gateway.
+   - **Fix:** Increase the proxy timeout for API routes. On the server, edit the Apache config:
+     ```bash
+     sudo nano /etc/httpd/conf.d/question-maker.conf
+     ```
+     Inside the `<LocationMatch "^/api/">` block, add:
+     ```apache
+     ProxyTimeout 300
+     ```
+     (300 seconds = 5 minutes). Then test and restart:
+     ```bash
+     sudo httpd -t
+     sudo systemctl restart httpd
+     ```
+   - The repo’s `apache-vhost.conf` template includes `ProxyTimeout 300`; if you deploy from that template, new installs get the longer timeout. Existing servers need the directive added and Apache restarted.
+
 ### Useful Commands
 
 ```bash
