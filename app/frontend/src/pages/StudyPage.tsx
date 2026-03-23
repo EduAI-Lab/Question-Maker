@@ -20,6 +20,7 @@ import { useCourses } from '../hooks/useCourses';
 import { courseService } from '../services/courseService';
 import assessmentService from '../services/assessmentService';
 import studyService from '../services/studyService';
+import { eduaiService, type EduAIModelOption } from '../services/eduaiService';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
 import type { Assessment, Course, Question } from '../types/question';
@@ -66,6 +67,8 @@ export function StudyPage() {
   const [assembling, setAssembling] = useState(false);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [lastAssembled, setLastAssembled] = useState<Array<{ id: number; name: string }>>([]);
+  const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
+  const [variantModel, setVariantModel] = useState('ollama:gpt-oss:120b');
   const [metricsData, setMetricsData] = useState<Awaited<ReturnType<typeof studyService.computeMetrics>> | null>(
     null
   );
@@ -73,6 +76,27 @@ export function StudyPage() {
   useEffect(() => {
     void fetchCourses();
   }, [fetchCourses]);
+
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const models = await eduaiService.listModels();
+        setAvailableModels(models);
+      } catch (error) {
+        console.error('Failed to load EduAI models for Study page', error);
+        setAvailableModels([]);
+      }
+    };
+    void loadModels();
+  }, []);
+
+  useEffect(() => {
+    if (availableModels.length === 0) return;
+    const hasSelected = availableModels.some((m) => m.id === variantModel);
+    if (hasSelected) return;
+    const preferred = availableModels.find((m) => m.id === 'ollama:gpt-oss:120b');
+    setVariantModel(preferred?.id ?? availableModels[0].id);
+  }, [availableModels, variantModel]);
 
   const loadTopics = useCallback(async (courseId: number) => {
     const t = await courseService.getCourseTopics(courseId);
@@ -168,6 +192,7 @@ export function StudyPage() {
       const result = await studyService.generateBankVariants({
         courseId: selectedCourse.id,
         questionIds,
+        model: variantModel,
         variantsToAdd: 2
       });
       const failed = result.errors?.length ?? 0;
@@ -372,6 +397,25 @@ export function StudyPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-wrap items-center gap-3">
+              <div className="min-w-[260px] space-y-1">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
+                <Select value={variantModel} onValueChange={setVariantModel} disabled={generatingVariants}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableModels.length === 0 ? (
+                      <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B (default)</SelectItem>
+                    ) : (
+                      availableModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.label}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
                 type="button"
                 disabled={!baselineAssessmentId || !selectedCourse?.id || generatingVariants}

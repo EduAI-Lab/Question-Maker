@@ -323,16 +323,27 @@ Please ensure the questions are appropriate for the course level and cover the k
         );
       }
 
-      // Filter and validate each question
-      const validQuestions = questions.filter(
+      // Normalize missing fields (extraction often omits reasoning_level; default instead of dropping)
+      const questionsNormalized = questions
+        .filter((q) => q && typeof q === "object" && typeof q.content === "string" && q.content.trim())
+        .map((q) => {
+          const difficulty = ["easy", "medium", "hard"].includes(q.difficulty)
+            ? q.difficulty
+            : "medium";
+          const rlRaw = q.reasoning_level ?? q.reasoningLevel;
+          const reasoning_level = ["factual", "analytical", "application"].includes(rlRaw)
+            ? rlRaw
+            : "factual";
+          return { ...q, content: q.content.trim(), difficulty, reasoning_level };
+        });
+
+      const validQuestions = questionsNormalized.filter(
         (q) =>
           q.content &&
           q.difficulty &&
           q.reasoning_level &&
           ["easy", "medium", "hard"].includes(q.difficulty) &&
-          ["factual", "analytical", "application"].includes(
-            q.reasoning_level
-          )
+          ["factual", "analytical", "application"].includes(q.reasoning_level)
       );
 
       if (validQuestions.length === 0) {

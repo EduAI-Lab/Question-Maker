@@ -528,7 +528,7 @@ export async function generateBankVariantsForQuestions(userId, params) {
   const {
     questionIds,
     courseId,
-    model = 'google:gemini-2.5-flash',
+    model = 'ollama:gpt-oss:120b',
     apiKeys = {},
     variantsToAdd = 2
   } = params;

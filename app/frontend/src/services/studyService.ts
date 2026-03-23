@@ -109,7 +109,7 @@ export const studyService = {
     model?: string;
     variantsToAdd?: number;
   }): Promise<GenerateBankVariantsResult> {
-    const model = payload.model ?? 'google:gemini-2.5-flash';
+    const model = payload.model ?? 'ollama:gpt-oss:120b';
     const apiKeys = await apiKeyStorage.buildApiKeysForModel(model);
     const response = await api.post('/api/study/generate-bank-variants', {
       ...payload,

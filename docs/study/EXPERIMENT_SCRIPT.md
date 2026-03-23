@@ -21,14 +21,16 @@ The integrated **Study** page (`/study`) follows this order:
 
 ## Design summary
 
-| Element | Specification |
-|--------|----------------|
-| Domain | Single course; one coherent topic taxonomy |
-| Base question bank | ~50 base questions (`question_metadata` rows), each with ≥1 variant |
-| Variants | Parameter/wording/numeric changes; same underlying concept; inherit metadata from base |
-| Reference exam | One real, previously administered exam imported and frozen as baseline (not system-generated) |
-| Generated exams | Three complete variants of the same blueprint (e.g. Exam A, B, C) |
-| Constraints | Topic distribution, question-type distribution, difficulty balance enforced at assembly |
+
+| Element            | Specification                                                                                 |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| Domain             | Single course; one coherent topic taxonomy                                                    |
+| Base question bank | ~50 base questions (`question_metadata` rows), each with ≥1 variant                           |
+| Variants           | Parameter/wording/numeric changes; same underlying concept; inherit metadata from base        |
+| Reference exam     | One real, previously administered exam imported and frozen as baseline (not system-generated) |
+| Generated exams    | Three complete variants of the same blueprint (e.g. Exam A, B, C)                             |
+| Constraints        | Topic distribution, question-type distribution, difficulty balance enforced at assembly       |
+
 
 ## Phase 1 — Build the question bank
 
@@ -36,12 +38,11 @@ The integrated **Study** page (`/study`) follows this order:
 
 1. Collect ~50 questions from existing materials in one course.
 2. For each item, create **question metadata** with:
-   - **Topic**: primary topic (and secondary topics if used).
-   - **Type**: MCQ, SA, or LA.
-   - **Difficulty** (operational): stored on the **variant** (`easy` / `medium` / `hard`); keep consistent rubric across items.
-   - **Reasoning level** (optional but recommended): `factual` / `analytical` / `application` on the variant.
-   - Short **description** on metadata for search and auditing.
-
+  - **Topic**: primary topic (and secondary topics if used).
+  - **Type**: MCQ, SA, or LA.
+  - **Difficulty** (operational): stored on the **variant** (`easy` / `medium` / `hard`); keep consistent rubric across items.
+  - **Reasoning level** (optional but recommended): `factual` / `analytical` / `application` on the variant.
+  - Short **description** on metadata for search and auditing.
 3. Record ingest date and source document ID in a study log (external spreadsheet or lab notebook).
 
 ### 1.2 Create variants per base question
@@ -83,12 +84,12 @@ For **Exam A**, **Exam B**, and **Exam C**:
 1. Start a timer when assembly begins; stop when the exam is saved and finalized.
 2. Run assembly with the same blueprint constraints for each.
 3. **Selection policy** (document which you actually implement):
-   - Satisfy topic / type / difficulty constraints.
-   - Prefer **different variants** whose **question_metadata_id** matches the same set of base concepts as other versions (equivalent item “slots”), avoiding the **same variant id** across exams where possible.
+  - Satisfy topic / type / difficulty constraints.
+  - Prefer **different variants** whose **question_metadata_id** matches the same set of base concepts as other versions (equivalent item “slots”), avoiding the **same variant id** across exams where possible.
 4. Record for each exam:
-   - Assessment id and name
-   - Ordered list of **variant ids** and **question_metadata ids**
-   - Any manual overrides (and reason)
+  - Assessment id and name
+  - Ordered list of **variant ids** and **question_metadata ids**
+  - Any manual overrides (and reason)
 
 ## Phase 5 — Metrics
 
@@ -96,34 +97,32 @@ For **Exam A**, **Exam B**, and **Exam C**:
 
 For each pair among {A, B, C} (and optionally each vs. Reference), compute:
 
-1. **Topic distribution similarity**  
-   - Build histogram: proportion of items per topic id.  
-   - Report **1 − JSD** (Jensen–Shannon divergence, base-2) or **cosine similarity** of proportion vectors; state which you use in the thesis.
-
-2. **Difficulty distribution similarity**  
-   - Same approach on `{easy, medium, hard}` counts.
-
-3. **Question-type distribution similarity**  
-   - Same on `{MCQ, SA, LA}`.
-
-4. **Base-question overlap (concept alignment)**  
-   - Let \(S_i\) be the set of `question_metadata_id` on exam \(i\).  
-   - Report **|S_A ∩ S_B| / |S_A ∪ S_B|** (Jaccard) for each pair.  
-   - Optionally compare to reference: same Jaccard vs. Reference.
-
-5. **Variant deduplication**  
-   - Proportion of variant ids that appear in more than one exam (should be **low** if the design avoids repeated items).
+1. **Topic distribution similarity**
+  - Build histogram: proportion of items per topic id.  
+  - Report **1 − JSD** (Jensen–Shannon divergence, base-2) or **cosine similarity** of proportion vectors; state which you use in the thesis.
+2. **Difficulty distribution similarity**
+  - Same approach on `{easy, medium, hard}` counts.
+3. **Question-type distribution similarity**
+  - Same on `{MCQ, SA, LA}`.
+4. **Base-question overlap (concept alignment)**
+  - Let S_i be the set of `question_metadata_id` on exam i.  
+  - Report **|S_A ∩ S_B| / |S_A ∪ S_B|** (Jaccard) for each pair.  
+  - Optionally compare to reference: same Jaccard vs. Reference.
+5. **Variant deduplication**
+  - Proportion of variant ids that appear in more than one exam (should be **low** if the design avoids repeated items).
 
 ### 5.2 Workflow metrics
 
 Per exam (A, B, C), record:
 
-| Metric | Definition |
-|--------|------------|
-| Assembly time | Wall-clock seconds from start to finalized save |
+
+| Metric                   | Definition                                      |
+| ------------------------ | ----------------------------------------------- |
+| Assembly time            | Wall-clock seconds from start to finalized save |
 | Cross-exam variant reuse | Count of variant ids appearing in >1 of {A,B,C} |
-| Variants utilized | Count of distinct variant ids placed |
-| AI variants used | Count where `is_ai_generated` is true |
+| Variants utilized        | Count of distinct variant ids placed            |
+| AI variants used         | Count where `is_ai_generated` is true           |
+
 
 ### 5.3 Aggregation and reporting
 
@@ -133,9 +132,9 @@ Per exam (A, B, C), record:
 
 ## Phase 6 — Integrity and ethics (checklist)
 
-- [ ] Course materials and past exams used with permission; de-identify if required.
-- [ ] Fixed random seeds if the assembler is stochastic; log version/commit of the application.
-- [ ] Pre-register or document post-hoc any changes to the blueprint after seeing results (transparency).
+- Course materials and past exams used with permission; de-identify if required.
+- Fixed random seeds if the assembler is stochastic; log version/commit of the application.
+- Pre-register or document post-hoc any changes to the blueprint after seeing results (transparency).
 
 ## Minimal data collection sheet (fields)
 
@@ -147,12 +146,14 @@ Use one row per exam version (Reference, A, B, C):
 
 Authenticated JSON endpoints under `/api/study`:
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `PATCH` | `/api/study/assessments/:id/role` | Body: `{ "studyRole": "reference_baseline" \| "generated_variant" \| null }`. Merges into `assessments.blueprint_config`. |
-| `GET` | `/api/study/assessments/:id/blueprint-snapshot` | Ordered slots (variant id, `question_metadata_id`, topic, type, difficulty) plus aggregate counts. |
-| `POST` | `/api/study/assemble-variants` | Body: `{ "referenceAssessmentId", "courseId", "examLabels"?, "namePrefix"?, "includeDrafts"?, ... }`. Creates Exam A/B/C–style assessments with one section each, picking distinct non-draft variants per slot (globally unique across the batch when possible). Returns `assemblyTimeMs` and warnings if the reference variant text had to be reused. |
-| `POST` | `/api/study/metrics` | Body: `{ "assessmentIds": number[], "referenceAssessmentId"?: number }`. Pairwise topic/difficulty/type similarity (1 − JSD), Jaccard on base question ids, duplicate variant counts, cross-exam reuse stats. |
+
+| Method  | Path                                            | Purpose                                                                                                                                                                                                                                                                                                                                                |
+| ------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `PATCH` | `/api/study/assessments/:id/role`               | Body: `{ "studyRole": "reference_baseline" | "generated_variant" | null }`. Merges into `assessments.blueprint_config`.                                                                                                                                                                                                                                |
+| `GET`   | `/api/study/assessments/:id/blueprint-snapshot` | Ordered slots (variant id, `question_metadata_id`, topic, type, difficulty) plus aggregate counts.                                                                                                                                                                                                                                                     |
+| `POST`  | `/api/study/assemble-variants`                  | Body: `{ "referenceAssessmentId", "courseId", "examLabels"?, "namePrefix"?, "includeDrafts"?, ... }`. Creates Exam A/B/C–style assessments with one section each, picking distinct non-draft variants per slot (globally unique across the batch when possible). Returns `assemblyTimeMs` and warnings if the reference variant text had to be reused. |
+| `POST`  | `/api/study/metrics`                            | Body: `{ "assessmentIds": number[], "referenceAssessmentId"?: number }`. Pairwise topic/difficulty/type similarity (1 − JSD), Jaccard on base question ids, duplicate variant counts, cross-exam reuse stats.                                                                                                                                          |
+
 
 **UI:** On the assessment builder (`/assessments/:id/builder`), the **Study experiment** panel supports marking the reference baseline, loading a snapshot, assembling three exams, and running metrics against the reference plus the last assembled batch.
 

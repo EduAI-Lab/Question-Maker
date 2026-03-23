@@ -343,13 +343,16 @@ const extractQuestionsWithEduAI = async (text, course, model = "ollama:gpt-oss:1
 CRITICAL — extraction only:
 - EXTRACT or preserve the exact wording of tasks/questions from the source. Do not invent new questions (e.g. do not turn assignment instructions into MCQs about time complexity).
 - One output question = one logical question block. A block includes ALL its sub-parts: (a), (b), (c), (i), (ii), etc.
+- **AP / standardized tests**: Phrases like "Consider the following method(s)", "1.", "2.", "SECTION I: Multiple-Choice", and blocks with Java/UML/code followed by (A)(B)(C)(D) options ARE questions. Extract each numbered item as one question (type MCQ when choices exist).
 - Treat assignment parts as question blocks even when not in classic "1. (a)(b)(c)" form: e.g. "Part 1", "Task 1", "Exercise 1", "Section 1" or prose instructions are valid blocks—extract each as one question with full text.
 - Do NOT split a single numbered question into multiple entries. Do NOT merge two different questions into one entry.
+- **Boilerplate** (e.g. "DO NOT OPEN THIS BOOKLET", "GO ON TO THE NEXT PAGE", copyright lines) is NOT a question—skip it, but if the SAME chunk also contains real numbered questions, extract those.
 ${continuationNote}Requirements:
 - Preserve numbering, sub-parts, and instructions exactly as in the source. Use \\n for line breaks inside the question text.
 - Provide a concise "description" (<= 12 words) that summarizes the question without repeating it verbatim.
 - Set answer to null if unknown. Do NOT fabricate answers.
 - Assign primary_topic_id and secondary_topic_ids from the course topics in the user message when relevant.
+- Always set "reasoning_level" to one of: factual, analytical, application (use "factual" if unsure).
 
 Format each question as a JSON object with these exact fields:
   {
@@ -364,7 +367,7 @@ Format each question as a JSON object with these exact fields:
     "choices": [{"letter": "A", "text": "..."}, ...]  // REQUIRED for MCQ only
   }
 
-ERROR HANDLING: If the source has no extractable question/task blocks at all, return: {"error": true, "reason": "Brief explanation"}. Otherwise return ONLY a valid JSON array of question objects. No markdown, no code fence.`;
+ERROR HANDLING: Return {"error": true, "reason": "..."} ONLY if the segment is empty, whitespace-only, or contains no question-like content (no numbers, no code, no "Consider"/"Question"/choice letters). If you see ANY numbered exam item or MCQ, you MUST return a JSON array, not an error. No markdown, no code fence.`;
 
     const extractionUserPrompt = `Extract every complete question or task block from the source material below. Preserve wording; do not generate new questions.${topicsSection}
 
@@ -373,7 +376,11 @@ Source material:
 ${chunk}
 """`;
 
-    try {
+    const extractionRetrySystemPrompt = `You extract exam questions from text. The input is always from a real exam (e.g. AP Computer Science). Extract EVERY numbered or "Consider the following" item as one JSON object. Use type MCQ when (A)-(E) or (A)-(D) choices appear. Use difficulty "medium" and reasoning_level "factual" when unsure. Return ONLY a JSON array of objects with fields: content, description, difficulty, reasoning_level, type, answer (or null), primary_topic_id (null), secondary_topic_ids ([]), choices (for MCQ). Never return {"error":true} unless the text is literally empty.`;
+
+    const extractionRetryUserPrompt = `Extract all questions from:\n"""${chunk}"""`;
+
+    const runChunkExtraction = async (systemPrompt, userPrompt) => {
       const questions = await eduaiService.generateQuestions({
         prompt: chunk,
         courseCode,
@@ -382,16 +389,38 @@ ${chunk}
         numQuestions,
         difficultyDistribution,
         reasoningDistribution,
-        systemPromptOverride: extractionSystemPrompt,
-        userPromptOverride: extractionUserPrompt,
+        systemPromptOverride: systemPrompt,
+        userPromptOverride: userPrompt,
       });
-      const sanitized = questions
+      return questions
         .map((question) => sanitizeEduAIQuestion(question))
         .filter(Boolean);
+    };
+
+    try {
+      let sanitized = await runChunkExtraction(extractionSystemPrompt, extractionUserPrompt);
+      if (sanitized.length === 0) {
+        throw new Error("No questions extracted from chunk after sanitization");
+      }
       extracted.push(...sanitized);
     } catch (error) {
-      console.error("EduAI extraction failed for chunk", error.message);
-      throw error;
+      console.warn("EduAI extraction chunk failed, retrying with simplified prompt", {
+        chunkIndex: i,
+        message: error.message,
+      });
+      try {
+        const sanitizedRetry = await runChunkExtraction(
+          extractionRetrySystemPrompt,
+          extractionRetryUserPrompt
+        );
+        if (sanitizedRetry.length === 0) {
+          throw new Error(error.message || "Extraction produced no questions");
+        }
+        extracted.push(...sanitizedRetry);
+      } catch (retryError) {
+        console.error("EduAI extraction failed for chunk", retryError.message);
+        throw retryError;
+      }
     }
   }
 
