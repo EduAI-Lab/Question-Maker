@@ -113,11 +113,13 @@ interface QuestionUploadDialogProps {
     courseName?: string;
     topics: Topic[];
     onEnsureTopics: (courseId: number) => Promise<Topic[]>;
-    onQuestionsSaved: (questions: Question[]) => void;
+    onQuestionsSaved: (questions: Question[], meta?: { assessmentId: number | null }) => void;
     /** When set, extraction runs in parent; modal closes and toasts show progress/result. */
     onExtractInBackground?: (params: BackgroundExtractionParams) => void;
     /** Pre-filled drafts when opening for review after background extraction (e.g. from toast "View"). */
     initialDraftQuestions?: DraftQuestion[] | null;
+    /** `bank` = save questions to the question bank only (no assessment). `assessment` = default behavior. */
+    saveTarget?: 'bank' | 'assessment';
 }
 
 const generateId = () => {
@@ -250,7 +252,8 @@ export const QuestionUploadDialog = ({
     onEnsureTopics,
     onQuestionsSaved,
     onExtractInBackground,
-    initialDraftQuestions
+    initialDraftQuestions,
+    saveTarget = 'assessment'
 }: QuestionUploadDialogProps) => {
     const { toast } = useToast();
 
@@ -617,9 +620,18 @@ export const QuestionUploadDialog = ({
         if (processingStage === 'saving') return false;
         if (!courseId) return false;
         if (includedDrafts.length === 0) return false;
+        if (saveTarget === 'bank') return true;
         if (!assessmentType || !assessmentName.trim() || !assessmentSemester.trim()) return false;
         return true;
-    }, [assessmentName, assessmentSemester, assessmentType, courseId, includedDrafts.length, processingStage]);
+    }, [
+        assessmentName,
+        assessmentSemester,
+        assessmentType,
+        courseId,
+        includedDrafts.length,
+        processingStage,
+        saveTarget
+    ]);
 
     const getDisabledReason = (): string | null => {
         if (processingStage === 'saving') return null; // Don't show tooltip while saving
@@ -627,10 +639,12 @@ export const QuestionUploadDialog = ({
             const reasons: string[] = [];
             if (!courseId) reasons.push('course');
             if (includedDrafts.length === 0) reasons.push('at least one question selected');
-            if (!assessmentType) reasons.push('assessment type');
-            if (!assessmentName.trim()) reasons.push('assessment name');
-            if (!assessmentSemester.trim()) reasons.push('assessment semester');
-            
+            if (saveTarget === 'assessment') {
+                if (!assessmentType) reasons.push('assessment type');
+                if (!assessmentName.trim()) reasons.push('assessment name');
+                if (!assessmentSemester.trim()) reasons.push('assessment semester');
+            }
+
             if (reasons.length > 0) {
                 return `Missing required: ${reasons.join(', ')}`;
             }
@@ -820,7 +834,7 @@ export const QuestionUploadDialog = ({
             setError('Each question must include the AI-generated summary before saving.');
             return;
         }
-        if (!assessmentType || !assessmentName.trim() || !assessmentSemester.trim()) {
+        if (saveTarget === 'assessment' && (!assessmentType || !assessmentName.trim() || !assessmentSemester.trim())) {
             setError('Assessment type, name, and semester are required.');
             return;
         }
@@ -839,14 +853,18 @@ export const QuestionUploadDialog = ({
                 primaryTopicId: fallbackPrimaryTopicId,
                 topicName: fallbackTopicName,
                 questions: payloadQuestions,
-                assessment: {
-                    type: assessmentType,
-                    name: assessmentName.trim(),
-                    semester: assessmentSemester.trim()
-                }
+                ...(saveTarget === 'assessment'
+                    ? {
+                          assessment: {
+                              type: assessmentType,
+                              name: assessmentName.trim(),
+                              semester: assessmentSemester.trim()
+                          }
+                      }
+                    : {})
             });
 
-            onQuestionsSaved(result.questions);
+            onQuestionsSaved(result.questions, { assessmentId: result.assessmentId ?? null });
             toast({
                 title: 'Questions added',
                 description: `${result.questions.length} question${result.questions.length === 1 ? '' : 's'} saved successfully.`,
@@ -865,7 +883,21 @@ export const QuestionUploadDialog = ({
             });
             setProcessingStage('review');
         }
-    }, [assessmentName, assessmentSemester, assessmentType, canSave, courseId, includedDrafts, newTopicName, onClose, onQuestionsSaved, primaryTopicId, toast, topics.length]);
+    }, [
+        assessmentName,
+        assessmentSemester,
+        assessmentType,
+        canSave,
+        courseId,
+        includedDrafts,
+        newTopicName,
+        onClose,
+        onQuestionsSaved,
+        primaryTopicId,
+        toast,
+        topics.length,
+        saveTarget
+    ]);
 
     const handleReset = useCallback(() => {
         setDraftQuestions([]);
@@ -939,52 +971,63 @@ export const QuestionUploadDialog = ({
 
                 <div className="flex gap-6 py-2 min-h-[70vh]">
                     {/* Left: Assessment details — narrow, vertical fields */}
-                    <Card data-tour-id="upload-assessment-meta" className="flex-shrink-0 w-[280px]">
-                        <CardHeader className="space-y-1">
-                            <CardTitle className="text-base font-semibold">Assessment details</CardTitle>
-                            <p className="text-xs text-muted-foreground">
-                                A new assessment will be created for these questions.
-                            </p>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="assessment-type">Type</Label>
-                                <Select
-                                    value={assessmentType}
-                                    onValueChange={(value) => setAssessmentType(value as typeof assessmentTypes[number])}
-                                >
-                                    <SelectTrigger id="assessment-type">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {assessmentTypes.map((type) => (
-                                            <SelectItem key={type} value={type}>
-                                                {type}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="assessment-name">Name</Label>
-                                <Input
-                                    id="assessment-name"
-                                    placeholder="e.g. Midterm Review Set"
-                                    value={assessmentName}
-                                    onChange={(event) => setAssessmentName(event.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="assessment-semester">Semester</Label>
-                                <Input
-                                    id="assessment-semester"
-                                    placeholder="e.g. Fall 2024"
-                                    value={assessmentSemester}
-                                    onChange={(event) => setAssessmentSemester(event.target.value)}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
+                    {saveTarget === 'bank' ? (
+                        <Card className="flex-shrink-0 w-[280px] border-dashed border-blue-200 bg-blue-50/50">
+                            <CardHeader className="space-y-1">
+                                <CardTitle className="text-base font-semibold">Question bank only</CardTitle>
+                                <p className="text-xs text-muted-foreground">
+                                    Questions are saved to the course bank. No assessment is created.
+                                </p>
+                            </CardHeader>
+                        </Card>
+                    ) : (
+                        <Card data-tour-id="upload-assessment-meta" className="flex-shrink-0 w-[280px]">
+                            <CardHeader className="space-y-1">
+                                <CardTitle className="text-base font-semibold">Assessment details</CardTitle>
+                                <p className="text-xs text-muted-foreground">
+                                    A new assessment will be created for these questions.
+                                </p>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="assessment-type">Type</Label>
+                                    <Select
+                                        value={assessmentType}
+                                        onValueChange={(value) => setAssessmentType(value as typeof assessmentTypes[number])}
+                                    >
+                                        <SelectTrigger id="assessment-type">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {assessmentTypes.map((type) => (
+                                                <SelectItem key={type} value={type}>
+                                                    {type}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="assessment-name">Name</Label>
+                                    <Input
+                                        id="assessment-name"
+                                        placeholder="e.g. Midterm Review Set"
+                                        value={assessmentName}
+                                        onChange={(event) => setAssessmentName(event.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="assessment-semester">Semester</Label>
+                                    <Input
+                                        id="assessment-semester"
+                                        placeholder="e.g. Fall 2024"
+                                        value={assessmentSemester}
+                                        onChange={(event) => setAssessmentSemester(event.target.value)}
+                                    />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* Right: Upload + Review — majority of space; when drafts exist, upload/model is collapsible */}
                     <div className="flex-1 min-w-0 flex flex-col gap-6 min-h-0">
@@ -1488,7 +1531,15 @@ export const QuestionUploadDialog = ({
                                 </span>
                             </Tooltip>
                         ) : (
-                            <Tooltip content={canSave ? 'Save selected questions and create a new assessment.' : 'Select at least one question and fill assessment details to save.'}>
+                            <Tooltip
+                                content={
+                                    canSave
+                                        ? saveTarget === 'bank'
+                                            ? 'Save selected questions to the question bank only.'
+                                            : 'Save selected questions and create a new assessment.'
+                                        : 'Select at least one question and fill assessment details to save.'
+                                }
+                            >
                                 <span className="inline-block">
                                     <Button onClick={() => void handleSave()} disabled={!canSave} data-tour-id="upload-create">
                                         {processingStage === 'saving' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

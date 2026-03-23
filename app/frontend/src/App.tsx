@@ -12,6 +12,7 @@ import { Homepage } from './pages/Homepage';
 import { ApiTestPage } from './pages/ApiTestPage';
 import AssessmentBuilderPage from './pages/AssessmentBuilderPage';
 import { HelpPage } from './pages/HelpPage';
+import { StudyPage } from './pages/StudyPage';
 import { GuidedTourProvider } from './contexts/GuidedTourContext';
 
 function RedirectAssessmentToBuilder() {
@@ -37,6 +38,7 @@ function App() {
                 <Route path="/assessments/:id" element={<RedirectAssessmentToBuilder />} />
                 <Route path="/assessments/:id/builder" element={<AssessmentBuilderPage />} />
                 <Route path="/help" element={<HelpPage />} />
+                <Route path="/study" element={<StudyPage />} />
                 <Route path="/" element={<Navigate to="/login" replace />} />
               </Routes>
               <Toaster />

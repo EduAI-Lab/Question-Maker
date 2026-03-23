@@ -7,7 +7,8 @@ import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Course } from '../../types/question';
-import { User, HelpCircle, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { User, HelpCircle, ArrowLeft, FlaskConical } from 'lucide-react';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 import { useGuidedTour } from '../../contexts/GuidedTourContext';
@@ -142,7 +143,15 @@ export const TopNavigation = (props: TopNavigationProps) => {
                         />
                     </div>
                     <div className="relative">
-                      <Tooltip content="Walk through the app with a guided tour" side="bottom">
+                      <Tooltip content="Study: baseline exam → variants → parallel assembly → similarity checker" side="bottom">
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link to="/study" className="gap-1.5">
+                          <FlaskConical className="h-4 w-4" />
+                          Study
+                        </Link>
+                      </Button>
+                    </Tooltip>
+                    <Tooltip content="Walk through the app with a guided tour" side="bottom">
                         <Button
                           variant="ghost"
                           size="sm"
