@@ -6,6 +6,14 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from '../ui/dialog';
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { Tooltip } from '../ui/tooltip';
@@ -19,7 +27,8 @@ import {
     FileText,
     Download,
     Layers3,
-    Sparkles
+    Sparkles,
+    Share2
 } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
@@ -162,8 +171,20 @@ export const AssessmentSection = ({
     const [pendingGenerateAction, setPendingGenerateAction] = useState<'create' | null>(null);
     const [isSavingBlueprint, setIsSavingBlueprint] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [exportDialogAssessment, setExportDialogAssessment] = useState<Assessment | null>(null);
 
     const hasAssessments = assessments.length > 0;
+    const hasAnyExportHandler = Boolean(onExportToCanvas || onExportToTxt);
+
+    const exportDialogBlockReason = useMemo(() => {
+        if (!exportDialogAssessment) return null;
+        const n = countTotalQuestions(exportDialogAssessment);
+        if (n === 0) return 'No questions in this assessment.';
+        if (hasDraftQuestions(exportDialogAssessment)) {
+            return 'Cannot export until all draft questions are reviewed and published.';
+        }
+        return null;
+    }, [exportDialogAssessment]);
 
     const handleOpenCreateModal = () => {
         if (!selectedCourseId) return;
@@ -340,81 +361,23 @@ export const AssessmentSection = ({
                                                 </Button>
                                             </Tooltip>
 
-                                            {onExportToCanvas &&
-                                                (totalQuestionCount === 0 || hasDrafts ? (
-                                                    <Tooltip
-                                                        content={
-                                                            totalQuestionCount === 0
-                                                                ? 'No questions in assessment'
-                                                                : hasDrafts
-                                                                    ? 'Cannot export: Assessment contains draft questions. Please review all draft questions before exporting.'
-                                                                    : 'Export assessment to Canvas'
-                                                        }
-                                                        multiline
-                                                    >
-                                                        <span className="inline-block">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                disabled
-                                                                data-tour-id="export-canvas-btn"
-                                                                className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                <Upload className="h-4 w-4" />
-                                                                <span>Export to Canvas</span>
-                                                            </Button>
-                                                        </span>
-                                                    </Tooltip>
-                                                ) : (
+                                            {hasAnyExportHandler && (
+                                                <Tooltip
+                                                    content="Export to Canvas or download a text file"
+                                                    side="bottom"
+                                                >
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => onExportToCanvas(assessment.id, assessment.name)}
-                                                        data-tour-id="export-canvas-btn"
-                                                        className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
+                                                        onClick={() => setExportDialogAssessment(assessment)}
+                                                        className="flex items-center space-x-1"
+                                                        data-tour-id="export-assessment-btn"
                                                     >
-                                                        <Upload className="h-4 w-4" />
-                                                        <span>Export to Canvas</span>
+                                                        <Share2 className="h-4 w-4" />
+                                                        <span>Export</span>
                                                     </Button>
-                                                ))}
-
-                                            {onExportToTxt &&
-                                                (totalQuestionCount === 0 || hasDrafts ? (
-                                                    <Tooltip
-                                                        content={
-                                                            totalQuestionCount === 0
-                                                                ? 'No questions in assessment'
-                                                                : hasDrafts
-                                                                    ? 'Cannot export: Assessment contains draft questions. Please review all draft questions before exporting.'
-                                                                    : 'Export assessment to TXT'
-                                                        }
-                                                        multiline
-                                                    >
-                                                        <span className="inline-block">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                disabled
-                                                                data-tour-id="export-txt-btn"
-                                                                className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black disabled:opacity-50 disabled:cursor-not-allowed"
-                                                            >
-                                                                <FileText className="h-4 w-4" />
-                                                                <span>Export TXT</span>
-                                                            </Button>
-                                                        </span>
-                                                    </Tooltip>
-                                                ) : (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => onExportToTxt(assessment.id, assessment.name)}
-                                                        data-tour-id="export-txt-btn"
-                                                        className="flex items-center space-x-1 bg-black text-white hover:bg-gray-800 border-black"
-                                                    >
-                                                        <FileText className="h-4 w-4" />
-                                                        <span>Export TXT</span>
-                                                    </Button>
-                                                ))}
+                                                </Tooltip>
+                                            )}
 
                                             {onDeleteAssessment && (
                                                 <Button
@@ -523,6 +486,70 @@ export const AssessmentSection = ({
                     </Button>
                 </div>
             )}
+
+            <Dialog
+                open={exportDialogAssessment != null}
+                onOpenChange={(open) => {
+                    if (!open) setExportDialogAssessment(null);
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Export assessment</DialogTitle>
+                        <DialogDescription>
+                            {exportDialogAssessment
+                                ? `"${exportDialogAssessment.name}" — pick Canvas or a plain-text file.`
+                                : 'Pick an export format.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {exportDialogBlockReason && (
+                        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                            {exportDialogBlockReason}
+                        </p>
+                    )}
+                    <div className="flex flex-col gap-2">
+                        {onExportToCanvas && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-start gap-2 bg-black text-white hover:bg-gray-800 hover:text-white border-black disabled:opacity-50"
+                                disabled={Boolean(exportDialogBlockReason)}
+                                data-tour-id="export-canvas-btn"
+                                onClick={() => {
+                                    if (!exportDialogAssessment || exportDialogBlockReason) return;
+                                    onExportToCanvas(exportDialogAssessment.id, exportDialogAssessment.name);
+                                    setExportDialogAssessment(null);
+                                }}
+                            >
+                                <Upload className="h-4 w-4 shrink-0" />
+                                Export to Canvas
+                            </Button>
+                        )}
+                        {onExportToTxt && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-start gap-2 bg-black text-white hover:bg-gray-800 hover:text-white border-black disabled:opacity-50"
+                                disabled={Boolean(exportDialogBlockReason)}
+                                data-tour-id="export-txt-btn"
+                                onClick={() => {
+                                    if (!exportDialogAssessment || exportDialogBlockReason) return;
+                                    onExportToTxt(exportDialogAssessment.id, exportDialogAssessment.name);
+                                    setExportDialogAssessment(null);
+                                }}
+                            >
+                                <FileText className="h-4 w-4 shrink-0" />
+                                Export as TXT
+                            </Button>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="secondary" onClick={() => setExportDialogAssessment(null)}>
+                            Cancel
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {isGenerateModalOpen &&
                 pendingGenerateAction === 'create' &&
