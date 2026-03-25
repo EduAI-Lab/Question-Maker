@@ -4,9 +4,9 @@
 
 Evaluate whether an AI-assisted assessment management system can support creation of multiple exam versions that maintain **comparable conceptual coverage** and **difficulty**, using structured question metadata and automated variant generation.
 
-## Study page workflow (application)
+## Assessment variant workflow (application)
 
-The integrated **Study** page (`/study`) follows this order:
+The integrated **Assessment variant** page (`/assessment-variant`; legacy `/study` redirects here) follows this order:
 
 1. **Baseline reference exam** — Upload or import (OCR with assessment, or Canvas). Select the assessment and mark it as the reference baseline (`blueprint_config.studyRole`).
 2. **Generate variants** — For each base question on that exam, the system promotes the primary variant and generates additional EduAI variants tied to the same `question_metadata` row.
@@ -64,7 +64,7 @@ For each base question:
 3. Ensure each placed question uses the **same metadata structure** as the bank (topic, type, difficulty on variants).
 4. **Do not** run automated variant generation on this assessment as part of the experimental condition; treat it as **ground truth for comparison** only.
 
-**Platform note**: The app models assessments with `type` ∈ {Assignment, Lab, Quiz, Midterm, Final} and does not define a separate `exam_type` enum. For the study, encode role in the **assessment name** and, if you use JSON blueprint storage, optional `blueprint_config.studyRole = "reference_baseline"` for exports and scripts.
+**Platform note**: The app models assessments with `type` ∈ {Assignment, Lab, Quiz, Midterm, Final} and does not define a separate `exam_type` enum. For this workflow, encode role in the **assessment name** and, if you use JSON blueprint storage, optional `blueprint_config.studyRole = "reference_baseline"` for exports and scripts.
 
 ## Phase 3 — Define target blueprint
 
@@ -155,7 +155,7 @@ Authenticated JSON endpoints under `/api/study`:
 | `POST`  | `/api/study/metrics`                            | Body: `{ "assessmentIds": number[], "referenceAssessmentId"?: number }`. Pairwise topic/difficulty/type similarity (1 − JSD), Jaccard on base question ids, duplicate variant counts, cross-exam reuse stats.                                                                                                                                          |
 
 
-**UI:** On the assessment builder (`/assessments/:id/builder`), the **Study experiment** panel supports marking the reference baseline, loading a snapshot, assembling three exams, and running metrics against the reference plus the last assembled batch.
+**UI:** On the assessment builder (`/assessments/:id/builder`), the **Assessment variant workflow** panel supports marking the reference baseline, loading a snapshot, assembling three exams, and running metrics against the reference plus the last assembled batch. From the homepage **Assessments** tab, use **Create Assessment Variant** or per-assessment **Create variant** to open the full workflow with course (and optional baseline) prefilled.
 
 ---
 

@@ -1,5 +1,5 @@
 /**
- * API client for honors study experiment endpoints (reference exams, assembly, metrics).
+ * API client for the assessment variant workflow (reference exams, assembly, metrics). Routes remain under `/api/study`.
  */
 import api from './api';
 import { apiKeyStorage } from './apiKeyStorage';

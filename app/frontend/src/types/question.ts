@@ -209,7 +209,7 @@ export interface AssessmentBlueprintConfig {
         application: number;
     };
     reasoningData: ReasoningDataState;
-    /** Honors study experiment: imported reference vs. system-assembled variant exams */
+    /** Assessment variant workflow: imported reference vs. system-assembled variant exams */
     studyRole?: 'reference_baseline' | 'generated_variant';
     referenceAssessmentId?: number;
     variantLabel?: string;

@@ -2,7 +2,7 @@
  * Root app component: wires theme/auth providers, router, and top-level pages.
  * Defines navigation for login, homepage, assessments, help, and an optional API test route.
  */
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { Toaster } from './components/ui/toaster';
 import { ThemeProvider } from './components/theme-provider';
 import { AuthProvider } from './contexts/AuthContext';
@@ -12,12 +12,19 @@ import { Homepage } from './pages/Homepage';
 import { ApiTestPage } from './pages/ApiTestPage';
 import AssessmentBuilderPage from './pages/AssessmentBuilderPage';
 import { HelpPage } from './pages/HelpPage';
-import { StudyPage } from './pages/StudyPage';
+import { AssessmentVariantPage } from './pages/AssessmentVariantPage';
 import { GuidedTourProvider } from './contexts/GuidedTourContext';
 
 function RedirectAssessmentToBuilder() {
   const { id } = useParams<{ id: string }>();
   return <Navigate to={id ? `/assessments/${id}/builder` : '/home'} replace />;
+}
+
+/** Legacy `/study` URLs forward to the assessment variant workflow, preserving query string. */
+function RedirectLegacyStudyRoute() {
+  const [searchParams] = useSearchParams();
+  const qs = searchParams.toString();
+  return <Navigate to={qs ? `/assessment-variant?${qs}` : '/assessment-variant'} replace />;
 }
 
 function App() {
@@ -38,7 +45,8 @@ function App() {
                 <Route path="/assessments/:id" element={<RedirectAssessmentToBuilder />} />
                 <Route path="/assessments/:id/builder" element={<AssessmentBuilderPage />} />
                 <Route path="/help" element={<HelpPage />} />
-                <Route path="/study" element={<StudyPage />} />
+                <Route path="/assessment-variant" element={<AssessmentVariantPage />} />
+                <Route path="/study" element={<RedirectLegacyStudyRoute />} />
                 <Route path="/" element={<Navigate to="/login" replace />} />
               </Routes>
               <Toaster />

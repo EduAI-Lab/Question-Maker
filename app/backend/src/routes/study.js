@@ -1,5 +1,5 @@
 /**
- * Routes for honors study experiment: reference marking, blueprint snapshot, assembly, metrics.
+ * Routes for the assessment variant workflow (API path `/api/study`): reference marking, blueprint snapshot, assembly, metrics.
  */
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';

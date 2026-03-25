@@ -1,10 +1,10 @@
 /**
- * Study workflow: (1) baseline reference exam → (2) generate variants from those questions →
+ * Assessment variant workflow: (1) baseline reference exam → (2) generate variants from those questions →
  * (3) assemble parallel exams matching baseline structure → (4) similarity metrics.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, FlaskConical, Loader2, Sparkles, Upload } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ClipboardList, Loader2, Sparkles, Upload } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import {
@@ -52,8 +52,11 @@ async function loadAssessmentDetail(assessmentId: number): Promise<Assessment> {
   return { ...a, sections };
 }
 
-export function StudyPage() {
+export function AssessmentVariantPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const courseIdParam = searchParams.get('courseId');
+  const baselineAssessmentIdParam = searchParams.get('baselineAssessmentId');
   const { toast } = useToast();
   const { courses, isLoading: coursesLoading, fetchCourses } = useCourses();
 
@@ -78,12 +81,31 @@ export function StudyPage() {
   }, [fetchCourses]);
 
   useEffect(() => {
+    if (coursesLoading || courses.length === 0) return;
+    if (!courseIdParam) return;
+    const id = Number(courseIdParam);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const c = courses.find((x) => x.id === id);
+    if (c) setSelectedCourse(c);
+  }, [coursesLoading, courses, courseIdParam]);
+
+  useEffect(() => {
+    if (baselineAssessmentIdParam && /^\d+$/.test(baselineAssessmentIdParam.trim())) {
+      setBaselineAssessmentId(baselineAssessmentIdParam.trim());
+      return;
+    }
+    if (courseIdParam && Number.isFinite(Number(courseIdParam)) && Number(courseIdParam) > 0) {
+      setBaselineAssessmentId('');
+    }
+  }, [courseIdParam, baselineAssessmentIdParam]);
+
+  useEffect(() => {
     const loadModels = async () => {
       try {
         const models = await eduaiService.listModels();
         setAvailableModels(models);
       } catch (error) {
-        console.error('Failed to load EduAI models for Study page', error);
+        console.error('Failed to load EduAI models for assessment variant workflow page', error);
         setAvailableModels([]);
       }
     };
@@ -114,12 +136,15 @@ export function StudyPage() {
     if (!selectedCourse?.id) {
       setTopics([]);
       setAssessments([]);
-      setBaselineAssessmentId('');
+      // Avoid wiping baseline from ?baselineAssessmentId=… before course list hydrates.
+      if (!baselineAssessmentIdParam && !courseIdParam) {
+        setBaselineAssessmentId('');
+      }
       return;
     }
     void loadTopics(selectedCourse.id);
     void loadAssessments(selectedCourse.id);
-  }, [selectedCourse?.id, loadTopics, loadAssessments]);
+  }, [selectedCourse?.id, baselineAssessmentIdParam, courseIdParam, loadTopics, loadAssessments]);
 
   const baselineAssessment = useMemo(
     () => assessments.find((a) => a.id.toString() === baselineAssessmentId),
@@ -201,7 +226,7 @@ export function StudyPage() {
         description: `Processed ${questionIds.length} base question(s). ${failed ? `${failed} step(s) logged errors (see console).` : 'Ready to assemble.'}`
       });
       if (result.errors?.length) {
-        console.warn('Study generateBankVariants errors', result.errors);
+        console.warn('Assessment variant workflow: generateBankVariants errors', result.errors);
       }
       void loadAssessments(selectedCourse.id);
     } catch (e: unknown) {
@@ -229,7 +254,7 @@ export function StudyPage() {
         referenceAssessmentId: refId,
         courseId: selectedCourse.id,
         examLabels: ['Exam A', 'Exam B', 'Exam C'],
-        namePrefix: baselineAssessment?.name ?? 'Study exam',
+        namePrefix: baselineAssessment?.name ?? 'Variant exam',
         includeDrafts: true
       });
       setLastAssembled(result.createdAssessments.map((a) => ({ id: a.id, name: a.name })));
@@ -289,8 +314,8 @@ export function StudyPage() {
               </Link>
             </Button>
             <div className="flex items-center gap-2">
-              <FlaskConical className="h-6 w-6 text-indigo-600" />
-              <h1 className="text-lg font-semibold tracking-tight text-slate-900">Study</h1>
+              <Sparkles className="h-6 w-6 text-indigo-600" />
+              <h1 className="text-lg font-semibold tracking-tight text-slate-900">Assessment variant workflow</h1>
             </div>
           </div>
           <div className="flex min-w-[220px] flex-1 items-center justify-end gap-2 sm:max-w-md">

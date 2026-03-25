@@ -1,6 +1,6 @@
 /**
  * Metrics for comparing exam/assessment structure (topics, difficulty, type) and workflow stats.
- * Jensen–Shannon similarity and Jaccard are defined for the honors study experiment.
+ * Jensen–Shannon similarity and Jaccard are defined for the assessment variant workflow metrics.
  */
 import {
   Assessments,

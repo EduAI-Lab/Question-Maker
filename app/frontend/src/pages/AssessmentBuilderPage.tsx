@@ -18,7 +18,7 @@ import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModa
 import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { StudyExperimentPanel } from '../components/study/StudyExperimentPanel';
+import { AssessmentVariantWorkflowPanel } from '../components/study/AssessmentVariantWorkflowPanel';
 import { defaultReasoningData } from './assessments/assessmentViewTypes';
 
 const AssessmentBuilderPage = () => {
@@ -445,7 +445,7 @@ const AssessmentBuilderPage = () => {
                     </div>
 
                     {assessment.course?.id ? (
-                        <StudyExperimentPanel
+                        <AssessmentVariantWorkflowPanel
                             assessmentId={assessment.id}
                             courseId={assessment.course.id}
                             assessmentName={assessment.name}

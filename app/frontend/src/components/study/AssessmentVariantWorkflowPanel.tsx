@@ -1,9 +1,9 @@
 /**
- * Honors study: mark reference exam, preview blueprint snapshot, assemble variant exams, run metrics.
+ * Assessment variant workflow: mark reference exam, blueprint snapshot, assemble variant exams, run metrics.
  */
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FlaskConical, Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -12,7 +12,7 @@ import studyService, { type BlueprintSnapshot } from '../../services/studyServic
 
 type BlueprintConfig = { studyRole?: string; referenceAssessmentId?: number } | null | undefined;
 
-interface StudyExperimentPanelProps {
+interface AssessmentVariantWorkflowPanelProps {
   assessmentId: number;
   courseId: number;
   assessmentName: string;
@@ -20,13 +20,13 @@ interface StudyExperimentPanelProps {
   onAssessmentRefresh: () => Promise<void>;
 }
 
-export const StudyExperimentPanel = ({
+export const AssessmentVariantWorkflowPanel = ({
   assessmentId,
   courseId,
   assessmentName,
   blueprintConfig,
   onAssessmentRefresh
-}: StudyExperimentPanelProps) => {
+}: AssessmentVariantWorkflowPanelProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [snapshot, setSnapshot] = React.useState<BlueprintSnapshot | null>(null);
@@ -42,7 +42,10 @@ export const StudyExperimentPanel = ({
     try {
       await studyService.setStudyRole(assessmentId, 'reference_baseline');
       await onAssessmentRefresh();
-      toast({ title: 'Study role updated', description: 'This assessment is marked as the reference baseline.' });
+      toast({
+        title: 'Reference baseline updated',
+        description: 'This assessment is marked as the reference baseline for the assessment variant workflow.'
+      });
     } catch (e: unknown) {
       toast({
         title: 'Failed to update',
@@ -56,7 +59,7 @@ export const StudyExperimentPanel = ({
     try {
       await studyService.setStudyRole(assessmentId, null);
       await onAssessmentRefresh();
-      toast({ title: 'Study role cleared' });
+      toast({ title: 'Workflow role cleared' });
     } catch (e: unknown) {
       toast({
         title: 'Failed to update',
@@ -100,7 +103,7 @@ export const StudyExperimentPanel = ({
         description: `${result.examCount} exams in ${result.assemblyTimeMs} ms. ${result.warnings.length ? `${result.warnings.length} warning(s) — see panel.` : ''}`
       });
       if (result.warnings.length > 0) {
-        console.warn('Study assembly warnings', result.warnings);
+        console.warn('Assessment variant workflow assembly warnings', result.warnings);
       }
     } catch (e: unknown) {
       toast({
@@ -118,7 +121,7 @@ export const StudyExperimentPanel = ({
     if (ids.length < 2) {
       toast({
         title: 'Need more exams',
-        description: 'Assemble variant exams first, or add other assessment IDs in the study API.',
+        description: 'Assemble variant exams first, or add other assessment IDs via the workflow metrics API.',
         variant: 'destructive'
       });
       return;
@@ -147,8 +150,8 @@ export const StudyExperimentPanel = ({
     <Card className="border-dashed border-amber-200/80 bg-amber-50/40">
       <CardHeader className="pb-2">
         <div className="flex flex-wrap items-center gap-2">
-          <FlaskConical className="h-5 w-5 text-amber-800" aria-hidden />
-          <CardTitle className="text-base text-amber-950">Study experiment</CardTitle>
+          <Sparkles className="h-5 w-5 text-amber-800" aria-hidden />
+          <CardTitle className="text-base text-amber-950">Assessment variant workflow</CardTitle>
           {studyRole === 'reference_baseline' && (
             <Badge className="bg-amber-700 text-white hover:bg-amber-700">Reference baseline</Badge>
           )}
@@ -166,7 +169,7 @@ export const StudyExperimentPanel = ({
             Mark as reference baseline
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={handleClearRole}>
-            Clear study role
+            Clear workflow role
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={handleLoadSnapshot} disabled={loadingSnapshot}>
             {loadingSnapshot ? (

@@ -1,5 +1,5 @@
 /**
- * Honors study: mark reference exams, snapshot blueprints, and assemble equivalent variant exams.
+ * Assessment variant workflow: mark reference exams, snapshot blueprints, and assemble equivalent variant exams.
  */
 import { sequelize } from '../config/database.js';
 import {
@@ -215,7 +215,7 @@ export async function assembleEquivalentExamVariants(userId, params) {
           type: assessmentTypeOverride || ref.type,
           name: assessmentName,
           semester: semesterOverride || ref.semester,
-          description: `Study-generated variant exam (${label}) from reference assessment #${referenceAssessmentId}`,
+          description: `Assessment variant workflow exam (${label}) from reference assessment #${referenceAssessmentId}`,
           blueprintConfig: {
             studyRole: 'generated_variant',
             referenceAssessmentId: referenceAssessmentId,
@@ -415,7 +415,7 @@ export async function assembleExamVariantsByMetadataSimilarity(userId, params) {
           type: assessmentTypeOverride || ref.type,
           name: assessmentName,
           semester: semesterOverride || ref.semester,
-          description: `Study exam (${label}) assembled by metadata similarity from reference #${referenceAssessmentId}`,
+          description: `Assessment variant workflow exam (${label}) assembled by metadata similarity from reference #${referenceAssessmentId}`,
           blueprintConfig: {
             studyRole: 'generated_variant',
             referenceAssessmentId: referenceAssessmentId,

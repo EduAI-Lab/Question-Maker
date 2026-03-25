@@ -18,7 +18,8 @@ import {
     AlertTriangle,
     FileText,
     Download,
-    Layers3
+    Layers3,
+    Sparkles
 } from 'lucide-react';
 import { Assessment, AssessmentGenerationParams } from '../../types/question';
 import GenerateAssessmentModal from './GenerateAssessmentModal';
@@ -171,6 +172,28 @@ export const AssessmentSection = ({
         setIsGenerateModalOpen(true);
     };
 
+    const assessmentVariantWorkflowHrefForCourse = (courseId: number) =>
+        `/assessment-variant?${new URLSearchParams({ courseId: String(courseId) }).toString()}`;
+
+    const assessmentVariantWorkflowHrefForBaseline = (courseId: number, assessmentId: number) =>
+        `/assessment-variant?${new URLSearchParams({
+            courseId: String(courseId),
+            baselineAssessmentId: String(assessmentId)
+        }).toString()}`;
+
+    const handleOpenAssessmentVariantWorkflowForCourse = () => {
+        if (!selectedCourseId) return;
+        navigate(assessmentVariantWorkflowHrefForCourse(selectedCourseId));
+    };
+
+    const handleOpenAssessmentVariantWorkflowForAssessment = (assessment: Assessment) => {
+        const courseId = assessment.courseId ?? selectedCourseId ?? null;
+        if (courseId == null) {
+            return;
+        }
+        navigate(assessmentVariantWorkflowHrefForBaseline(courseId, assessment.id));
+    };
+
     const handleBlueprintSave = async (params: AssessmentGenerationParams) => {
         try {
             setIsSavingBlueprint(true);
@@ -225,6 +248,19 @@ export const AssessmentSection = ({
                         >
                             <Plus className="h-4 w-4" />
                             <span>{isSavingBlueprint ? 'Saving...' : 'Add Assessment'}</span>
+                        </Button>
+                    </Tooltip>
+                    <Tooltip content="Assessment variant workflow: baseline, variants, parallel exams, similarity" side="bottom">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleOpenAssessmentVariantWorkflowForCourse}
+                            className="flex items-center space-x-2"
+                            disabled={!selectedCourseId}
+                            data-tour-id="create-assessment-variant-btn"
+                        >
+                            <Sparkles className="h-4 w-4" />
+                            <span>Create Assessment Variant</span>
                         </Button>
                     </Tooltip>
                 </div>
@@ -282,6 +318,25 @@ export const AssessmentSection = ({
                                                 >
                                                     <Layers3 className="h-4 w-4" />
                                                     <span>Open</span>
+                                                </Button>
+                                            </Tooltip>
+
+                                            <Tooltip
+                                                content="Open assessment variant workflow with this exam as the baseline"
+                                                side="bottom"
+                                            >
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleOpenAssessmentVariantWorkflowForAssessment(assessment)}
+                                                    disabled={
+                                                        (assessment.courseId ?? selectedCourseId) == null
+                                                    }
+                                                    className="flex items-center space-x-1"
+                                                    data-tour-id="assessment-create-variant-btn"
+                                                >
+                                                    <Sparkles className="h-4 w-4" />
+                                                    <span>Create variant</span>
                                                 </Button>
                                             </Tooltip>
 
