@@ -4,8 +4,9 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardList, Loader2, Sparkles, Upload } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardList, Loader2, Sparkles, Upload, XCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import {
   Select,
@@ -19,7 +20,7 @@ import { useToast } from '../components/ui/use-toast';
 import { useCourses } from '../hooks/useCourses';
 import { courseService } from '../services/courseService';
 import assessmentService from '../services/assessmentService';
-import studyService from '../services/studyService';
+import studyService, { type BaselineVariantReadiness } from '../services/studyService';
 import { eduaiService, type EduAIModelOption } from '../services/eduaiService';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
@@ -72,6 +73,9 @@ export function AssessmentVariantPage() {
   const [lastAssembled, setLastAssembled] = useState<Array<{ id: number; name: string }>>([]);
   const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
   const [variantModel, setVariantModel] = useState('ollama:gpt-oss:120b');
+  const [variantReadiness, setVariantReadiness] = useState<BaselineVariantReadiness | null>(null);
+  const [variantReadinessLoading, setVariantReadinessLoading] = useState(false);
+  const [variantUserPrompt, setVariantUserPrompt] = useState('');
   const [metricsData, setMetricsData] = useState<Awaited<ReturnType<typeof studyService.computeMetrics>> | null>(
     null
   );
@@ -131,6 +135,29 @@ export function AssessmentVariantPage() {
     setAssessments(list);
     return list;
   }, []);
+
+  const refreshVariantReadiness = useCallback(async () => {
+    const refId = Number(baselineAssessmentId);
+    const cid = selectedCourse?.id;
+    if (!refId || !cid) {
+      setVariantReadiness(null);
+      return;
+    }
+    setVariantReadinessLoading(true);
+    try {
+      const data = await studyService.getBaselineVariantReadiness(refId, cid);
+      setVariantReadiness(data);
+    } catch (e) {
+      console.warn('Variant readiness check failed', e);
+      setVariantReadiness(null);
+    } finally {
+      setVariantReadinessLoading(false);
+    }
+  }, [baselineAssessmentId, selectedCourse?.id]);
+
+  useEffect(() => {
+    void refreshVariantReadiness();
+  }, [refreshVariantReadiness]);
 
   useEffect(() => {
     if (!selectedCourse?.id) {
@@ -205,8 +232,8 @@ export function AssessmentVariantPage() {
     setLastAssembled([]);
     try {
       const detail = await loadAssessmentDetail(refId);
-      const questionIds = collectQuestionMetadataIdsFromAssessment(detail);
-      if (questionIds.length === 0) {
+      const allQuestionIds = collectQuestionMetadataIdsFromAssessment(detail);
+      if (allQuestionIds.length === 0) {
         toast({
           variant: 'destructive',
           title: 'No questions found',
@@ -214,21 +241,36 @@ export function AssessmentVariantPage() {
         });
         return;
       }
+
+      const needingIds =
+        variantReadiness?.slots.filter((s) => !s.ready).map((s) => s.questionMetadataId) ?? allQuestionIds;
+      const questionIds = needingIds.length > 0 ? needingIds : [];
+
+      if (questionIds.length === 0) {
+        toast({
+          title: 'Nothing to generate',
+          description: `Each base question already has at least ${variantReadiness?.minRequiredNonDraft ?? 2} non-draft variants. Continue to assembly.`
+        });
+        return;
+      }
+
       const result = await studyService.generateBankVariants({
         courseId: selectedCourse.id,
         questionIds,
         model: variantModel,
-        variantsToAdd: 2
+        variantsToAdd: 1,
+        variantPromptInstructions: variantUserPrompt.trim() ? variantUserPrompt.trim() : null
       });
       const failed = result.errors?.length ?? 0;
       toast({
         title: 'Variants generated',
-        description: `Processed ${questionIds.length} base question(s). ${failed ? `${failed} step(s) logged errors (see console).` : 'Ready to assemble.'}`
+        description: `Generated one alternate variant for ${questionIds.length} base question(s). ${failed ? `${failed} step(s) logged errors (see console).` : 'Re-check readiness before assembly.'}`
       });
       if (result.errors?.length) {
         console.warn('Assessment variant workflow: generateBankVariants errors', result.errors);
       }
       void loadAssessments(selectedCourse.id);
+      void refreshVariantReadiness();
     } catch (e: unknown) {
       toast({
         variant: 'destructive',
@@ -240,6 +282,16 @@ export function AssessmentVariantPage() {
       setGeneratingVariants(false);
     }
   };
+
+  const variantSlotsNeedingCount = variantReadiness?.slots.filter((s) => !s.ready).length ?? 0;
+  const variantGenerateDisabled =
+    !baselineAssessmentId ||
+    !selectedCourse?.id ||
+    generatingVariants ||
+    variantReadinessLoading ||
+    (variantReadiness != null &&
+      variantReadiness.slots.length > 0 &&
+      variantReadiness.allReady);
 
   const assembleStructureMatchedExams = async () => {
     const refId = Number(baselineAssessmentId);
@@ -344,9 +396,9 @@ export function AssessmentVariantPage() {
 
       <main className="mx-auto max-w-5xl space-y-8 px-4 py-10">
         <p className="text-sm text-muted-foreground">
-          <strong className="font-medium text-foreground">Order:</strong> upload the baseline reference exam first, generate
-          variants for those questions, assemble parallel exams that mirror the baseline structure, then run the similarity
-          checker.
+          <strong className="font-medium text-foreground">Order:</strong> set the baseline reference exam, ensure each base
+          question has enough non-draft variants (or generate one AI variant per question that still needs an alternate),
+          assemble a parallel exam, then run the similarity checker.
         </p>
 
         <section className="space-y-4">
@@ -417,50 +469,132 @@ export function AssessmentVariantPage() {
                 Variants for each exam question
               </CardTitle>
               <CardDescription>
-                For every base question on the baseline, the system promotes the primary variant and generates two alternate
-                variants (EduAI), linked to the same metadata as the original items.
+                Create a variant for every question in the exam. If variants already exists, you can skip to next step
+                or create more variants.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap items-center gap-3">
-              <div className="min-w-[260px] space-y-1">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
-                <Select value={variantModel} onValueChange={setVariantModel} disabled={generatingVariants}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableModels.length === 0 ? (
-                      <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B (default)</SelectItem>
-                    ) : (
-                      availableModels.map((model) => (
-                        <SelectItem key={model.id} value={model.id}>
-                          {model.label}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                type="button"
-                disabled={!baselineAssessmentId || !selectedCourse?.id || generatingVariants}
-                onClick={generateVariantsFromBaseline}
-              >
-                {generatingVariants ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate variants from baseline
-                  </>
-                )}
-              </Button>
+            <CardContent className="space-y-4">
               {!baselineAssessmentId && (
-                <span className="text-sm text-muted-foreground">Complete step 1 first.</span>
+                <p className="text-sm text-muted-foreground">Select a baseline assessment in step 1 to check variant readiness.</p>
               )}
+              {baselineAssessmentId && selectedCourse?.id && (
+                <>
+                  {variantReadinessLoading && (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Checking variant counts…
+                    </p>
+                  )}
+                  {!variantReadinessLoading && variantReadiness && (
+                    <>
+                      {variantReadiness.allReady ? (
+                        <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                          <span>
+                            All {variantReadiness.slots.length} base question(s) have at least{' '}
+                            {variantReadiness.minRequiredNonDraft} non-draft variants. You can proceed to assembly.
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+                          <strong className="font-medium">{variantSlotsNeedingCount}</strong> base question(s) still need an
+                          extra non-draft variant. Run generation to add one AI variant each for those slots.
+                        </div>
+                      )}
+                      {variantReadiness.slots.length > 0 && (
+                        <div className="max-h-48 overflow-auto rounded-md border text-sm">
+                          <table className="w-full border-collapse text-left">
+                            <thead>
+                              <tr className="border-b bg-muted/50">
+                                <th className="p-2 font-medium">#</th>
+                                <th className="p-2 font-medium">Question</th>
+                                <th className="p-2 font-medium">Non-draft variants</th>
+                                <th className="p-2 font-medium">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {variantReadiness.slots.map((row) => (
+                                <tr key={row.questionMetadataId} className="border-b border-border/60">
+                                  <td className="p-2">{row.order}</td>
+                                  <td className="p-2">
+                                    <span className="line-clamp-2" title={row.description ?? undefined}>
+                                      {row.description?.trim() || `Metadata #${row.questionMetadataId}`}
+                                    </span>
+                                    {row.questionType && (
+                                      <span className="text-xs text-muted-foreground"> · {row.questionType}</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2">
+                                    {row.nonDraftVariantCount} / {variantReadiness.minRequiredNonDraft}
+                                  </td>
+                                  <td className="p-2">
+                                    {row.ready ? (
+                                      <span className="inline-flex items-center gap-1 text-emerald-700">
+                                        <CheckCircle2 className="h-3.5 w-3.5" /> Ready
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-amber-800">
+                                        <XCircle className="h-3.5 w-3.5" /> Needs variant
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+              <div className="space-y-2">
+                <label htmlFor="variant-ai-prompt" className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Optional instructions for the AI
+                </label>
+                <Textarea
+                  id="variant-ai-prompt"
+                  placeholder="e.g. Keep MCQ distractors plausible; use different numeric values; avoid cultural names…"
+                  value={variantUserPrompt}
+                  onChange={(e) => setVariantUserPrompt(e.target.value)}
+                  disabled={generatingVariants || !baselineAssessmentId}
+                  className="min-h-[88px] border-input bg-background text-foreground placeholder:text-muted-foreground"
+                />
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="min-w-[260px] space-y-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
+                  <Select value={variantModel} onValueChange={setVariantModel} disabled={generatingVariants}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableModels.length === 0 ? (
+                        <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B (default)</SelectItem>
+                      ) : (
+                        availableModels.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.label}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button type="button" disabled={variantGenerateDisabled} onClick={generateVariantsFromBaseline}>
+                  {generatingVariants ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Generate question variants
+                    </>
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </section>

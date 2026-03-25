@@ -6,6 +6,7 @@ import { authenticateToken } from '../middleware/auth.js';
 import {
   setAssessmentStudyRole,
   getBlueprintSnapshot,
+  getBaselineVariantReadiness,
   assembleEquivalentExamVariants,
   assembleExamVariantsByMetadataSimilarity,
   generateBankVariantsForQuestions
@@ -36,6 +37,26 @@ router.get('/assessments/:id/blueprint-snapshot', authenticateToken, async (req,
   try {
     const snapshot = await getBlueprintSnapshot(Number(req.params.id), req.user.id);
     res.json({ success: true, data: snapshot });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** GET /api/study/assessments/:id/variant-readiness?courseId= — non-draft variant counts per base question on baseline. */
+router.get('/assessments/:id/variant-readiness', authenticateToken, async (req, res, next) => {
+  try {
+    const courseId = req.query.courseId;
+    if (!courseId) {
+      return res.status(400).json({
+        success: false,
+        error: 'courseId query parameter is required'
+      });
+    }
+    const data = await getBaselineVariantReadiness(req.user.id, {
+      assessmentId: Number(req.params.id),
+      courseId: Number(courseId)
+    });
+    res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
@@ -116,7 +137,7 @@ router.post('/assemble-by-metadata', authenticateToken, async (req, res, next) =
 /** POST /api/study/generate-bank-variants — EduAI alternate variants per question id (promotes primary variant). */
 router.post('/generate-bank-variants', authenticateToken, async (req, res, next) => {
   try {
-    const { questionIds, courseId, model, apiKeys, variantsToAdd } = req.body;
+    const { questionIds, courseId, model, apiKeys, variantsToAdd, variantPromptInstructions } = req.body;
 
     if (!courseId || !Array.isArray(questionIds) || questionIds.length === 0) {
       return res.status(400).json({
@@ -130,7 +151,8 @@ router.post('/generate-bank-variants', authenticateToken, async (req, res, next)
       courseId: Number(courseId),
       model: typeof model === 'string' ? model : undefined,
       apiKeys: apiKeys && typeof apiKeys === 'object' ? apiKeys : {},
-      variantsToAdd: variantsToAdd != null ? Number(variantsToAdd) : 2
+      variantsToAdd: variantsToAdd != null ? Number(variantsToAdd) : 1,
+      variantPromptInstructions: typeof variantPromptInstructions === 'string' ? variantPromptInstructions : null
     });
 
     res.status(201).json({ success: true, data: result });

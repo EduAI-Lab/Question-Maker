@@ -17,6 +17,72 @@ import { loadOrderedVariantsForAssessment, aggregateStructure } from './studyMet
 
 const VALID_STUDY_ROLES = ['reference_baseline', 'generated_variant'];
 
+/** Non-draft variant count per base question required before parallel assembly can swap alternate wording. */
+export const MIN_NON_DRAFT_VARIANTS_FOR_WORKFLOW = 2;
+
+/**
+ * Per base question on a baseline assessment: non-draft variant counts in the bank and readiness for assembly.
+ */
+export async function getBaselineVariantReadiness(userId, { assessmentId, courseId }) {
+  if (!assessmentId || !courseId) {
+    throw new Error('assessmentId and courseId are required');
+  }
+
+  const assessment = await Assessments.findOne({
+    where: { id: Number(assessmentId), courseId: Number(courseId) },
+    include: [
+      {
+        model: Course,
+        as: 'course',
+        where: { userId },
+        attributes: ['id'],
+        required: true
+      }
+    ]
+  });
+
+  if (!assessment) {
+    throw new Error('Assessment not found or course mismatch');
+  }
+
+  const orderedVariants = await loadOrderedVariantsForAssessment(assessment.id);
+  const seenMeta = new Set();
+  const slots = [];
+
+  for (const v of orderedVariants) {
+    const mid = v.questionMetadata?.id;
+    if (mid == null || seenMeta.has(mid)) continue;
+    seenMeta.add(mid);
+
+    const metaRow = await Question_Metadata.findOne({
+      where: { id: mid, courseId: Number(courseId) },
+      attributes: ['id']
+    });
+    if (!metaRow) continue;
+
+    const nonDraftVariantCount = await Variants.count({
+      where: { questionMetadataId: mid, isDraft: false }
+    });
+
+    slots.push({
+      order: slots.length + 1,
+      questionMetadataId: mid,
+      description: v.questionMetadata?.description ?? null,
+      questionType: v.questionMetadata?.type ?? null,
+      nonDraftVariantCount,
+      ready: nonDraftVariantCount >= MIN_NON_DRAFT_VARIANTS_FOR_WORKFLOW
+    });
+  }
+
+  return {
+    assessmentId: assessment.id,
+    courseId: assessment.courseId,
+    minRequiredNonDraft: MIN_NON_DRAFT_VARIANTS_FOR_WORKFLOW,
+    slots,
+    allReady: slots.length > 0 && slots.every((s) => s.ready)
+  };
+}
+
 /** Merges `studyRole` into assessment.blueprintConfig (JSONB). */
 export async function setAssessmentStudyRole(assessmentId, userId, studyRole) {
   if (studyRole !== null && studyRole !== undefined && !VALID_STUDY_ROLES.includes(studyRole)) {
@@ -530,8 +596,15 @@ export async function generateBankVariantsForQuestions(userId, params) {
     courseId,
     model = 'ollama:gpt-oss:120b',
     apiKeys = {},
-    variantsToAdd = 2
+    variantsToAdd = 1,
+    variantPromptInstructions = null
   } = params;
+
+  let extraInstructions = '';
+  if (variantPromptInstructions != null && String(variantPromptInstructions).trim()) {
+    const trimmed = String(variantPromptInstructions).trim().slice(0, 4000);
+    extraInstructions = `\n\nAdditional instructions from the instructor (apply to this variant):\n"""\n${trimmed}\n"""\n`;
+  }
 
   if (!courseId || !Array.isArray(questionIds) || questionIds.length === 0) {
     throw new Error('courseId and a non-empty questionIds array are required');
@@ -608,8 +681,7 @@ Original question text:
 ${primaryVariant.questionText}
 """
 
-${topicLines ? `Course topics (use numeric IDs in output when applicable):\n${topicLines}\n` : ''}
-
+${topicLines ? `Course topics (use numeric IDs in output when applicable):\n${topicLines}\n` : ''}${extraInstructions}
 Return exactly one question in the required JSON format.`;
 
       try {

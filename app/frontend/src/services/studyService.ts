@@ -50,6 +50,23 @@ export interface GenerateBankVariantsResult {
   courseId: number;
 }
 
+export interface VariantReadinessSlot {
+  order: number;
+  questionMetadataId: number;
+  description: string | null;
+  questionType: string | null;
+  nonDraftVariantCount: number;
+  ready: boolean;
+}
+
+export interface BaselineVariantReadiness {
+  assessmentId: number;
+  courseId: number | null;
+  minRequiredNonDraft: number;
+  slots: VariantReadinessSlot[];
+  allReady: boolean;
+}
+
 export interface StudyMetricsResult {
   assessmentIds: number[];
   pairwise: unknown[];
@@ -72,6 +89,14 @@ export const studyService = {
 
   async getBlueprintSnapshot(assessmentId: number): Promise<BlueprintSnapshot> {
     const response = await api.get(`/api/study/assessments/${assessmentId}/blueprint-snapshot`);
+    return response.data.data;
+  },
+
+  async getBaselineVariantReadiness(assessmentId: number, courseId: number): Promise<BaselineVariantReadiness> {
+    const response = await api.get(
+      `/api/study/assessments/${assessmentId}/variant-readiness`,
+      { params: { courseId } }
+    );
     return response.data.data;
   },
 
@@ -108,6 +133,7 @@ export const studyService = {
     questionIds: number[];
     model?: string;
     variantsToAdd?: number;
+    variantPromptInstructions?: string | null;
   }): Promise<GenerateBankVariantsResult> {
     const model = payload.model ?? 'ollama:gpt-oss:120b';
     const apiKeys = await apiKeyStorage.buildApiKeysForModel(model);
