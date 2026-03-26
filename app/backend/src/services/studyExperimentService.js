@@ -791,6 +791,8 @@ export async function reviewVariantExamWithAi(userId, params) {
     includeOverallSummary = true
   } = params;
 
+  const reviewStartMs = Date.now();
+
   if (!baselineAssessmentId || !variantAssessmentId || !courseId) {
     throw new Error('baselineAssessmentId, variantAssessmentId, and courseId are required');
   }
@@ -1139,12 +1141,15 @@ Do not include markdown fences. Keep strings concise.`;
 
   if (!overallSummary) overallSummary = fallbackOverallSummary();
 
+  const reviewTimeMs = Date.now() - reviewStartMs;
+
   return {
     baselineAssessmentId: baselineAssessment.id,
     variantAssessmentId: variantAssessment.id,
     courseId: Number(courseId),
     model,
     rubricUsed: rubric,
+    reviewTimeMs,
     comparedSlots: pairCount,
     baselineSlotCount: baselineVariants.length,
     variantSlotCount: variantVariants.length,

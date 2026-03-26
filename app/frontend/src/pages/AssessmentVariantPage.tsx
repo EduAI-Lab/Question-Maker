@@ -255,6 +255,7 @@ function buildAiReviewWordHtmlReport(
   const finalScore0to100 = typeof result.examVariantScoreFinal0to100 === 'number' ? result.examVariantScoreFinal0to100 : null;
   const baseScore0to100 = typeof result.examVariantScoreBase0to100 === 'number' ? result.examVariantScoreBase0to100 : null;
   const usablePct = typeof result.usableQuestionPercentage === 'number' ? result.usableQuestionPercentage : null;
+  const reviewSeconds = typeof result.reviewTimeMs === 'number' ? result.reviewTimeMs / 1000 : null;
   const distinctnessAvg = typeof result.distinctnessAverage1to5 === 'number' ? result.distinctnessAverage1to5 : null;
   const distinctnessFactorAvg = typeof result.distinctnessFactorAvg === 'number' ? result.distinctnessFactorAvg : null;
   const overallSummaryText = result.overallSummary?.summaryText ?? 'n/a';
@@ -287,7 +288,8 @@ function buildAiReviewWordHtmlReport(
   <p><strong>Baseline exam:</strong> ${escapeHtml(baselineName)} (#${result.baselineAssessmentId})<br/>
      <strong>Variant exam:</strong> ${escapeHtml(variantName)} (#${result.variantAssessmentId})<br/>
      <strong>Model:</strong> ${escapeHtml(result.model)}<br/>
-     <strong>Compared slots:</strong> ${result.comparedSlots}</p>
+     <strong>Compared slots:</strong> ${result.comparedSlots}<br/>
+     <strong>Review time:</strong> ${reviewSeconds != null ? reviewSeconds.toFixed(1) : 'n/a'}s</p>
 
   <h2>Overall score</h2>
   <div class="card">
@@ -1399,6 +1401,11 @@ export function AssessmentVariantPage() {
                     <p className="text-muted-foreground">
                       Compared {aiReviewResult.comparedSlots} aligned slot(s). Baseline slots: {aiReviewResult.baselineSlotCount}
                       , variant slots: {aiReviewResult.variantSlotCount}.
+                    </p>
+
+                    <p className="text-xs text-muted-foreground">
+                      Review time:{' '}
+                      {typeof aiReviewResult.reviewTimeMs === 'number' ? (aiReviewResult.reviewTimeMs / 1000).toFixed(1) : 'n/a'}s
                     </p>
 
                     <div className="rounded border bg-slate-50 p-3">

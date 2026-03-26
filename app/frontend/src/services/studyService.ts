@@ -106,6 +106,7 @@ export interface VariantAiReviewResult {
   courseId: number;
   model: string;
   rubricUsed: string;
+  reviewTimeMs: number;
   comparedSlots: number;
   baselineSlotCount: number;
   variantSlotCount: number;
