@@ -108,7 +108,7 @@ export const AssessmentVariantWorkflowPanel = ({
     } catch (e: unknown) {
       toast({
         title: 'Assembly failed',
-        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Need ≥2 non-draft variants per slot where possible.',
+        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Need ≥2 reviewed variants per slot where possible.',
         variant: 'destructive'
       });
     } finally {

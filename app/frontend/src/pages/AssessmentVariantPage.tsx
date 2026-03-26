@@ -16,6 +16,7 @@ import {
   SelectValue
 } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
+import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { useCourses } from '../hooks/useCourses';
 import { courseService } from '../services/courseService';
@@ -26,6 +27,14 @@ import { QuestionUploadDialog } from '../components/question-bank/QuestionUpload
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
 import type { Assessment, Course, Question } from '../types/question';
 import type { Topic } from '../types/topic';
+
+/** Hover text for the Variants column — counts are reviewed-only (drafts excluded). */
+const REVIEWED_VARIANTS_TOOLTIP =
+  'Number of reviewed variants for this question in the bank. Draft variants are not included.';
+
+function variantStatusTooltip(minRequired: number): string {
+  return `Ready when this question has at least ${minRequired} reviewed variants. Draft variants do not count.`;
+}
 
 /** Unique question_metadata ids in section order (first occurrence per base question). */
 function collectQuestionMetadataIdsFromAssessment(assessment: Assessment): number[] {
@@ -249,7 +258,7 @@ export function AssessmentVariantPage() {
       if (questionIds.length === 0) {
         toast({
           title: 'Nothing to generate',
-          description: `Each base question already has at least ${variantReadiness?.minRequiredNonDraft ?? 2} non-draft variants. Continue to assembly.`
+          description: `Each base question already has at least ${variantReadiness?.minRequiredNonDraft ?? 2} variants (reviewed only). Continue to assembly.`
         });
         return;
       }
@@ -322,7 +331,7 @@ export function AssessmentVariantPage() {
       toast({
         variant: 'destructive',
         title: 'Assembly failed',
-        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Need enough distinct variants per baseline slot (≥3 non-draft per base for three exams).',
+        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Need enough distinct variants per baseline slot (≥3 reviewed variants per base for three exams).',
         duration: Number.POSITIVE_INFINITY
       });
     } finally {
@@ -397,7 +406,7 @@ export function AssessmentVariantPage() {
       <main className="mx-auto max-w-5xl space-y-8 px-4 py-10">
         <p className="text-sm text-muted-foreground">
           <strong className="font-medium text-foreground">Order:</strong> set the baseline reference exam, ensure each base
-          question has enough non-draft variants (or generate one AI variant per question that still needs an alternate),
+          question has enough variants (or generate one AI variant per question that still needs an alternate),
           assemble a parallel exam, then run the similarity checker.
         </p>
 
@@ -492,13 +501,13 @@ export function AssessmentVariantPage() {
                           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
                           <span>
                             All {variantReadiness.slots.length} base question(s) have at least{' '}
-                            {variantReadiness.minRequiredNonDraft} non-draft variants. You can proceed to assembly.
+                            {variantReadiness.minRequiredNonDraft} variants. You can proceed to assembly.
                           </span>
                         </div>
                       ) : (
                         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                           <strong className="font-medium">{variantSlotsNeedingCount}</strong> base question(s) still need an
-                          extra non-draft variant. Run generation to add one AI variant each for those slots.
+                          extra variant. Run generation to add one AI variant each for those slots.
                         </div>
                       )}
                       {variantReadiness.slots.length > 0 && (
@@ -508,8 +517,22 @@ export function AssessmentVariantPage() {
                               <tr className="border-b bg-muted/50">
                                 <th className="p-2 font-medium">#</th>
                                 <th className="p-2 font-medium">Question</th>
-                                <th className="p-2 font-medium">Non-draft variants</th>
-                                <th className="p-2 font-medium">Status</th>
+                                <th className="p-2 font-medium">
+                                  <Tooltip content={REVIEWED_VARIANTS_TOOLTIP} multiline side="top">
+                                    <span className="cursor-help border-b border-dotted border-current">
+                                      Variants
+                                    </span>
+                                  </Tooltip>
+                                </th>
+                                <th className="p-2 font-medium">
+                                  <Tooltip
+                                    content={variantStatusTooltip(variantReadiness.minRequiredNonDraft)}
+                                    multiline
+                                    side="top"
+                                  >
+                                    <span className="cursor-help border-b border-dotted border-current">Status</span>
+                                  </Tooltip>
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
@@ -524,19 +547,23 @@ export function AssessmentVariantPage() {
                                       <span className="text-xs text-muted-foreground"> · {row.questionType}</span>
                                     )}
                                   </td>
+                                  <td className="p-2 tabular-nums">{row.nonDraftVariantCount}</td>
                                   <td className="p-2">
-                                    {row.nonDraftVariantCount} / {variantReadiness.minRequiredNonDraft}
-                                  </td>
-                                  <td className="p-2">
-                                    {row.ready ? (
-                                      <span className="inline-flex items-center gap-1 text-emerald-700">
-                                        <CheckCircle2 className="h-3.5 w-3.5" /> Ready
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1 text-amber-800">
-                                        <XCircle className="h-3.5 w-3.5" /> Needs variant
-                                      </span>
-                                    )}
+                                    <Tooltip
+                                      content={variantStatusTooltip(variantReadiness.minRequiredNonDraft)}
+                                      multiline
+                                      side="top"
+                                    >
+                                      {row.ready ? (
+                                        <span className="inline-flex cursor-help items-center gap-1 border-b border-dotted border-current text-emerald-700">
+                                          <CheckCircle2 className="h-3.5 w-3.5" /> Ready
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex cursor-help items-center gap-1 border-b border-dotted border-current text-amber-800">
+                                          <XCircle className="h-3.5 w-3.5" /> Needs variant
+                                        </span>
+                                      )}
+                                    </Tooltip>
                                   </td>
                                 </tr>
                               ))}
