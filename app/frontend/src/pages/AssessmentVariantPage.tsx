@@ -331,12 +331,12 @@ function buildAiReviewWordHtmlReport(
     <thead>
       <tr>
         <th>Slot</th>
-        <th>Concept</th>
-        <th>Difficulty</th>
-        <th>Structure</th>
-        <th>Answer</th>
-        <th>Topic</th>
-        <th>Distinctness</th>
+        <th title="How well the variant preserves the same concept and reasoning intent as the original.">Concept</th>
+        <th title="How similar the variant’s difficulty level is to the original (comparable challenge for students).">Difficulty</th>
+        <th title="Whether the variant is internally valid and unambiguous (clear structure, solvable prompt/options/requirements).">Structure</th>
+        <th title="Whether the provided answer is correct and the distractors/solution are consistent with that answer.">Answer</th>
+        <th title="Whether the variant matches the same course topic (not just loosely related).">Topic</th>
+        <th title="How different the variant is from the original (values/context/structure/scenario), while still preserving the core concept. Low distinctness means near-duplicate wording/parameters.">Distinctness</th>
         <th>Usability</th>
         <th>Reason</th>
       </tr>
@@ -1509,12 +1509,39 @@ export function AssessmentVariantPage() {
                         <thead>
                           <tr className="border-b">
                             <th className="p-2">Slot</th>
-                            <th className="p-2">Concept</th>
-                            <th className="p-2">Difficulty</th>
-                            <th className="p-2">Structure</th>
-                            <th className="p-2">Answer</th>
-                            <th className="p-2">Topic</th>
-                            <th className="p-2">Distinctness</th>
+                            <th className="p-2">
+                              <Tooltip content="How well the variant preserves the same concept and reasoning intent as the original." side="top">
+                                <span>Concept</span>
+                              </Tooltip>
+                            </th>
+                            <th className="p-2">
+                              <Tooltip content="How similar the variant’s difficulty level is to the original question." side="top">
+                                <span>Difficulty</span>
+                              </Tooltip>
+                            </th>
+                            <th className="p-2">
+                              <Tooltip content="Whether the variant is internally valid and unambiguous." side="top">
+                                <span>Structure</span>
+                              </Tooltip>
+                            </th>
+                            <th className="p-2">
+                              <Tooltip content="Whether the provided answer is correct and the distractors/solution are consistent with that answer." side="top">
+                                <span>Answer</span>
+                              </Tooltip>
+                            </th>
+                            <th className="p-2">
+                              <Tooltip content="Whether the variant matches the same course topic." side="top">
+                                <span>Topic</span>
+                              </Tooltip>
+                            </th>
+                            <th className="p-2">
+                              <Tooltip
+                                content="How different the variant is from the original (values/context/structure/scenario) while preserving the core concept. Low distinctness = near-duplicate wording/parameters."
+                                side="top"
+                              >
+                                <span>Distinctness</span>
+                              </Tooltip>
+                            </th>
                             <th className="p-2">Usability</th>
                             <th className="p-2">Reason</th>
                           </tr>
