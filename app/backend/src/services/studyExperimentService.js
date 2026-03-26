@@ -826,6 +826,12 @@ export async function reviewVariantExamWithAi(userId, params) {
       'Structural validity (1-5)',
       'Answer correctness (1-5)',
       'Topic alignment (1-5)',
+      'Variant distinctness (1-5)',
+      '5: Substantially different while preserving concept',
+      '4: Moderate changes',
+      '3: Minor variation',
+      '2: Very similar',
+      '1: Near-duplicate',
       'Usability classification: usable_as_is | usable_with_edits | unusable'
     ].join('\n');
 
@@ -870,6 +876,7 @@ Output ONLY valid JSON with this exact schema:
   "structural_validity": number,
   "answer_correctness": number,
   "topic_alignment": number,
+  "distinctness": number,
   "usability": "usable_as_is | usable_with_edits | unusable",
   "brief_reason": "one sentence explanation"
 }`;
@@ -901,6 +908,7 @@ Output ONLY valid JSON with this exact schema:
       structural_validity: normalizeJudgeScore(parsed.structural_validity),
       answer_correctness: normalizeJudgeScore(parsed.answer_correctness),
       topic_alignment: normalizeJudgeScore(parsed.topic_alignment),
+      distinctness: normalizeJudgeScore(parsed.distinctness),
       usability: normalizeUsability(parsed.usability),
       brief_reason: String(parsed.brief_reason ?? '').trim() || 'No reason provided.'
     });
@@ -931,6 +939,15 @@ Output ONLY valid JSON with this exact schema:
     unusable: 0.75
   };
 
+  // Distinctness is a penalty dimension: lower distinctness => smaller factor.
+  const distinctnessToFactor = {
+    5: 1.0,
+    4: 0.9,
+    3: 0.7,
+    2: 0.4,
+    1: 0.1
+  };
+
   function normalize1to5To0to100(score1to5) {
     if (!Number.isFinite(score1to5)) return null;
     const clamped = Math.max(1, Math.min(5, score1to5));
@@ -959,6 +976,9 @@ Output ONLY valid JSON with this exact schema:
     q.exam_variant_composite_score_1to5 = baseComposite1to5;
     q.exam_variant_composite_score_0to100 = normalize1to5To0to100(baseComposite1to5);
 
+    const distinctnessFactor = Number.isFinite(q.distinctness) ? distinctnessToFactor[q.distinctness] : null;
+    q.exam_variant_distinctness_factor = typeof distinctnessFactor === 'number' ? distinctnessFactor : null;
+
     const multiplier = usabilityMultiplier[q.usability] ?? 1.0;
     const adjustedComposite1to5 =
       baseComposite1to5 == null ? null : Math.max(1, Math.min(5, baseComposite1to5 * multiplier));
@@ -970,22 +990,33 @@ Output ONLY valid JSON with this exact schema:
     .map((q) => q.exam_variant_composite_score_1to5)
     .filter((v) => typeof v === 'number' && Number.isFinite(v));
 
-  const adjustedCompositeValues = perQuestion
-    .map((q) => q.exam_variant_composite_score_1to5_usability_adjusted)
-    .filter((v) => typeof v === 'number' && Number.isFinite(v));
-
   const examVariantScoreBase1to5 = baseCompositeValues.length
     ? baseCompositeValues.reduce((a, b) => a + b, 0) / baseCompositeValues.length
     : null;
 
-  const examVariantScoreFinal1to5 = applyUsabilityPenalty
-    ? adjustedCompositeValues.length
-      ? adjustedCompositeValues.reduce((a, b) => a + b, 0) / adjustedCompositeValues.length
-      : null
-    : examVariantScoreBase1to5;
-
   const examVariantScoreBase0to100 = normalize1to5To0to100(examVariantScoreBase1to5);
-  const examVariantScoreFinal0to100 = normalize1to5To0to100(examVariantScoreFinal1to5);
+  const distinctnessFactorValues = perQuestion
+    .map((q) => q.exam_variant_distinctness_factor)
+    .filter((v) => typeof v === 'number' && Number.isFinite(v));
+  const distinctnessFactorAvg = distinctnessFactorValues.length ? distinctnessFactorValues.reduce((a, b) => a + b, 0) / distinctnessFactorValues.length : 1.0;
+
+  const usabilityFactorValues = perQuestion
+    .map((q) => usabilityMultiplier[q.usability] ?? 1.0)
+    .filter((v) => typeof v === 'number' && Number.isFinite(v));
+  const usabilityFactorAvg = usabilityFactorValues.length ? usabilityFactorValues.reduce((a, b) => a + b, 0) / usabilityFactorValues.length : 1.0;
+
+  const examVariantScoreFinal0to100 =
+    examVariantScoreBase0to100 == null
+      ? null
+      : Math.max(0, Math.min(100, examVariantScoreBase0to100 * distinctnessFactorAvg * (applyUsabilityPenalty ? usabilityFactorAvg : 1.0)));
+
+  const examVariantScoreFinal1to5 =
+    examVariantScoreFinal0to100 == null ? null : 1 + (examVariantScoreFinal0to100 / 100) * 4;
+
+  const distinctnessValues = perQuestion
+    .map((q) => q.distinctness)
+    .filter((v) => typeof v === 'number' && Number.isFinite(v));
+  const distinctnessAverage1to5 = distinctnessValues.length ? distinctnessValues.reduce((a, b) => a + b, 0) / distinctnessValues.length : null;
 
   const averages = {};
   for (const key of dimensions) {
@@ -1021,10 +1052,17 @@ Output ONLY valid JSON with this exact schema:
           ? `Several slots are workable but need edits (${usabilityCounts.usable_with_edits}/${pairCount}).`
           : 'All slots were judged usable (no unusable slots).';
 
+    const distinctnessWeakness =
+      typeof distinctnessAverage1to5 === 'number' && Number.isFinite(distinctnessAverage1to5) && distinctnessAverage1to5 <= 2.0
+        ? `Variant distinctness is low (avg ${distinctnessAverage1to5.toFixed(2)}/5): changes look like near-duplicates; consider altering values, structure, or scenario.`
+        : null;
+
+    const baseWeaknesses = weaknessBits.length ? weaknessBits : ['At least one rubric dimension averaged lower across slots.'];
+
     return {
       summaryText: `Overall, the variant preserves the rubric intent with strength in ${strengthBits.join(', ') || 'rubric dimensions'}. ${usabilityWeakness}`,
       strengths: strengthBits.length ? strengthBits : ['Rubric dimensions were generally consistent across slots.'],
-      weaknesses: weaknessBits.length ? weaknessBits : ['At least one rubric dimension averaged lower across slots.']
+      weaknesses: distinctnessWeakness ? [...baseWeaknesses, distinctnessWeakness] : baseWeaknesses
     };
   }
 
@@ -1047,6 +1085,10 @@ Usability (actionability):
 - usable_with_edits: ${usabilityCounts.usable_with_edits}
 - unusable: ${usabilityCounts.unusable}
 
+Variant distinctness (penalty dimension):
+- distinctnessAverage (1-5): ${distinctnessAverage1to5 ?? 'n/a'}
+- distinctnessFactorAvg (multiplier): ${distinctnessFactorAvg ?? 'n/a'}
+
 Overall composite score (0-100):
 - base: ${examVariantScoreBase0to100 ?? 'n/a'}
 - final: ${examVariantScoreFinal0to100 ?? 'n/a'}
@@ -1058,6 +1100,8 @@ Return ONLY valid JSON:
   "strengths": ["2-4 short strings"],
   "weaknesses": ["2-4 short strings"]
 }
+
+If distinctnessAverage is low (near-duplicate/very similar), ensure at least one item in "weaknesses" explicitly mentions that the variant is too similar and should change values, structure, or scenario.
 
 Do not include markdown fences. Keep strings concise.`;
 
@@ -1109,6 +1153,9 @@ Do not include markdown fences. Keep strings concise.`;
     usableQuestionPercentage,
     compositeWeights,
     usabilityMultiplier,
+    distinctnessAverage1to5,
+    distinctnessFactorAvg,
+    distinctnessToFactor,
     usabilityPenaltyApplied: Boolean(applyUsabilityPenalty),
     examVariantScoreBase1to5,
     examVariantScoreBase0to100,

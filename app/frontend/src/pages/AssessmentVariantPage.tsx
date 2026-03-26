@@ -71,6 +71,13 @@ Score 3: Related but somewhat outside the topic.
 Score 2: Weak topical relationship.
 Score 1: Completely different topic.
 
+Variant distinctness (1-5)
+5: Substantially different (new numbers, context, structure, or scenario) while preserving concept
+4: Moderate changes (clear variation in values or framing)
+3: Minor variation (mostly reworded, small parameter changes)
+2: Very similar (only superficial edits)
+1: Near-duplicate
+
 Usability classification
 usable_as_is
 usable_with_edits
@@ -188,7 +195,16 @@ function buildAiReviewWordHtmlReport(
       typeof r.exam_variant_composite_score_1to5 === 'number' &&
       Number.isFinite(r.exam_variant_composite_score_1to5)
     ) {
-      return r.exam_variant_composite_score_1to5;
+      const distinctnessFactor =
+        typeof r.exam_variant_distinctness_factor === 'number' && Number.isFinite(r.exam_variant_distinctness_factor)
+          ? r.exam_variant_distinctness_factor
+          : 1;
+      const usabilityAdjusted =
+        typeof r.exam_variant_composite_score_1to5_usability_adjusted === 'number' &&
+        Number.isFinite(r.exam_variant_composite_score_1to5_usability_adjusted)
+          ? r.exam_variant_composite_score_1to5_usability_adjusted
+          : r.exam_variant_composite_score_1to5;
+      return usabilityAdjusted * distinctnessFactor;
     }
     const vals = [
       r.conceptual_equivalence,
@@ -218,6 +234,7 @@ function buildAiReviewWordHtmlReport(
         <td>${r.structural_validity ?? '-'}</td>
         <td>${r.answer_correctness ?? '-'}</td>
         <td>${r.topic_alignment ?? '-'}</td>
+        <td>${r.distinctness ?? '-'}</td>
         <td>${escapeHtml(formatUsabilityLabel(r.usability))}</td>
         <td>${escapeHtml(r.brief_reason ?? '')}</td>
       </tr>`
@@ -238,6 +255,8 @@ function buildAiReviewWordHtmlReport(
   const finalScore0to100 = typeof result.examVariantScoreFinal0to100 === 'number' ? result.examVariantScoreFinal0to100 : null;
   const baseScore0to100 = typeof result.examVariantScoreBase0to100 === 'number' ? result.examVariantScoreBase0to100 : null;
   const usablePct = typeof result.usableQuestionPercentage === 'number' ? result.usableQuestionPercentage : null;
+  const distinctnessAvg = typeof result.distinctnessAverage1to5 === 'number' ? result.distinctnessAverage1to5 : null;
+  const distinctnessFactorAvg = typeof result.distinctnessFactorAvg === 'number' ? result.distinctnessFactorAvg : null;
   const overallSummaryText = result.overallSummary?.summaryText ?? 'n/a';
   const overallStrengthsText = Array.isArray(result.overallSummary?.strengths) ? result.overallSummary.strengths.join(', ') : 'n/a';
   const overallWeaknessesText = Array.isArray(result.overallSummary?.weaknesses) ? result.overallSummary.weaknesses.join(', ') : 'n/a';
@@ -274,7 +293,8 @@ function buildAiReviewWordHtmlReport(
   <div class="card">
     <p>Final exam variant score: <strong>${finalScore0to100 != null ? finalScore0to100.toFixed(0) : 'n/a'}</strong> / 100<br/>
        Base (rubric-only): <strong>${baseScore0to100 != null ? baseScore0to100.toFixed(0) : 'n/a'}</strong> / 100<br/>
-       Usable questions: <strong>${usablePct != null ? usablePct.toFixed(0) : 'n/a'}</strong>%</p>
+       Usable questions: <strong>${usablePct != null ? usablePct.toFixed(0) : 'n/a'}</strong>%<br/>
+       Distinctness: <strong>${distinctnessAvg != null ? distinctnessAvg.toFixed(2) : 'n/a'}</strong>/5 (factor ${distinctnessFactorAvg != null ? distinctnessFactorAvg.toFixed(2) : 'n/a'})</p>
   </div>
 
   <h2>Instructor summary</h2>
@@ -316,6 +336,7 @@ function buildAiReviewWordHtmlReport(
         <th>Structure</th>
         <th>Answer</th>
         <th>Topic</th>
+        <th>Distinctness</th>
         <th>Usability</th>
         <th>Reason</th>
       </tr>
@@ -1398,6 +1419,16 @@ export function AssessmentVariantPage() {
                           ? aiReviewResult.usableQuestionPercentage.toFixed(0)
                           : 'n/a'}
                         %
+                        <br />
+                        · Distinctness:{' '}
+                        {typeof aiReviewResult.distinctnessAverage1to5 === 'number'
+                          ? aiReviewResult.distinctnessAverage1to5.toFixed(2)
+                          : 'n/a'}
+                        /5 (factor{' '}
+                        {typeof aiReviewResult.distinctnessFactorAvg === 'number'
+                          ? aiReviewResult.distinctnessFactorAvg.toFixed(2)
+                          : 'n/a'}
+                        )
                       </p>
                     </div>
 
@@ -1483,6 +1514,7 @@ export function AssessmentVariantPage() {
                             <th className="p-2">Structure</th>
                             <th className="p-2">Answer</th>
                             <th className="p-2">Topic</th>
+                            <th className="p-2">Distinctness</th>
                             <th className="p-2">Usability</th>
                             <th className="p-2">Reason</th>
                           </tr>
@@ -1496,6 +1528,7 @@ export function AssessmentVariantPage() {
                               <td className="p-2">{row.structural_validity ?? '-'}</td>
                               <td className="p-2">{row.answer_correctness ?? '-'}</td>
                               <td className="p-2">{row.topic_alignment ?? '-'}</td>
+                              <td className="p-2">{row.distinctness ?? '-'}</td>
                               <td className="p-2">{formatUsabilityLabel(row.usability)}</td>
                               <td className="p-2">{row.brief_reason}</td>
                             </tr>

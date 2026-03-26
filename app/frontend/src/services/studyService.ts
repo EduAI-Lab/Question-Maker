@@ -90,10 +90,12 @@ export interface VariantAiReviewRow {
   structural_validity: number | null;
   answer_correctness: number | null;
   topic_alignment: number | null;
+  distinctness?: number | null;
   exam_variant_composite_score_1to5: number | null;
   exam_variant_composite_score_0to100: number | null;
   exam_variant_composite_score_1to5_usability_adjusted: number | null;
   exam_variant_composite_score_0to100_usability_adjusted: number | null;
+  exam_variant_distinctness_factor?: number | null;
   usability: 'usable_as_is' | 'usable_with_edits' | 'unusable';
   brief_reason: string;
 }
@@ -121,6 +123,9 @@ export interface VariantAiReviewResult {
   examVariantScoreBase0to100: number | null;
   examVariantScoreFinal1to5: number | null;
   examVariantScoreFinal0to100: number | null;
+  distinctnessAverage1to5?: number | null;
+  distinctnessFactorAvg?: number;
+  distinctnessToFactor?: Record<string, number>;
   overallSummary: {
     summaryText: string;
     strengths: string[];
