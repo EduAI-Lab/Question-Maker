@@ -784,7 +784,11 @@ export async function reviewVariantExamWithAi(userId, params) {
     courseId,
     model = 'ollama:gpt-oss:120b',
     apiKeys = {},
-    rubricText = ''
+    rubricText = '',
+    // If true, penalize low-usability slots when computing the overall score.
+    applyUsabilityPenalty = true,
+    // If true, ask the LLM for a short strengths/weaknesses summary.
+    includeOverallSummary = true
   } = params;
 
   if (!baselineAssessmentId || !variantAssessmentId || !courseId) {
@@ -909,6 +913,80 @@ Output ONLY valid JSON with this exact schema:
     'answer_correctness',
     'topic_alignment'
   ];
+
+  // Composite weights come directly from the rubric dimensions.
+  // Conceptual equivalence gets a slightly higher weight than the other rubric dimensions.
+  const compositeWeights = {
+    conceptual_equivalence: 0.24,
+    difficulty_similarity: 0.19,
+    structural_validity: 0.19,
+    answer_correctness: 0.19,
+    topic_alignment: 0.19
+  };
+
+  // Usability multiplier is applied only as a penalty to the overall score (never changes per-dimension rubric scores).
+  const usabilityMultiplier = {
+    usable_as_is: 1.0,
+    usable_with_edits: 0.9,
+    unusable: 0.75
+  };
+
+  function normalize1to5To0to100(score1to5) {
+    if (!Number.isFinite(score1to5)) return null;
+    const clamped = Math.max(1, Math.min(5, score1to5));
+    return ((clamped - 1) / (5 - 1)) * 100;
+  }
+
+  function computeComposite1to5ForQuestion(question) {
+    let weightedSum = 0;
+    let usedWeight = 0;
+
+    for (const dim of dimensions) {
+      const v = question[dim];
+      const w = compositeWeights[dim];
+      if (typeof v === 'number' && Number.isFinite(v) && typeof w === 'number' && Number.isFinite(w)) {
+        weightedSum += v * w;
+        usedWeight += w;
+      }
+    }
+
+    if (usedWeight <= 0) return null;
+    return weightedSum / usedWeight;
+  }
+
+  for (const q of perQuestion) {
+    const baseComposite1to5 = computeComposite1to5ForQuestion(q);
+    q.exam_variant_composite_score_1to5 = baseComposite1to5;
+    q.exam_variant_composite_score_0to100 = normalize1to5To0to100(baseComposite1to5);
+
+    const multiplier = usabilityMultiplier[q.usability] ?? 1.0;
+    const adjustedComposite1to5 =
+      baseComposite1to5 == null ? null : Math.max(1, Math.min(5, baseComposite1to5 * multiplier));
+    q.exam_variant_composite_score_1to5_usability_adjusted = adjustedComposite1to5;
+    q.exam_variant_composite_score_0to100_usability_adjusted = normalize1to5To0to100(adjustedComposite1to5);
+  }
+
+  const baseCompositeValues = perQuestion
+    .map((q) => q.exam_variant_composite_score_1to5)
+    .filter((v) => typeof v === 'number' && Number.isFinite(v));
+
+  const adjustedCompositeValues = perQuestion
+    .map((q) => q.exam_variant_composite_score_1to5_usability_adjusted)
+    .filter((v) => typeof v === 'number' && Number.isFinite(v));
+
+  const examVariantScoreBase1to5 = baseCompositeValues.length
+    ? baseCompositeValues.reduce((a, b) => a + b, 0) / baseCompositeValues.length
+    : null;
+
+  const examVariantScoreFinal1to5 = applyUsabilityPenalty
+    ? adjustedCompositeValues.length
+      ? adjustedCompositeValues.reduce((a, b) => a + b, 0) / adjustedCompositeValues.length
+      : null
+    : examVariantScoreBase1to5;
+
+  const examVariantScoreBase0to100 = normalize1to5To0to100(examVariantScoreBase1to5);
+  const examVariantScoreFinal0to100 = normalize1to5To0to100(examVariantScoreFinal1to5);
+
   const averages = {};
   for (const key of dimensions) {
     const vals = perQuestion.map((q) => q[key]).filter((v) => Number.isFinite(v));
@@ -921,6 +999,102 @@ Output ONLY valid JSON with this exact schema:
     unusable: perQuestion.filter((q) => q.usability === 'unusable').length
   };
 
+  const usableQuestionCount = usabilityCounts.usable_as_is + usabilityCounts.usable_with_edits;
+  const usableQuestionPercentage = pairCount ? (usableQuestionCount / pairCount) * 100 : 0;
+
+  function fallbackOverallSummary() {
+    const entries = dimensions
+      .map((d) => ({ dim: d, avg: averages[d] }))
+      .filter((x) => typeof x.avg === 'number' && Number.isFinite(x.avg))
+      .sort((a, b) => b.avg - a.avg);
+
+    const top = entries.slice(0, 2);
+    const bottom = entries.slice(-2);
+
+    const strengthBits = top.map((x) => `${x.dim.replaceAll('_', ' ')} (${x.avg.toFixed(2)}/5)`);
+    const weaknessBits = bottom.map((x) => `${x.dim.replaceAll('_', ' ')} (${x.avg.toFixed(2)}/5)`);
+
+    const usabilityWeakness =
+      usabilityCounts.unusable > 0
+        ? `Some slots were judged unusable (${usabilityCounts.unusable}/${pairCount}), so practical exam quality likely needs revision.`
+        : usabilityCounts.usable_with_edits > 0
+          ? `Several slots are workable but need edits (${usabilityCounts.usable_with_edits}/${pairCount}).`
+          : 'All slots were judged usable (no unusable slots).';
+
+    return {
+      summaryText: `Overall, the variant preserves the rubric intent with strength in ${strengthBits.join(', ') || 'rubric dimensions'}. ${usabilityWeakness}`,
+      strengths: strengthBits.length ? strengthBits : ['Rubric dimensions were generally consistent across slots.'],
+      weaknesses: weaknessBits.length ? weaknessBits : ['At least one rubric dimension averaged lower across slots.']
+    };
+  }
+
+  let overallSummary = null;
+  if (includeOverallSummary) {
+    const summarySystemInstruction =
+      'You are an expert university instructor. Write short, actionable feedback about why an exam variant does or does not meet a rubric.';
+    const summaryUserPrompt = `We compared a baseline exam against a generated variant, slot-by-slot, using this rubric:
+${rubric}
+
+Rubric dimension averages (1-5):
+- conceptual_equivalence: ${averages.conceptual_equivalence ?? 'n/a'}
+- difficulty_similarity: ${averages.difficulty_similarity ?? 'n/a'}
+- structural_validity: ${averages.structural_validity ?? 'n/a'}
+- answer_correctness: ${averages.answer_correctness ?? 'n/a'}
+- topic_alignment: ${averages.topic_alignment ?? 'n/a'}
+
+Usability (actionability):
+- usable_as_is: ${usabilityCounts.usable_as_is}
+- usable_with_edits: ${usabilityCounts.usable_with_edits}
+- unusable: ${usabilityCounts.unusable}
+
+Overall composite score (0-100):
+- base: ${examVariantScoreBase0to100 ?? 'n/a'}
+- final: ${examVariantScoreFinal0to100 ?? 'n/a'}
+
+Task:
+Return ONLY valid JSON:
+{
+  "summaryText": "1-3 sentences, instructor-facing (mention strengths and weaknesses)",
+  "strengths": ["2-4 short strings"],
+  "weaknesses": ["2-4 short strings"]
+}
+
+Do not include markdown fences. Keep strings concise.`;
+
+    try {
+      const response = await eduaiService.chat({
+        model,
+        apiKeys,
+        courseCode: `COURSE-${courseId}`,
+        messages: [
+          { role: 'system', content: summarySystemInstruction },
+          { role: 'user', content: summaryUserPrompt }
+        ],
+        streaming: false,
+        timeoutMs: 60000
+      });
+
+      const content = response?.content ?? response?.message ?? '';
+      const parsed = parseJsonObjectFromText(content);
+      if (
+        parsed &&
+        typeof parsed.summaryText === 'string' &&
+        Array.isArray(parsed.strengths) &&
+        Array.isArray(parsed.weaknesses)
+      ) {
+        overallSummary = {
+          summaryText: parsed.summaryText.trim(),
+          strengths: parsed.strengths.map((s) => String(s).trim()).filter(Boolean).slice(0, 6),
+          weaknesses: parsed.weaknesses.map((s) => String(s).trim()).filter(Boolean).slice(0, 6)
+        };
+      }
+    } catch {
+      overallSummary = null;
+    }
+  }
+
+  if (!overallSummary) overallSummary = fallbackOverallSummary();
+
   return {
     baselineAssessmentId: baselineAssessment.id,
     variantAssessmentId: variantAssessment.id,
@@ -932,6 +1106,15 @@ Output ONLY valid JSON with this exact schema:
     variantSlotCount: variantVariants.length,
     averages,
     usabilityCounts,
+    usableQuestionPercentage,
+    compositeWeights,
+    usabilityMultiplier,
+    usabilityPenaltyApplied: Boolean(applyUsabilityPenalty),
+    examVariantScoreBase1to5,
+    examVariantScoreBase0to100,
+    examVariantScoreFinal1to5,
+    examVariantScoreFinal0to100,
+    overallSummary,
     perQuestion
   };
 }

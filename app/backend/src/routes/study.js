@@ -188,7 +188,7 @@ router.post('/metrics', authenticateToken, async (req, res, next) => {
 /** POST /api/study/review-variant-ai — AI judge compares variant exam against baseline using rubric. */
 router.post('/review-variant-ai', authenticateToken, async (req, res, next) => {
   try {
-    const { baselineAssessmentId, variantAssessmentId, courseId, model, apiKeys, rubricText } = req.body;
+    const { baselineAssessmentId, variantAssessmentId, courseId, model, apiKeys, rubricText, applyUsabilityPenalty, includeOverallSummary } = req.body;
     if (!baselineAssessmentId || !variantAssessmentId || !courseId) {
       return res.status(400).json({
         success: false,
@@ -202,7 +202,9 @@ router.post('/review-variant-ai', authenticateToken, async (req, res, next) => {
       courseId: Number(courseId),
       model: typeof model === 'string' ? model : undefined,
       apiKeys: apiKeys && typeof apiKeys === 'object' ? apiKeys : {},
-      rubricText: typeof rubricText === 'string' ? rubricText : ''
+      rubricText: typeof rubricText === 'string' ? rubricText : '',
+      applyUsabilityPenalty: typeof applyUsabilityPenalty === 'boolean' ? applyUsabilityPenalty : undefined,
+      includeOverallSummary: typeof includeOverallSummary === 'boolean' ? includeOverallSummary : undefined
     });
 
     res.json({ success: true, data });

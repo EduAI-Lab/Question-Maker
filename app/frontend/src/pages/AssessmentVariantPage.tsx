@@ -184,6 +184,12 @@ function buildAiReviewWordHtmlReport(
 ): string {
   const rows = [...result.perQuestion];
   const scoreOf = (r: (typeof rows)[number]) => {
+    if (
+      typeof r.exam_variant_composite_score_1to5 === 'number' &&
+      Number.isFinite(r.exam_variant_composite_score_1to5)
+    ) {
+      return r.exam_variant_composite_score_1to5;
+    }
     const vals = [
       r.conceptual_equivalence,
       r.difficulty_similarity,
@@ -221,13 +227,20 @@ function buildAiReviewWordHtmlReport(
   const highHtml = highExamples
     .map(
       (item, idx) =>
-        `<li>${idx + 1}. Slot ${item.row.slot} (avg ${item.avg.toFixed(2)}) - ${escapeHtml(formatUsabilityLabel(item.row.usability))}: ${escapeHtml(item.row.brief_reason ?? '')}</li>`
+        `<li>${idx + 1}. Slot ${item.row.slot} (composite ${item.avg.toFixed(2)}/5) - ${escapeHtml(formatUsabilityLabel(item.row.usability))}: ${escapeHtml(item.row.brief_reason ?? '')}</li>`
     )
     .join('');
 
   const lowHtml = lowExample
-    ? `<li>Slot ${lowExample.row.slot} (avg ${lowExample.avg.toFixed(2)}) - ${escapeHtml(formatUsabilityLabel(lowExample.row.usability))}: ${escapeHtml(lowExample.row.brief_reason ?? '')}</li>`
+    ? `<li>Slot ${lowExample.row.slot} (composite ${lowExample.avg.toFixed(2)}/5) - ${escapeHtml(formatUsabilityLabel(lowExample.row.usability))}: ${escapeHtml(lowExample.row.brief_reason ?? '')}</li>`
     : '<li>n/a</li>';
+
+  const finalScore0to100 = typeof result.examVariantScoreFinal0to100 === 'number' ? result.examVariantScoreFinal0to100 : null;
+  const baseScore0to100 = typeof result.examVariantScoreBase0to100 === 'number' ? result.examVariantScoreBase0to100 : null;
+  const usablePct = typeof result.usableQuestionPercentage === 'number' ? result.usableQuestionPercentage : null;
+  const overallSummaryText = result.overallSummary?.summaryText ?? 'n/a';
+  const overallStrengthsText = Array.isArray(result.overallSummary?.strengths) ? result.overallSummary.strengths.join(', ') : 'n/a';
+  const overallWeaknessesText = Array.isArray(result.overallSummary?.weaknesses) ? result.overallSummary.weaknesses.join(', ') : 'n/a';
 
   return `<!DOCTYPE html>
 <html>
@@ -256,6 +269,20 @@ function buildAiReviewWordHtmlReport(
      <strong>Variant exam:</strong> ${escapeHtml(variantName)} (#${result.variantAssessmentId})<br/>
      <strong>Model:</strong> ${escapeHtml(result.model)}<br/>
      <strong>Compared slots:</strong> ${result.comparedSlots}</p>
+
+  <h2>Overall score</h2>
+  <div class="card">
+    <p>Final exam variant score: <strong>${finalScore0to100 != null ? finalScore0to100.toFixed(0) : 'n/a'}</strong> / 100<br/>
+       Base (rubric-only): <strong>${baseScore0to100 != null ? baseScore0to100.toFixed(0) : 'n/a'}</strong> / 100<br/>
+       Usable questions: <strong>${usablePct != null ? usablePct.toFixed(0) : 'n/a'}</strong>%</p>
+  </div>
+
+  <h2>Instructor summary</h2>
+  <div class="card">
+    <p><strong>Summary:</strong> ${escapeHtml(overallSummaryText)}</p>
+    <p><strong>Strengths:</strong> ${escapeHtml(overallStrengthsText)}</p>
+    <p><strong>Weaknesses:</strong> ${escapeHtml(overallWeaknessesText)}</p>
+  </div>
 
   <h2>Aggregate scores</h2>
   <div class="card">
@@ -1352,6 +1379,93 @@ export function AssessmentVariantPage() {
                       Compared {aiReviewResult.comparedSlots} aligned slot(s). Baseline slots: {aiReviewResult.baselineSlotCount}
                       , variant slots: {aiReviewResult.variantSlotCount}.
                     </p>
+
+                    <div className="rounded border bg-slate-50 p-3">
+                      <p className="text-sm font-semibold text-slate-900">
+                        Overall variant score:{' '}
+                        {typeof aiReviewResult.examVariantScoreFinal0to100 === 'number'
+                          ? aiReviewResult.examVariantScoreFinal0to100.toFixed(0)
+                          : 'n/a'}{' '}
+                        / 100
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Base (rubric-only):{' '}
+                        {typeof aiReviewResult.examVariantScoreBase0to100 === 'number'
+                          ? aiReviewResult.examVariantScoreBase0to100.toFixed(0)
+                          : 'n/a'}{' '}
+                        · Usable questions:{' '}
+                        {typeof aiReviewResult.usableQuestionPercentage === 'number'
+                          ? aiReviewResult.usableQuestionPercentage.toFixed(0)
+                          : 'n/a'}
+                        %
+                      </p>
+                    </div>
+
+                    <div className="grid gap-2 grid-cols-2 sm:grid-cols-5">
+                      <div className="rounded border bg-white p-2">
+                        <span className="font-medium">Concept</span>
+                        <div className="text-xs text-muted-foreground">
+                          {typeof aiReviewResult.averages.conceptual_equivalence === 'number'
+                            ? aiReviewResult.averages.conceptual_equivalence.toFixed(2)
+                            : 'n/a'}
+                          /5
+                        </div>
+                      </div>
+                      <div className="rounded border bg-white p-2">
+                        <span className="font-medium">Difficulty</span>
+                        <div className="text-xs text-muted-foreground">
+                          {typeof aiReviewResult.averages.difficulty_similarity === 'number'
+                            ? aiReviewResult.averages.difficulty_similarity.toFixed(2)
+                            : 'n/a'}
+                          /5
+                        </div>
+                      </div>
+                      <div className="rounded border bg-white p-2">
+                        <span className="font-medium">Structure</span>
+                        <div className="text-xs text-muted-foreground">
+                          {typeof aiReviewResult.averages.structural_validity === 'number'
+                            ? aiReviewResult.averages.structural_validity.toFixed(2)
+                            : 'n/a'}
+                          /5
+                        </div>
+                      </div>
+                      <div className="rounded border bg-white p-2">
+                        <span className="font-medium">Answer</span>
+                        <div className="text-xs text-muted-foreground">
+                          {typeof aiReviewResult.averages.answer_correctness === 'number'
+                            ? aiReviewResult.averages.answer_correctness.toFixed(2)
+                            : 'n/a'}
+                          /5
+                        </div>
+                      </div>
+                      <div className="rounded border bg-white p-2">
+                        <span className="font-medium">Topic</span>
+                        <div className="text-xs text-muted-foreground">
+                          {typeof aiReviewResult.averages.topic_alignment === 'number'
+                            ? aiReviewResult.averages.topic_alignment.toFixed(2)
+                            : 'n/a'}
+                          /5
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded border bg-white p-3">
+                      <p className="text-sm font-semibold">Instructor summary</p>
+                      <p className="text-xs text-muted-foreground">
+                        {aiReviewResult.overallSummary?.summaryText ?? 'n/a'}
+                      </p>
+                      <div className="mt-2 text-xs">
+                        <p>
+                          <span className="font-medium">Strengths:</span>{' '}
+                          {aiReviewResult.overallSummary?.strengths?.join('; ') ?? 'n/a'}
+                        </p>
+                        <p>
+                          <span className="font-medium">Weaknesses:</span>{' '}
+                          {aiReviewResult.overallSummary?.weaknesses?.join('; ') ?? 'n/a'}
+                        </p>
+                      </div>
+                    </div>
+
                     <div className="grid gap-2 sm:grid-cols-3">
                       <div className="rounded border bg-slate-50 p-2">Usable as-is: {aiReviewResult.usabilityCounts.usable_as_is}</div>
                       <div className="rounded border bg-slate-50 p-2">
