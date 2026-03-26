@@ -4,11 +4,12 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ClipboardList, Loader2, Sparkles, Upload, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardList, History, Loader2, Sparkles, Trash2, Upload, XCircle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { ScrollArea } from '../components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -32,6 +33,8 @@ import type { Topic } from '../types/topic';
 /** Hover text for the Variants column — counts are reviewed-only (drafts excluded). */
 const REVIEWED_VARIANTS_TOOLTIP =
   'Number of reviewed variants for this question in the bank. Draft variants are not included.';
+const AI_REVIEW_HISTORY_KEY = 'study.aiReview.history.v1';
+const AI_REVIEW_HISTORY_MAX_ITEMS = 40;
 
 const DEFAULT_AI_JUDGE_RUBRIC = `Conceptual equivalence (1-5)
 Score 5: The variant assesses the same concept and reasoning process as the original.
@@ -75,6 +78,231 @@ unusable`;
 
 function variantStatusTooltip(minRequired: number): string {
   return `Ready when this question has at least ${minRequired} reviewed variants. Draft variants do not count.`;
+}
+
+function formatUsabilityLabel(value: string): string {
+  if (value === 'usable_as_is') return 'Usable as-is';
+  if (value === 'usable_with_edits') return 'Usable with edits';
+  if (value === 'unusable') return 'Unusable';
+  return value.replaceAll('_', ' ');
+}
+
+type AiReviewResult = Awaited<ReturnType<typeof studyService.reviewVariantWithAi>>;
+
+interface AiReviewHistoryItem {
+  id: string;
+  createdAt: string;
+  courseId: number;
+  baselineAssessmentId: number;
+  baselineName: string;
+  variantAssessmentId: number;
+  variantName: string;
+  model: string;
+  result: AiReviewResult;
+}
+
+function loadAiReviewHistoryFromStorage(): AiReviewHistoryItem[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(AI_REVIEW_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as AiReviewHistoryItem[];
+    return Array.isArray(parsed) ? parsed.slice(0, AI_REVIEW_HISTORY_MAX_ITEMS) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAiReviewHistoryToStorage(items: AiReviewHistoryItem[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(AI_REVIEW_HISTORY_KEY, JSON.stringify(items.slice(0, AI_REVIEW_HISTORY_MAX_ITEMS)));
+  } catch {
+    // Ignore storage write failures and continue.
+  }
+}
+
+function isToday(date: Date): boolean {
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  );
+}
+
+function isYesterday(date: Date): boolean {
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  return (
+    date.getFullYear() === y.getFullYear() &&
+    date.getMonth() === y.getMonth() &&
+    date.getDate() === y.getDate()
+  );
+}
+
+function groupAiReviewHistory(items: AiReviewHistoryItem[]): {
+  today: AiReviewHistoryItem[];
+  yesterday: AiReviewHistoryItem[];
+  earlier: AiReviewHistoryItem[];
+} {
+  const out = { today: [] as AiReviewHistoryItem[], yesterday: [] as AiReviewHistoryItem[], earlier: [] as AiReviewHistoryItem[] };
+  for (const item of items) {
+    const d = new Date(item.createdAt);
+    if (isToday(d)) out.today.push(item);
+    else if (isYesterday(d)) out.yesterday.push(item);
+    else out.earlier.push(item);
+  }
+  return out;
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function buildAiReviewWordHtmlReport(
+  result: Awaited<ReturnType<typeof studyService.reviewVariantWithAi>>,
+  baselineName: string,
+  variantName: string
+): string {
+  const rows = [...result.perQuestion];
+  const scoreOf = (r: (typeof rows)[number]) => {
+    const vals = [
+      r.conceptual_equivalence,
+      r.difficulty_similarity,
+      r.structural_validity,
+      r.answer_correctness,
+      r.topic_alignment
+    ].filter((v): v is number => typeof v === 'number');
+    if (vals.length === 0) return 0;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+  };
+  const ranked = rows.map((r) => ({ row: r, avg: scoreOf(r) })).sort((a, b) => b.avg - a.avg);
+  const highExamples = ranked.slice(0, Math.min(3, ranked.length));
+  const lowExample = ranked.length > 0 ? ranked[ranked.length - 1] : null;
+  const avg = (k: string) => {
+    const v = result.averages[k];
+    return typeof v === 'number' ? v.toFixed(2) : 'n/a';
+  };
+
+  const rowsHtml = rows
+    .map(
+      (r) => `
+      <tr>
+        <td>${r.slot}</td>
+        <td>${r.conceptual_equivalence ?? '-'}</td>
+        <td>${r.difficulty_similarity ?? '-'}</td>
+        <td>${r.structural_validity ?? '-'}</td>
+        <td>${r.answer_correctness ?? '-'}</td>
+        <td>${r.topic_alignment ?? '-'}</td>
+        <td>${escapeHtml(formatUsabilityLabel(r.usability))}</td>
+        <td>${escapeHtml(r.brief_reason ?? '')}</td>
+      </tr>`
+    )
+    .join('');
+
+  const highHtml = highExamples
+    .map(
+      (item, idx) =>
+        `<li>${idx + 1}. Slot ${item.row.slot} (avg ${item.avg.toFixed(2)}) - ${escapeHtml(formatUsabilityLabel(item.row.usability))}: ${escapeHtml(item.row.brief_reason ?? '')}</li>`
+    )
+    .join('');
+
+  const lowHtml = lowExample
+    ? `<li>Slot ${lowExample.row.slot} (avg ${lowExample.avg.toFixed(2)}) - ${escapeHtml(formatUsabilityLabel(lowExample.row.usability))}: ${escapeHtml(lowExample.row.brief_reason ?? '')}</li>`
+    : '<li>n/a</li>';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>AI Judge Report</title>
+  <style>
+    body { font-family: Calibri, Arial, sans-serif; line-height: 1.35; color: #111; }
+    h1, h2, h3 { margin: 0 0 8px; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 18px; margin-top: 20px; }
+    h3 { font-size: 15px; margin-top: 14px; }
+    p, li { font-size: 12px; }
+    ul { margin-top: 4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 11px; }
+    th, td { border: 1px solid #cbd5e1; padding: 6px; vertical-align: top; text-align: left; }
+    th { background: #f1f5f9; }
+    .muted { color: #475569; }
+    .card { border: 1px solid #e2e8f0; padding: 10px; margin-top: 8px; }
+    pre { white-space: pre-wrap; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>AI Judge Report</h1>
+  <p><strong>Baseline exam:</strong> ${escapeHtml(baselineName)} (#${result.baselineAssessmentId})<br/>
+     <strong>Variant exam:</strong> ${escapeHtml(variantName)} (#${result.variantAssessmentId})<br/>
+     <strong>Model:</strong> ${escapeHtml(result.model)}<br/>
+     <strong>Compared slots:</strong> ${result.comparedSlots}</p>
+
+  <h2>Aggregate scores</h2>
+  <div class="card">
+    <p>Conceptual equivalence: <strong>${avg('conceptual_equivalence')}</strong><br/>
+       Difficulty similarity: <strong>${avg('difficulty_similarity')}</strong><br/>
+       Structural validity: <strong>${avg('structural_validity')}</strong><br/>
+       Answer correctness: <strong>${avg('answer_correctness')}</strong><br/>
+       Topic alignment: <strong>${avg('topic_alignment')}</strong></p>
+  </div>
+
+  <h2>Usability</h2>
+  <div class="card">
+    <p>Usable as-is: <strong>${result.usabilityCounts.usable_as_is}</strong><br/>
+       Usable with edits: <strong>${result.usabilityCounts.usable_with_edits}</strong><br/>
+       Unusable: <strong>${result.usabilityCounts.unusable}</strong></p>
+  </div>
+
+  <h2>Qualitative examples</h2>
+  <h3>Highest-rated variants (2-3 examples)</h3>
+  <ul>${highHtml || '<li>n/a</li>'}</ul>
+  <h3>Low-rated variant (1 example)</h3>
+  <ul>${lowHtml}</ul>
+
+  <h2>Per-slot results</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Slot</th>
+        <th>Concept</th>
+        <th>Difficulty</th>
+        <th>Structure</th>
+        <th>Answer</th>
+        <th>Topic</th>
+        <th>Usability</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <h2>Rubric used</h2>
+  <pre>${escapeHtml(result.rubricUsed || '(none)')}</pre>
+  <p class="muted">Generated by Assessment Variant Workflow - AI Review export.</p>
+</body>
+</html>`;
 }
 
 /** Unique question_metadata ids in section order (first occurrence per base question). */
@@ -136,9 +364,10 @@ export function AssessmentVariantPage() {
   const [aiReviewModel, setAiReviewModel] = useState('ollama:gpt-oss:120b');
   const [aiReviewRubricOpen, setAiReviewRubricOpen] = useState(false);
   const [aiReviewRubricText, setAiReviewRubricText] = useState(DEFAULT_AI_JUDGE_RUBRIC);
-  const [aiReviewResult, setAiReviewResult] = useState<Awaited<ReturnType<typeof studyService.reviewVariantWithAi>> | null>(
-    null
-  );
+  const [aiReviewResult, setAiReviewResult] = useState<AiReviewResult | null>(null);
+  const [aiReviewHistoryOpen, setAiReviewHistoryOpen] = useState(false);
+  const [aiReviewHistory, setAiReviewHistory] = useState<AiReviewHistoryItem[]>([]);
+  const [aiReviewHistoryReady, setAiReviewHistoryReady] = useState(false);
 
   useEffect(() => {
     void fetchCourses();
@@ -199,6 +428,16 @@ export function AssessmentVariantPage() {
     const preferred = availableModels.find((m) => m.id === 'ollama:gpt-oss:120b');
     setAiReviewModel(preferred?.id ?? availableModels[0].id);
   }, [availableModels, aiReviewModel]);
+
+  useEffect(() => {
+    setAiReviewHistory(loadAiReviewHistoryFromStorage());
+    setAiReviewHistoryReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!aiReviewHistoryReady) return;
+    saveAiReviewHistoryToStorage(aiReviewHistory);
+  }, [aiReviewHistory, aiReviewHistoryReady]);
 
   const loadTopics = useCallback(async (courseId: number) => {
     const t = await courseService.getCourseTopics(courseId);
@@ -478,6 +717,20 @@ export function AssessmentVariantPage() {
         rubricText: aiReviewRubricText.trim()
       });
       setAiReviewResult(result);
+      const baselineName = assessments.find((a) => a.id === baselineId)?.name ?? `Assessment #${baselineId}`;
+      const variantName = assessments.find((a) => a.id === variantId)?.name ?? `Assessment #${variantId}`;
+      const historyItem: AiReviewHistoryItem = {
+        id: `ai-review-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        createdAt: new Date().toISOString(),
+        courseId: cid,
+        baselineAssessmentId: baselineId,
+        baselineName,
+        variantAssessmentId: variantId,
+        variantName,
+        model: aiReviewModel,
+        result
+      };
+      setAiReviewHistory((prev) => [historyItem, ...prev].slice(0, AI_REVIEW_HISTORY_MAX_ITEMS));
       toast({
         title: 'AI review complete',
         description: `Compared ${result.comparedSlots} slot(s). See Phase 5 results below.`
@@ -497,6 +750,86 @@ export function AssessmentVariantPage() {
   const aiReviewCandidates = assessments.filter((a) => a.id.toString() !== aiReviewBaselineEffectiveId);
   const aiReviewDisabled =
     aiReviewLoading || !selectedCourse?.id || !aiReviewBaselineEffectiveId || !aiReviewVariantId;
+  const aiReviewBaselineName =
+    assessments.find((a) => a.id.toString() === aiReviewBaselineEffectiveId)?.name ?? 'Baseline exam';
+  const aiReviewVariantName =
+    assessments.find((a) => a.id.toString() === aiReviewVariantId)?.name ?? 'Variant exam';
+  const aiReviewHistoryForCourse = aiReviewHistory.filter((h) => !selectedCourse?.id || h.courseId === selectedCourse.id);
+  const aiReviewHistoryGroups = groupAiReviewHistory(aiReviewHistoryForCourse);
+
+  const loadAiReviewFromHistory = (item: AiReviewHistoryItem) => {
+    setAiReviewBaselineId(String(item.baselineAssessmentId));
+    setAiReviewVariantId(String(item.variantAssessmentId));
+    setAiReviewModel(item.model);
+    setAiReviewResult(item.result);
+  };
+
+  const removeAiReviewHistoryItem = (id: string) => {
+    setAiReviewHistory((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const clearAiReviewHistory = () => {
+    setAiReviewHistory([]);
+  };
+
+  const renderAiReviewHistoryGroup = (title: string, items: AiReviewHistoryItem[]) => {
+    if (items.length === 0) return null;
+    return (
+      <div className="space-y-2">
+        <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          {title} ({items.length})
+        </p>
+        {items.map((item) => (
+          <div key={item.id} className="rounded border bg-white p-2 text-xs">
+            <button
+              type="button"
+              className="w-full text-left"
+              onClick={() => loadAiReviewFromHistory(item)}
+            >
+              <p className="font-medium text-foreground">{item.baselineName} vs {item.variantName}</p>
+              <p className="text-muted-foreground">
+                {new Date(item.createdAt).toLocaleString()} · {item.model}
+              </p>
+              <p className="text-muted-foreground">
+                Slots: {item.result.comparedSlots} · Unusable: {item.result.usabilityCounts.unusable}
+              </p>
+            </button>
+            <div className="mt-2 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => removeAiReviewHistoryItem(item.id)}
+              >
+                Remove
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const exportAiReviewJson = () => {
+    if (!aiReviewResult) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadTextFile(
+      `ai-review-${aiReviewResult.baselineAssessmentId}-vs-${aiReviewResult.variantAssessmentId}-${stamp}.json`,
+      JSON.stringify(aiReviewResult, null, 2),
+      'application/json;charset=utf-8'
+    );
+  };
+
+  const exportAiReviewWord = () => {
+    if (!aiReviewResult) return;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const html = buildAiReviewWordHtmlReport(aiReviewResult, aiReviewBaselineName, aiReviewVariantName);
+    downloadTextFile(
+      `ai-review-${aiReviewResult.baselineAssessmentId}-vs-${aiReviewResult.variantAssessmentId}-${stamp}.doc`,
+      html,
+      'application/msword;charset=utf-8'
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/80">
@@ -915,126 +1248,183 @@ export function AssessmentVariantPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">5 · AI review</h2>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">AI judge: baseline vs exam variant</CardTitle>
-              <CardDescription>
-                Uses the selected model as a judge to score each aligned slot against your rubric for validity and
-                credibility.
-              </CardDescription>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">AI judge: baseline vs exam variant</CardTitle>
+                  <CardDescription>
+                    Uses the selected model as a judge to score each aligned slot against your rubric for validity and
+                    credibility.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAiReviewHistoryOpen((v) => !v)}
+                  className="ml-auto"
+                >
+                  <History className="mr-1.5 h-4 w-4" />
+                  AI review history
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="space-y-1">
-                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Baseline exam</span>
-                  <Select value={aiReviewBaselineEffectiveId} onValueChange={setAiReviewBaselineId} disabled={!selectedCourse?.id}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select baseline exam" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {assessments.map((a) => (
-                        <SelectItem key={a.id} value={a.id.toString()}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Exam variant</span>
-                  <Select value={aiReviewVariantId} onValueChange={setAiReviewVariantId} disabled={!selectedCourse?.id}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select exam variant" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {aiReviewCandidates.map((a) => (
-                        <SelectItem key={a.id} value={a.id.toString()}>
-                          {a.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
-                  <Select value={aiReviewModel} onValueChange={setAiReviewModel} disabled={aiReviewLoading}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select model" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableModels.length === 0 ? (
-                        <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B (default)</SelectItem>
-                      ) : (
-                        availableModels.map((model) => (
-                          <SelectItem key={model.id} value={model.id}>
-                            {model.label}
+            <CardContent className="relative overflow-hidden">
+              <div className={`space-y-4 transition-all duration-200 ${aiReviewHistoryOpen ? 'lg:pr-80' : 'pr-0'}`}>
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Baseline exam</span>
+                    <Select value={aiReviewBaselineEffectiveId} onValueChange={setAiReviewBaselineId} disabled={!selectedCourse?.id}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select baseline exam" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {assessments.map((a) => (
+                          <SelectItem key={a.id} value={a.id.toString()}>
+                            {a.name}
                           </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={() => setAiReviewRubricOpen(true)}>
-                  Rubric
-                </Button>
-                <Button type="button" onClick={runAiReview} disabled={aiReviewDisabled}>
-                  {aiReviewLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Reviewing…
-                    </>
-                  ) : (
-                    'Run AI review'
-                  )}
-                </Button>
-              </div>
-
-              {aiReviewResult && (
-                <div className="space-y-4 rounded-lg border bg-white p-4 text-sm">
-                  <p className="text-muted-foreground">
-                    Compared {aiReviewResult.comparedSlots} aligned slot(s). Baseline slots: {aiReviewResult.baselineSlotCount}
-                    , variant slots: {aiReviewResult.variantSlotCount}.
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="rounded border bg-slate-50 p-2">Usable as-is: {aiReviewResult.usabilityCounts.usable_as_is}</div>
-                    <div className="rounded border bg-slate-50 p-2">
-                      Usable w/ edits: {aiReviewResult.usabilityCounts.usable_with_edits}
-                    </div>
-                    <div className="rounded border bg-slate-50 p-2">Unusable: {aiReviewResult.usabilityCounts.unusable}</div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[820px] border-collapse text-left text-xs">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="p-2">Slot</th>
-                          <th className="p-2">Concept</th>
-                          <th className="p-2">Difficulty</th>
-                          <th className="p-2">Structure</th>
-                          <th className="p-2">Answer</th>
-                          <th className="p-2">Topic</th>
-                          <th className="p-2">Usability</th>
-                          <th className="p-2">Reason</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {aiReviewResult.perQuestion.map((row) => (
-                          <tr key={`${row.slot}-${row.variantVariantId}`} className="border-b border-slate-100">
-                            <td className="p-2">{row.slot}</td>
-                            <td className="p-2">{row.conceptual_equivalence ?? '-'}</td>
-                            <td className="p-2">{row.difficulty_similarity ?? '-'}</td>
-                            <td className="p-2">{row.structural_validity ?? '-'}</td>
-                            <td className="p-2">{row.answer_correctness ?? '-'}</td>
-                            <td className="p-2">{row.topic_alignment ?? '-'}</td>
-                            <td className="p-2">{row.usability}</td>
-                            <td className="p-2">{row.brief_reason}</td>
-                          </tr>
                         ))}
-                      </tbody>
-                    </table>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Exam variant</span>
+                    <Select value={aiReviewVariantId} onValueChange={setAiReviewVariantId} disabled={!selectedCourse?.id}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select exam variant" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {aiReviewCandidates.map((a) => (
+                          <SelectItem key={a.id} value={a.id.toString()}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
+                    <Select value={aiReviewModel} onValueChange={setAiReviewModel} disabled={aiReviewLoading}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableModels.length === 0 ? (
+                          <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B (default)</SelectItem>
+                        ) : (
+                          availableModels.map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                              {model.label}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              )}
+
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" onClick={() => setAiReviewRubricOpen(true)}>
+                    Rubric
+                  </Button>
+                  <Button type="button" onClick={runAiReview} disabled={aiReviewDisabled}>
+                    {aiReviewLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Reviewing…
+                      </>
+                    ) : (
+                      'Run AI review'
+                    )}
+                  </Button>
+                </div>
+
+                {aiReviewResult && (
+                  <div className="space-y-4 rounded-lg border bg-white p-4 text-sm">
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" variant="outline" onClick={exportAiReviewWord}>
+                        Export Word (.doc)
+                      </Button>
+                      <Button type="button" variant="outline" onClick={exportAiReviewJson}>
+                        Export raw JSON
+                      </Button>
+                    </div>
+                    <p className="text-muted-foreground">
+                      Compared {aiReviewResult.comparedSlots} aligned slot(s). Baseline slots: {aiReviewResult.baselineSlotCount}
+                      , variant slots: {aiReviewResult.variantSlotCount}.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="rounded border bg-slate-50 p-2">Usable as-is: {aiReviewResult.usabilityCounts.usable_as_is}</div>
+                      <div className="rounded border bg-slate-50 p-2">
+                        Usable w/ edits: {aiReviewResult.usabilityCounts.usable_with_edits}
+                      </div>
+                      <div className="rounded border bg-slate-50 p-2">Unusable: {aiReviewResult.usabilityCounts.unusable}</div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[820px] border-collapse text-left text-xs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="p-2">Slot</th>
+                            <th className="p-2">Concept</th>
+                            <th className="p-2">Difficulty</th>
+                            <th className="p-2">Structure</th>
+                            <th className="p-2">Answer</th>
+                            <th className="p-2">Topic</th>
+                            <th className="p-2">Usability</th>
+                            <th className="p-2">Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {aiReviewResult.perQuestion.map((row) => (
+                            <tr key={`${row.slot}-${row.variantVariantId}`} className="border-b border-slate-100">
+                              <td className="p-2">{row.slot}</td>
+                              <td className="p-2">{row.conceptual_equivalence ?? '-'}</td>
+                              <td className="p-2">{row.difficulty_similarity ?? '-'}</td>
+                              <td className="p-2">{row.structural_validity ?? '-'}</td>
+                              <td className="p-2">{row.answer_correctness ?? '-'}</td>
+                              <td className="p-2">{row.topic_alignment ?? '-'}</td>
+                              <td className="p-2">{formatUsabilityLabel(row.usability)}</td>
+                              <td className="p-2">{row.brief_reason}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <aside
+                className={`absolute bottom-0 right-0 top-0 w-72 border-l bg-slate-50/95 shadow-sm transition-transform duration-200 ${
+                  aiReviewHistoryOpen ? 'translate-x-0' : 'translate-x-full'
+                }`}
+                aria-hidden={!aiReviewHistoryOpen}
+              >
+                <div className="flex items-center justify-between border-b px-3 py-2">
+                  <div className="inline-flex items-center gap-2 text-sm font-medium">
+                    <History className="h-4 w-4" />
+                    AI review history
+                    <span className="text-xs text-muted-foreground">({aiReviewHistoryForCourse.length})</span>
+                  </div>
+                  {aiReviewHistoryForCourse.length > 0 && (
+                    <Button type="button" variant="ghost" size="sm" onClick={clearAiReviewHistory}>
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                <ScrollArea className="h-[420px] p-3">
+                  <div className="space-y-2">
+                    {aiReviewHistoryForCourse.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No previous AI reviews for this course yet.</p>
+                    ) : (
+                      <>
+                        {renderAiReviewHistoryGroup('Today', aiReviewHistoryGroups.today)}
+                        {renderAiReviewHistoryGroup('Yesterday', aiReviewHistoryGroups.yesterday)}
+                        {renderAiReviewHistoryGroup('Earlier', aiReviewHistoryGroups.earlier)}
+                      </>
+                    )}
+                  </div>
+                </ScrollArea>
+              </aside>
             </CardContent>
           </Card>
         </section>
