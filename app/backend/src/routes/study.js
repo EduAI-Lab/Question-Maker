@@ -9,7 +9,8 @@ import {
   getBaselineVariantReadiness,
   assembleEquivalentExamVariants,
   assembleExamVariantsByMetadataSimilarity,
-  generateBankVariantsForQuestions
+  generateBankVariantsForQuestions,
+  reviewVariantExamWithAi
 } from '../services/studyExperimentService.js';
 import { computeStudyMetrics } from '../services/studyMetricsService.js';
 
@@ -179,6 +180,32 @@ router.post('/metrics', authenticateToken, async (req, res, next) => {
     );
 
     res.json({ success: true, data: metrics });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** POST /api/study/review-variant-ai — AI judge compares variant exam against baseline using rubric. */
+router.post('/review-variant-ai', authenticateToken, async (req, res, next) => {
+  try {
+    const { baselineAssessmentId, variantAssessmentId, courseId, model, apiKeys, rubricText } = req.body;
+    if (!baselineAssessmentId || !variantAssessmentId || !courseId) {
+      return res.status(400).json({
+        success: false,
+        error: 'baselineAssessmentId, variantAssessmentId, and courseId are required'
+      });
+    }
+
+    const data = await reviewVariantExamWithAi(req.user.id, {
+      baselineAssessmentId: Number(baselineAssessmentId),
+      variantAssessmentId: Number(variantAssessmentId),
+      courseId: Number(courseId),
+      model: typeof model === 'string' ? model : undefined,
+      apiKeys: apiKeys && typeof apiKeys === 'object' ? apiKeys : {},
+      rubricText: typeof rubricText === 'string' ? rubricText : ''
+    });
+
+    res.json({ success: true, data });
   } catch (error) {
     next(error);
   }

@@ -100,6 +100,9 @@ export async function loadOrderedVariantsForAssessment(assessmentId) {
             as: 'variant',
             attributes: [
               'id',
+              'questionText',
+              'answer',
+              'choices',
               'difficulty',
               'reasoningLevel',
               'questionMetadataId',

@@ -738,3 +738,200 @@ Return exactly one question in the required JSON format.`;
 
   return { results, errors, courseId: course.id };
 }
+
+function parseJsonObjectFromText(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text) return null;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start === -1 || end === -1 || end <= start) return null;
+    try {
+      const sliced = text.slice(start, end + 1);
+      const parsed = JSON.parse(sliced);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+function normalizeJudgeScore(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(1, Math.min(5, Math.round(n)));
+}
+
+function normalizeUsability(value) {
+  const v = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  if (v === 'usable_as_is') return 'usable_as_is';
+  if (v === 'usable_with_edits') return 'usable_with_edits';
+  return 'unusable';
+}
+
+/**
+ * AI judge pass: compares one variant exam against baseline slot-by-slot and returns rubric scores.
+ */
+export async function reviewVariantExamWithAi(userId, params) {
+  const {
+    baselineAssessmentId,
+    variantAssessmentId,
+    courseId,
+    model = 'ollama:gpt-oss:120b',
+    apiKeys = {},
+    rubricText = ''
+  } = params;
+
+  if (!baselineAssessmentId || !variantAssessmentId || !courseId) {
+    throw new Error('baselineAssessmentId, variantAssessmentId, and courseId are required');
+  }
+
+  const baselineAssessment = await Assessments.findOne({
+    where: { id: Number(baselineAssessmentId), courseId: Number(courseId) },
+    include: [{ model: Course, as: 'course', where: { userId }, attributes: ['id'], required: true }]
+  });
+  if (!baselineAssessment) {
+    throw new Error('Baseline assessment not found or course mismatch');
+  }
+
+  const variantAssessment = await Assessments.findOne({
+    where: { id: Number(variantAssessmentId), courseId: Number(courseId) },
+    include: [{ model: Course, as: 'course', where: { userId }, attributes: ['id'], required: true }]
+  });
+  if (!variantAssessment) {
+    throw new Error('Variant assessment not found or course mismatch');
+  }
+
+  const baselineVariants = await loadOrderedVariantsForAssessment(baselineAssessment.id);
+  const variantVariants = await loadOrderedVariantsForAssessment(variantAssessment.id);
+  const pairCount = Math.min(baselineVariants.length, variantVariants.length);
+  if (pairCount === 0) {
+    throw new Error('Both assessments must have at least one question');
+  }
+
+  const rubric =
+    String(rubricText || '').trim() ||
+    [
+      'Conceptual equivalence (1-5)',
+      'Difficulty similarity (1-5)',
+      'Structural validity (1-5)',
+      'Answer correctness (1-5)',
+      'Topic alignment (1-5)',
+      'Usability classification: usable_as_is | usable_with_edits | unusable'
+    ].join('\n');
+
+  const systemInstruction =
+    'You are an expert university instructor evaluating whether a generated exam question variant preserves the intent of the original question.';
+
+  const perQuestion = [];
+  for (let i = 0; i < pairCount; i++) {
+    const original = baselineVariants[i];
+    const generated = variantVariants[i];
+
+    const userPrompt = `Original Question (slot ${i + 1})
+"""
+${original.questionText ?? ''}
+"""
+
+Original answer:
+${original.answer ?? '(none)'}
+Original choices:
+${Array.isArray(original.choices) && original.choices.length ? JSON.stringify(original.choices) : '(none)'}
+
+Generated Variant (slot ${i + 1})
+"""
+${generated.questionText ?? ''}
+"""
+
+Generated answer:
+${generated.answer ?? '(none)'}
+Generated choices:
+${Array.isArray(generated.choices) && generated.choices.length ? JSON.stringify(generated.choices) : '(none)'}
+
+Task:
+Evaluate the generated variant using the rubric below.
+
+Rubric:
+${rubric}
+
+Output ONLY valid JSON with this exact schema:
+{
+  "conceptual_equivalence": number,
+  "difficulty_similarity": number,
+  "structural_validity": number,
+  "answer_correctness": number,
+  "topic_alignment": number,
+  "usability": "usable_as_is | usable_with_edits | unusable",
+  "brief_reason": "one sentence explanation"
+}`;
+
+    const response = await eduaiService.chat({
+      model,
+      apiKeys,
+      courseCode: `COURSE-${courseId}`,
+      messages: [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: userPrompt }
+      ],
+      streaming: false,
+      timeoutMs: 120000
+    });
+
+    const content = response?.content ?? response?.message ?? '';
+    const parsed = parseJsonObjectFromText(content);
+    if (!parsed) {
+      throw new Error(`AI judge returned invalid JSON for slot ${i + 1}`);
+    }
+
+    perQuestion.push({
+      slot: i + 1,
+      baselineVariantId: original.id,
+      variantVariantId: generated.id,
+      conceptual_equivalence: normalizeJudgeScore(parsed.conceptual_equivalence),
+      difficulty_similarity: normalizeJudgeScore(parsed.difficulty_similarity),
+      structural_validity: normalizeJudgeScore(parsed.structural_validity),
+      answer_correctness: normalizeJudgeScore(parsed.answer_correctness),
+      topic_alignment: normalizeJudgeScore(parsed.topic_alignment),
+      usability: normalizeUsability(parsed.usability),
+      brief_reason: String(parsed.brief_reason ?? '').trim() || 'No reason provided.'
+    });
+  }
+
+  const dimensions = [
+    'conceptual_equivalence',
+    'difficulty_similarity',
+    'structural_validity',
+    'answer_correctness',
+    'topic_alignment'
+  ];
+  const averages = {};
+  for (const key of dimensions) {
+    const vals = perQuestion.map((q) => q[key]).filter((v) => Number.isFinite(v));
+    averages[key] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }
+
+  const usabilityCounts = {
+    usable_as_is: perQuestion.filter((q) => q.usability === 'usable_as_is').length,
+    usable_with_edits: perQuestion.filter((q) => q.usability === 'usable_with_edits').length,
+    unusable: perQuestion.filter((q) => q.usability === 'unusable').length
+  };
+
+  return {
+    baselineAssessmentId: baselineAssessment.id,
+    variantAssessmentId: variantAssessment.id,
+    courseId: Number(courseId),
+    model,
+    rubricUsed: rubric,
+    comparedSlots: pairCount,
+    baselineSlotCount: baselineVariants.length,
+    variantSlotCount: variantVariants.length,
+    averages,
+    usabilityCounts,
+    perQuestion
+  };
+}

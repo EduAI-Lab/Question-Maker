@@ -81,6 +81,37 @@ export interface StudyMetricsResult {
   topicNames: Record<number, string>;
 }
 
+export interface VariantAiReviewRow {
+  slot: number;
+  baselineVariantId: number;
+  variantVariantId: number;
+  conceptual_equivalence: number | null;
+  difficulty_similarity: number | null;
+  structural_validity: number | null;
+  answer_correctness: number | null;
+  topic_alignment: number | null;
+  usability: 'usable_as_is' | 'usable_with_edits' | 'unusable';
+  brief_reason: string;
+}
+
+export interface VariantAiReviewResult {
+  baselineAssessmentId: number;
+  variantAssessmentId: number;
+  courseId: number;
+  model: string;
+  rubricUsed: string;
+  comparedSlots: number;
+  baselineSlotCount: number;
+  variantSlotCount: number;
+  averages: Record<string, number | null>;
+  usabilityCounts: {
+    usable_as_is: number;
+    usable_with_edits: number;
+    unusable: number;
+  };
+  perQuestion: VariantAiReviewRow[];
+}
+
 export const studyService = {
   async setStudyRole(assessmentId: number, studyRole: StudyRole): Promise<{ blueprintConfig?: unknown }> {
     const response = await api.patch(`/api/study/assessments/${assessmentId}/role`, { studyRole });
@@ -149,6 +180,23 @@ export const studyService = {
     const response = await api.post('/api/study/metrics', {
       assessmentIds,
       referenceAssessmentId
+    });
+    return response.data.data;
+  },
+
+  async reviewVariantWithAi(payload: {
+    baselineAssessmentId: number;
+    variantAssessmentId: number;
+    courseId: number;
+    model?: string;
+    rubricText?: string;
+  }): Promise<VariantAiReviewResult> {
+    const model = payload.model ?? 'ollama:gpt-oss:120b';
+    const apiKeys = await apiKeyStorage.buildApiKeysForModel(model);
+    const response = await api.post('/api/study/review-variant-ai', {
+      ...payload,
+      model,
+      apiKeys
     });
     return response.data.data;
   }

@@ -8,6 +8,7 @@ import { ArrowLeft, CheckCircle2, ClipboardList, Loader2, Sparkles, Upload, XCir
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -31,6 +32,46 @@ import type { Topic } from '../types/topic';
 /** Hover text for the Variants column — counts are reviewed-only (drafts excluded). */
 const REVIEWED_VARIANTS_TOOLTIP =
   'Number of reviewed variants for this question in the bank. Draft variants are not included.';
+
+const DEFAULT_AI_JUDGE_RUBRIC = `Conceptual equivalence (1-5)
+Score 5: The variant assesses the same concept and reasoning process as the original.
+Score 4: Same concept but slightly different reasoning path.
+Score 3: Related concept but partially different reasoning required.
+Score 2: Concept overlap is weak.
+Score 1: Completely different concept.
+
+Difficulty similarity (1-5)
+Score 5: Difficulty level is nearly identical.
+Score 4: Slightly easier or harder but still comparable.
+Score 3: Noticeable difficulty difference.
+Score 2: Major difference in difficulty.
+Score 1: Completely mismatched difficulty.
+
+Structural validity (1-5)
+Score 5: Clear, unambiguous, and fully solvable.
+Score 4: Minor wording issues but still valid.
+Score 3: Some ambiguity or missing detail.
+Score 2: Significant issues that would confuse students.
+Score 1: Invalid or unsolvable question.
+
+Answer correctness (1-5)
+Score 5: One clearly correct answer and distractors are plausible.
+Score 4: Mostly correct but minor issues in distractors.
+Score 3: Some ambiguity in correct answer.
+Score 2: Distractors or solution inconsistent.
+Score 1: No correct answer or multiple unintended answers.
+
+Topic alignment (1-5)
+Score 5: Perfectly aligned with the same topic.
+Score 4: Mostly aligned with slight contextual shift.
+Score 3: Related but somewhat outside the topic.
+Score 2: Weak topical relationship.
+Score 1: Completely different topic.
+
+Usability classification
+usable_as_is
+usable_with_edits
+unusable`;
 
 function variantStatusTooltip(minRequired: number): string {
   return `Ready when this question has at least ${minRequired} reviewed variants. Draft variants do not count.`;
@@ -89,6 +130,15 @@ export function AssessmentVariantPage() {
   const [metricsData, setMetricsData] = useState<Awaited<ReturnType<typeof studyService.computeMetrics>> | null>(
     null
   );
+  const [aiReviewLoading, setAiReviewLoading] = useState(false);
+  const [aiReviewBaselineId, setAiReviewBaselineId] = useState<string>('');
+  const [aiReviewVariantId, setAiReviewVariantId] = useState<string>('');
+  const [aiReviewModel, setAiReviewModel] = useState('ollama:gpt-oss:120b');
+  const [aiReviewRubricOpen, setAiReviewRubricOpen] = useState(false);
+  const [aiReviewRubricText, setAiReviewRubricText] = useState(DEFAULT_AI_JUDGE_RUBRIC);
+  const [aiReviewResult, setAiReviewResult] = useState<Awaited<ReturnType<typeof studyService.reviewVariantWithAi>> | null>(
+    null
+  );
 
   useEffect(() => {
     void fetchCourses();
@@ -133,6 +183,22 @@ export function AssessmentVariantPage() {
     const preferred = availableModels.find((m) => m.id === 'ollama:gpt-oss:120b');
     setVariantModel(preferred?.id ?? availableModels[0].id);
   }, [availableModels, variantModel]);
+
+  useEffect(() => {
+    if (!baselineAssessmentId) {
+      setAiReviewBaselineId('');
+      return;
+    }
+    setAiReviewBaselineId((prev) => prev || baselineAssessmentId);
+  }, [baselineAssessmentId]);
+
+  useEffect(() => {
+    if (availableModels.length === 0) return;
+    const hasSelected = availableModels.some((m) => m.id === aiReviewModel);
+    if (hasSelected) return;
+    const preferred = availableModels.find((m) => m.id === 'ollama:gpt-oss:120b');
+    setAiReviewModel(preferred?.id ?? availableModels[0].id);
+  }, [availableModels, aiReviewModel]);
 
   const loadTopics = useCallback(async (courseId: number) => {
     const t = await courseService.getCourseTopics(courseId);
@@ -388,6 +454,49 @@ export function AssessmentVariantPage() {
       setMetricsLoading(false);
     }
   };
+
+  const runAiReview = async () => {
+    const cid = selectedCourse?.id;
+    const baselineId = Number(aiReviewBaselineId || baselineAssessmentId);
+    const variantId = Number(aiReviewVariantId);
+    if (!cid || !baselineId || !variantId) {
+      toast({ variant: 'destructive', title: 'Select baseline, variant exam, and course first' });
+      return;
+    }
+    if (baselineId === variantId) {
+      toast({ variant: 'destructive', title: 'Variant exam must be different from baseline' });
+      return;
+    }
+
+    setAiReviewLoading(true);
+    try {
+      const result = await studyService.reviewVariantWithAi({
+        baselineAssessmentId: baselineId,
+        variantAssessmentId: variantId,
+        courseId: cid,
+        model: aiReviewModel,
+        rubricText: aiReviewRubricText.trim()
+      });
+      setAiReviewResult(result);
+      toast({
+        title: 'AI review complete',
+        description: `Compared ${result.comparedSlots} slot(s). See Phase 5 results below.`
+      });
+    } catch (e: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'AI review failed',
+        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Try again.'
+      });
+    } finally {
+      setAiReviewLoading(false);
+    }
+  };
+
+  const aiReviewBaselineEffectiveId = aiReviewBaselineId || baselineAssessmentId;
+  const aiReviewCandidates = assessments.filter((a) => a.id.toString() !== aiReviewBaselineEffectiveId);
+  const aiReviewDisabled =
+    aiReviewLoading || !selectedCourse?.id || !aiReviewBaselineEffectiveId || !aiReviewVariantId;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/80">
@@ -801,6 +910,134 @@ export function AssessmentVariantPage() {
             </CardContent>
           </Card>
         </section>
+
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">5 · AI review</h2>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">AI judge: baseline vs exam variant</CardTitle>
+              <CardDescription>
+                Uses the selected model as a judge to score each aligned slot against your rubric for validity and
+                credibility.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="space-y-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Baseline exam</span>
+                  <Select value={aiReviewBaselineEffectiveId} onValueChange={setAiReviewBaselineId} disabled={!selectedCourse?.id}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select baseline exam" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {assessments.map((a) => (
+                        <SelectItem key={a.id} value={a.id.toString()}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500">Exam variant</span>
+                  <Select value={aiReviewVariantId} onValueChange={setAiReviewVariantId} disabled={!selectedCourse?.id}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select exam variant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {aiReviewCandidates.map((a) => (
+                        <SelectItem key={a.id} value={a.id.toString()}>
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
+                  <Select value={aiReviewModel} onValueChange={setAiReviewModel} disabled={aiReviewLoading}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableModels.length === 0 ? (
+                        <SelectItem value="ollama:gpt-oss:120b">Ollama GPT OSS 120B (default)</SelectItem>
+                      ) : (
+                        availableModels.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.label}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={() => setAiReviewRubricOpen(true)}>
+                  Rubric
+                </Button>
+                <Button type="button" onClick={runAiReview} disabled={aiReviewDisabled}>
+                  {aiReviewLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Reviewing…
+                    </>
+                  ) : (
+                    'Run AI review'
+                  )}
+                </Button>
+              </div>
+
+              {aiReviewResult && (
+                <div className="space-y-4 rounded-lg border bg-white p-4 text-sm">
+                  <p className="text-muted-foreground">
+                    Compared {aiReviewResult.comparedSlots} aligned slot(s). Baseline slots: {aiReviewResult.baselineSlotCount}
+                    , variant slots: {aiReviewResult.variantSlotCount}.
+                  </p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="rounded border bg-slate-50 p-2">Usable as-is: {aiReviewResult.usabilityCounts.usable_as_is}</div>
+                    <div className="rounded border bg-slate-50 p-2">
+                      Usable w/ edits: {aiReviewResult.usabilityCounts.usable_with_edits}
+                    </div>
+                    <div className="rounded border bg-slate-50 p-2">Unusable: {aiReviewResult.usabilityCounts.unusable}</div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[820px] border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="p-2">Slot</th>
+                          <th className="p-2">Concept</th>
+                          <th className="p-2">Difficulty</th>
+                          <th className="p-2">Structure</th>
+                          <th className="p-2">Answer</th>
+                          <th className="p-2">Topic</th>
+                          <th className="p-2">Usability</th>
+                          <th className="p-2">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {aiReviewResult.perQuestion.map((row) => (
+                          <tr key={`${row.slot}-${row.variantVariantId}`} className="border-b border-slate-100">
+                            <td className="p-2">{row.slot}</td>
+                            <td className="p-2">{row.conceptual_equivalence ?? '-'}</td>
+                            <td className="p-2">{row.difficulty_similarity ?? '-'}</td>
+                            <td className="p-2">{row.structural_validity ?? '-'}</td>
+                            <td className="p-2">{row.answer_correctness ?? '-'}</td>
+                            <td className="p-2">{row.topic_alignment ?? '-'}</td>
+                            <td className="p-2">{row.usability}</td>
+                            <td className="p-2">{row.brief_reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
       </main>
 
       {selectedCourse?.id && (
@@ -819,6 +1056,29 @@ export function AssessmentVariantPage() {
             onQuestionsSaved={handleExamQuestionsSaved}
           />
           <CanvasImportDialog open={canvasImportOpen} onClose={() => setCanvasImportOpen(false)} onImportSuccess={handleCanvasImport} />
+          <Dialog open={aiReviewRubricOpen} onOpenChange={setAiReviewRubricOpen}>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>AI review rubric</DialogTitle>
+                <DialogDescription>
+                  Customize the rubric passed to AI judge. Keep dimensions + scoring language explicit for consistent JSON.
+                </DialogDescription>
+              </DialogHeader>
+              <Textarea
+                value={aiReviewRubricText}
+                onChange={(e) => setAiReviewRubricText(e.target.value)}
+                className="min-h-[360px] font-mono text-xs"
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setAiReviewRubricText(DEFAULT_AI_JUDGE_RUBRIC)}>
+                  Reset default rubric
+                </Button>
+                <Button type="button" onClick={() => setAiReviewRubricOpen(false)}>
+                  Done
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>
