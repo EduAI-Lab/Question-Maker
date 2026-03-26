@@ -1015,6 +1015,17 @@ Output ONLY valid JSON with this exact schema:
   const examVariantScoreFinal1to5 =
     examVariantScoreFinal0to100 == null ? null : 1 + (examVariantScoreFinal0to100 / 100) * 4;
 
+  const scoreAfterDistinctness0to100 = examVariantScoreBase0to100 == null ? null : examVariantScoreBase0to100 * distinctnessFactorAvg;
+  const scoreAfterDistinctnessUsability0to100 =
+    scoreAfterDistinctness0to100 == null ? null : scoreAfterDistinctness0to100 * (applyUsabilityPenalty ? usabilityFactorAvg : 1.0);
+
+  const totalScoreCalculationSummary =
+    scoreAfterDistinctness0to100 == null || examVariantScoreFinal0to100 == null
+      ? null
+      : `Final = Base(${examVariantScoreBase0to100.toFixed(1)}) × DistinctnessFactor(${distinctnessFactorAvg.toFixed(2)})${
+          applyUsabilityPenalty ? ` × UsabilityFactor(${usabilityFactorAvg.toFixed(2)})` : ''
+        } = ${scoreAfterDistinctnessUsability0to100.toFixed(1)} (clamped to ${examVariantScoreFinal0to100.toFixed(0)}/100)`;
+
   const distinctnessValues = perQuestion
     .map((q) => q.distinctness)
     .filter((v) => typeof v === 'number' && Number.isFinite(v));
@@ -1161,11 +1172,13 @@ Do not include markdown fences. Keep strings concise.`;
     distinctnessAverage1to5,
     distinctnessFactorAvg,
     distinctnessToFactor,
+    usabilityFactorAvg,
     usabilityPenaltyApplied: Boolean(applyUsabilityPenalty),
     examVariantScoreBase1to5,
     examVariantScoreBase0to100,
     examVariantScoreFinal1to5,
     examVariantScoreFinal0to100,
+    totalScoreCalculationSummary,
     overallSummary,
     perQuestion
   };

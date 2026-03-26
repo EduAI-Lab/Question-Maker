@@ -127,6 +127,8 @@ export interface VariantAiReviewResult {
   distinctnessAverage1to5?: number | null;
   distinctnessFactorAvg?: number;
   distinctnessToFactor?: Record<string, number>;
+  usabilityFactorAvg?: number;
+  totalScoreCalculationSummary?: string | null;
   overallSummary: {
     summaryText: string;
     strengths: string[];

@@ -261,6 +261,7 @@ function buildAiReviewWordHtmlReport(
   const overallSummaryText = result.overallSummary?.summaryText ?? 'n/a';
   const overallStrengthsText = Array.isArray(result.overallSummary?.strengths) ? result.overallSummary.strengths.join(', ') : 'n/a';
   const overallWeaknessesText = Array.isArray(result.overallSummary?.weaknesses) ? result.overallSummary.weaknesses.join(', ') : 'n/a';
+  const totalScoreCalcSummary = result.totalScoreCalculationSummary ?? null;
 
   return `<!DOCTYPE html>
 <html>
@@ -297,6 +298,7 @@ function buildAiReviewWordHtmlReport(
        Base (rubric-only): <strong>${baseScore0to100 != null ? baseScore0to100.toFixed(0) : 'n/a'}</strong> / 100<br/>
        Usable questions: <strong>${usablePct != null ? usablePct.toFixed(0) : 'n/a'}</strong>%<br/>
        Distinctness: <strong>${distinctnessAvg != null ? distinctnessAvg.toFixed(2) : 'n/a'}</strong>/5 (factor ${distinctnessFactorAvg != null ? distinctnessFactorAvg.toFixed(2) : 'n/a'})</p>
+    ${totalScoreCalcSummary ? `<p class="muted">Total score calculation: ${escapeHtml(totalScoreCalcSummary)}</p>` : ''}
   </div>
 
   <h2>Instructor summary</h2>
@@ -1436,6 +1438,12 @@ export function AssessmentVariantPage() {
                           ? aiReviewResult.distinctnessFactorAvg.toFixed(2)
                           : 'n/a'}
                         )
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Total score calculation:{' '}
+                        {typeof aiReviewResult.totalScoreCalculationSummary === 'string'
+                          ? aiReviewResult.totalScoreCalculationSummary
+                          : 'n/a'}
                       </p>
                     </div>
 
