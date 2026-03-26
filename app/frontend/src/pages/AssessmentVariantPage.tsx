@@ -77,6 +77,7 @@ export function AssessmentVariantPage() {
   const [examUploadOpen, setExamUploadOpen] = useState(false);
   const [canvasImportOpen, setCanvasImportOpen] = useState(false);
   const [generatingVariants, setGeneratingVariants] = useState(false);
+  const [variantGenMode, setVariantGenMode] = useState<'all' | 'missing' | null>(null);
   const [assembling, setAssembling] = useState(false);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [lastAssembled, setLastAssembled] = useState<Array<{ id: number; name: string }>>([]);
@@ -230,13 +231,14 @@ export function AssessmentVariantPage() {
     }
   };
 
-  const generateVariantsFromBaseline = async () => {
+  const generateVariantsFromBaseline = async (mode: 'all' | 'missing') => {
     const refId = Number(baselineAssessmentId);
     if (!selectedCourse?.id || !refId) {
       toast({ variant: 'destructive', title: 'Select a course and baseline exam first' });
       return;
     }
     setGeneratingVariants(true);
+    setVariantGenMode(mode);
     setMetricsData(null);
     setLastAssembled([]);
     try {
@@ -251,14 +253,21 @@ export function AssessmentVariantPage() {
         return;
       }
 
-      const needingIds =
-        variantReadiness?.slots.filter((s) => !s.ready).map((s) => s.questionMetadataId) ?? allQuestionIds;
-      const questionIds = needingIds.length > 0 ? needingIds : [];
+      let questionIds: number[];
+      if (mode === 'all') {
+        questionIds = allQuestionIds;
+      } else {
+        const needingIds = variantReadiness?.slots.filter((s) => !s.ready).map((s) => s.questionMetadataId) ?? [];
+        questionIds = needingIds;
+      }
 
       if (questionIds.length === 0) {
         toast({
           title: 'Nothing to generate',
-          description: `Each base question already has at least ${variantReadiness?.minRequiredNonDraft ?? 2} variants (reviewed only). Continue to assembly.`
+          description:
+            mode === 'missing'
+              ? 'No questions are missing variants right now.'
+              : `Each base question already has at least ${variantReadiness?.minRequiredNonDraft ?? 2} variants (reviewed only). Continue to assembly.`
         });
         return;
       }
@@ -271,9 +280,13 @@ export function AssessmentVariantPage() {
         variantPromptInstructions: variantUserPrompt.trim() ? variantUserPrompt.trim() : null
       });
       const failed = result.errors?.length ?? 0;
+      const scope =
+        mode === 'all'
+          ? `all ${questionIds.length} base question(s)`
+          : `${questionIds.length} question(s) that still need variants`;
       toast({
         title: 'Variants generated',
-        description: `Generated one alternate variant for ${questionIds.length} base question(s). ${failed ? `${failed} step(s) logged errors (see console).` : 'Re-check readiness before assembly.'}`
+        description: `Generated one AI variant for ${scope}. ${failed ? `${failed} step(s) logged errors (see console).` : 'Re-check readiness before assembly.'}`
       });
       if (result.errors?.length) {
         console.warn('Assessment variant workflow: generateBankVariants errors', result.errors);
@@ -289,18 +302,31 @@ export function AssessmentVariantPage() {
       });
     } finally {
       setGeneratingVariants(false);
+      setVariantGenMode(null);
     }
   };
 
   const variantSlotsNeedingCount = variantReadiness?.slots.filter((s) => !s.ready).length ?? 0;
-  const variantGenerateDisabled =
+  const variantSlotsReadyCount = variantReadiness?.slots.filter((s) => s.ready).length ?? 0;
+  /** Show “missing only” only when some slots are ready and some are not (per baseline readiness). */
+  const variantHasMixedReadiness =
+    variantReadiness != null &&
+    variantReadiness.slots.length > 0 &&
+    variantSlotsReadyCount > 0 &&
+    variantSlotsNeedingCount > 0;
+
+  const variantGenerateAllDisabled = !baselineAssessmentId || !selectedCourse?.id || generatingVariants;
+
+  const showMissingOnlyGenerate =
+    variantHasMixedReadiness && !variantReadinessLoading;
+
+  const variantGenerateMissingDisabled =
     !baselineAssessmentId ||
     !selectedCourse?.id ||
     generatingVariants ||
     variantReadinessLoading ||
-    (variantReadiness != null &&
-      variantReadiness.slots.length > 0 &&
-      variantReadiness.allReady);
+    !variantHasMixedReadiness ||
+    variantSlotsNeedingCount === 0;
 
   const assembleStructureMatchedExams = async () => {
     const refId = Number(baselineAssessmentId);
@@ -478,8 +504,10 @@ export function AssessmentVariantPage() {
                 Variants for each exam question
               </CardTitle>
               <CardDescription>
-                Create a variant for every question in the exam. If variants already exists, you can skip to next step
-                or create more variants.
+                Add one AI variant per base question: use <strong className="font-medium text-foreground">all questions</strong>{' '}
+                for a full pass, or—when some rows are already ready—use{' '}
+                <strong className="font-medium text-foreground">missing only</strong> to fill the rest without touching ready
+                slots.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -508,6 +536,12 @@ export function AssessmentVariantPage() {
                         <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
                           <strong className="font-medium">{variantSlotsNeedingCount}</strong> base question(s) still need an
                           extra variant. Run generation to add one AI variant each for those slots.
+                          {variantHasMixedReadiness && (
+                            <span className="mt-1 block text-amber-900/90">
+                              Some questions are already ready — use <strong className="font-medium">Generate variants for missing
+                              questions only</strong> below to skip the rest.
+                            </span>
+                          )}
                         </div>
                       )}
                       {variantReadiness.slots.length > 0 && (
@@ -588,7 +622,7 @@ export function AssessmentVariantPage() {
                   className="min-h-[88px] border-input bg-background text-foreground placeholder:text-muted-foreground"
                 />
               </div>
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end">
                 <div className="min-w-[260px] space-y-1">
                   <span className="text-xs font-medium uppercase tracking-wide text-slate-500">AI model</span>
                   <Select value={variantModel} onValueChange={setVariantModel} disabled={generatingVariants}>
@@ -608,19 +642,46 @@ export function AssessmentVariantPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button type="button" disabled={variantGenerateDisabled} onClick={generateVariantsFromBaseline}>
-                  {generatingVariants ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Generate question variants
-                    </>
+                <div className="flex min-w-[min(100%,280px)] flex-col gap-2">
+                  <Button
+                    type="button"
+                    variant="default"
+                    disabled={variantGenerateAllDisabled}
+                    onClick={() => void generateVariantsFromBaseline('all')}
+                  >
+                    {generatingVariants && variantGenMode === 'all' ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        Generate variants for all questions
+                      </>
+                    )}
+                  </Button>
+                  {showMissingOnlyGenerate && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={variantGenerateMissingDisabled}
+                      onClick={() => void generateVariantsFromBaseline('missing')}
+                    >
+                      {generatingVariants && variantGenMode === 'missing' ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Generating…
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="mr-2 h-4 w-4" />
+                          Generate variants for missing questions only ({variantSlotsNeedingCount})
+                        </>
+                      )}
+                    </Button>
                   )}
-                </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
