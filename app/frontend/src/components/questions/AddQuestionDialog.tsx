@@ -623,6 +623,16 @@ export const AddQuestionDialog = ({
                     if (contextLines.length > 0) {
                         sections.splice(1, 0, `Base question context:\n${contextLines.join('\n')}`);
                     }
+
+                    if (form.questionType === 'MCQ') {
+                        const n = form.variantChoices.filter((c) => c.text.trim().length > 0).length;
+                        if (n >= 2) {
+                            const lastLetter = String.fromCharCode(64 + n);
+                            sections.push(
+                                `MCQ variant rule: the JSON "choices" array MUST contain exactly ${n} options (same count as this base question), labeled A through ${lastLetter}. Do not output 4 options if the base has ${n}.`
+                            );
+                        }
+                    }
                 }
 
                 if (topics.length > 0) {
@@ -635,6 +645,14 @@ export const AddQuestionDialog = ({
                 return sections.filter(Boolean).join('\n\n');
             })();
 
+            const variantMcqRequiredCount =
+                mode === 'variant' && form.questionType === 'MCQ'
+                    ? (() => {
+                          const n = form.variantChoices.filter((c) => c.text.trim().length > 0).length;
+                          return n >= 2 ? n : undefined;
+                      })()
+                    : undefined;
+
             const apiKeys = await apiKeyStorage.buildApiKeysForModel(form.generationModel);
             const response = await eduaiService.generateQuestions({
                 prompt: promptWithTopics,
@@ -643,7 +661,8 @@ export const AddQuestionDialog = ({
                 numQuestions: 1,
                 difficultyDistribution,
                 reasoningDistribution,
-                apiKeys
+                apiKeys,
+                ...(variantMcqRequiredCount != null ? { mcqRequiredChoiceCount: variantMcqRequiredCount } : {})
             });
 
             const generated = response?.data?.questions?.[0];
@@ -663,6 +682,17 @@ export const AddQuestionDialog = ({
                 generated.reasoning_level === 'analytical' || generated.reasoning_level === 'application'
                     ? generated.reasoning_level
                     : 'factual';
+
+            if (
+                variantMcqRequiredCount != null &&
+                inferredType === 'MCQ' &&
+                Array.isArray(generated.choices) &&
+                generated.choices.length !== variantMcqRequiredCount
+            ) {
+                throw new Error(
+                    `AI returned ${generated.choices.length} MCQ option(s); this base question uses ${variantMcqRequiredCount}. Try again or adjust choices manually.`
+                );
+            }
 
             setForm((prev) => {
                 const topicIdSet = new Set(topics.map((topic) => topic.id));

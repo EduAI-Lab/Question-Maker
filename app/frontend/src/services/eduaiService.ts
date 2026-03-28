@@ -43,6 +43,8 @@ export interface EduAIQuestionGenerationRequest {
         analytical: number;
         application: number;
     };
+    /** When set (2–26), MCQ outputs must use exactly this many choices (variant parity with originals). */
+    mcqRequiredChoiceCount?: number;
 }
 
 export interface EduAIQuestionGenerationResponse {
