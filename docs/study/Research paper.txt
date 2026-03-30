@@ -1,4 +1,4 @@
-﻿AI-Assisted Assessment Management for Equivalent Exam Variants
+AI-Assisted Assessment Management for Equivalent Exam Variants
 
 
 
@@ -17,9 +17,9 @@ exam variants through structured question metadata and automated variant generat
 that design: persistent structured metadata, controlled automated variant generation from base 
 questions, course-scoped retrieval-augmented generation, and mandatory instructor review before storage and export. We describe the 
 architecture and report a structured evaluation in which an AP Computer Science A exam was the reference and two full variants were 
-generated independently. Using an LLM-as-judge rubric over aligned slots, both variants scored 85/100 on the composite exam metric, 
-and every item was usable as-is or with minor edits; answer-key ambiguity remained the dominant risk, aligning with 
-review-before-deployment as a structural safeguard. The evidence supports a qualified positive answer for text-based 
+generated independently. Using an LLM-as-judge rubric over aligned slots, the composite exam scores were 86/100 and 85/100; rubric-only 
+base scores were 98/100 for both. Every item was usable as-is or with minor edits, and no item was unusable; the main score compression 
+came from moderate distinctness and usability factors, aligning with review-before-deployment as a structural safeguard. The evidence supports a qualified positive answer for text-based 
 items on one reference exam; broader generalization is left to future work.
 
 
@@ -327,22 +327,22 @@ We produced two independent full-exam variant passes (Variant A and Variant B) f
 6.2 Results
 
 
-Both variants achieved a final exam variant score of 85/100, with rubric-only base scores of 94/100 (Variant A) and 95/100 (Variant B). Usability was high: all 47 questions in both variants were classified as either usable as-is or usable with minor edits. No questions were classified as unusable.
+Variant A, corresponding to the exported judge report for AP CS A — Exam Variant 1, received a final exam variant score of 86/100 and a rubric-only base score of 98/100. Variant B, from AP CS A — Exam Variant 2, received 85/100 final and 98/100 rubric-only. In both runs all 47 slots were classified as usable as-is or usable with edits; none were unusable.
 
 
 
 
-For Variant A, 39 of 47 questions (83%) were usable as-is and 8 (17%) required minor edits. Mean scores across validity dimensions were: conceptual equivalence 4.83, difficulty similarity 4.51, structural validity 4.91, answer correctness 4.49, and topic alignment 4.96. Mean distinctness was 4.26/5 (factor 0.92).
+For Variant A, 43 of 47 questions (91%) were usable as-is and 4 (9%) usable with edits. Mean scores were: conceptual equivalence 4.96, difficulty similarity 4.94, structural validity 5.00, answer correctness 4.77, and topic alignment 4.98. Mean distinctness was 4.09/5 (factor 0.88).
 
 
 
 
-For Variant B, 43 of 47 questions (91%) were usable as-is and 4 (9%) required minor edits. Mean scores were: conceptual equivalence 4.83, difficulty similarity 4.45, structural validity 4.98, answer correctness 4.79, and topic alignment 4.98. Mean distinctness was 4.19/5 (factor 0.91).
+For Variant B, 44 of 47 questions (94%) were usable as-is and 3 (6%) usable with edits. Mean scores were: conceptual equivalence 4.96, difficulty similarity 4.91, structural validity 4.96, answer correctness 4.77, and topic alignment 4.98. Mean distinctness was 4.02/5 (factor 0.87).
 
 
 
 
-Across both variants, conceptual equivalence, structural validity, and topic alignment were consistently high (≥4.83), indicating that the system reliably preserved the learning objectives and topical scope of the reference exam. Difficulty similarity and answer correctness showed more variability, reflecting the most common sources of instructor editing effort.
+Across both variant exams, conceptual equivalence averaged 4.96 and topic alignment 4.98; difficulty similarity averaged 4.94 and 4.91; structural validity averaged 5.00 and 4.96. Answer correctness averaged 4.77 on both, the lowest dimension in these runs. Mean distinctness near 4.0 produced the multiplicative penalties in the composite score even when rubric-only bases stayed at 98/100.
 
 
 
@@ -363,20 +363,12 @@ The following cases illustrate the range of outcomes observed in the aggregate r
 
 
 
-Highest-scoring questions illustrate what validity preservation looks like in practice. In Variant A, question 21 scored 5.00 out of 5 on the weighted composite and 
-asked students to implement fraction multiplication, the same core task as the original but with a substantially rephrased scenario, different variable names, and 
-equivalent difficulty. In Variant B, question 15 scored 5.00 out of 5 and tested the same List add and set indexing concepts with different values, clear wording, and 
-a single unambiguous correct answer. These cases show that the system can produce items that are conceptually equivalent, topically aligned, and sufficiently distinct 
-to serve as independent exam variants. A figure for this section is forthcoming.
+Highest-scoring slots illustrate strong alignment with the reference. In Variant A, the judge gave composite 5.00/5 to several slots including slot 1 (Java pass-by-value with clear wording and distinct numbers), slot 4 (selection-sort intermediate state with new numbers), and slot 5 (array manipulation with comparable difficulty and a correct key). In Variant B, composite 5.00/5 appeared on slots such as 4 (again selection-sort intermediate state with new numbers), 6 (multi-level indexing and method-call reasoning), and 7 (nested-loop condition checking recast with a locker scenario). These cases show the system can produce items that match the baseline concept and structure while changing surface detail. A figure for this section is forthcoming.
 
 
 
 
-Lower-scoring questions illustrate the most common failure mode, answer key ambiguity. In Variant A, slot 13 scored 2.24 out of 5 on the composite because the variant 
-changed the class, method name, and required logic enough that the correct answer became ambiguous; the judge noted drift from the base concept and could not verify 
-the answer key. In Variant B, slot 7 scored 3.09 out of 5 on the composite: the conceptual task matched, but the provided answer was likely wrong and one distractor 
-referenced an undefined method. Both cases were classified as usable with edits rather than unusable. The structure was salvageable, but the answer key still needed 
-instructor correction before deployment.
+Lower composite scores in these reports were tied to weak distinctness, not unusability. In Variant A, slot 43 scored 2.00/5 on the composite while still labeled usable as-is: the judge described an array-order check that changed only names and stayed very close to the baseline wording. In Variant B, slot 38 scored 2.00/5 while usable as-is: the same reliability concept with nearly identical options and minor rewording. Separately, a few slots in each exam were usable with edits because of answer-key or clarity issues; for example, in Variant B the judge flagged slot 5 as usable with edits after an incorrect marked answer on an array-loop variant. Those items illustrate where human review still matters before deployment.
 
 
 
@@ -400,7 +392,7 @@ Second, this evaluation used a single reference exam from one course and discipl
 
 
 
-Third, the distinctness dimension rewards surface-level variation but does not capture deeper forms of exam security such as underlying structure or similar answer choices. This is reflected in the relatively high distinctness scores (~4.2), which indicate moderate variation but suggest that deeper structural diversity remains limited. An exam that scores well on distinctness may still be recognizable to a student who has seen the original. Deeper distinctness analysis remains future work.
+Third, the distinctness dimension rewards surface-level variation but does not capture deeper forms of exam security such as underlying structure or similar answer choices. This is reflected in mean distinctness near 4.0–4.1 in these runs, which indicates only moderate surface variation and leaves room for deeper structural diversity. An exam that scores well on distinctness may still be recognizable to a student who has seen the original. Deeper distinctness analysis remains future work.
 
 Fourth, the high rubric scores indicate strong preservation of assessment properties; however, the relatively modest distinctness penalty highlights that many variants remain structurally similar to the reference exam.
 
@@ -413,24 +405,21 @@ the rubric may absorb some misalignment, but Bloom-style tag compliance was not 
 
 
 
-6.5  Review Enforcement and Export
+6.5  Analysis
 
 
 
 
 
 
-The results support that Question Maker preserves properties that matter for parallel-form style assessment. Mean conceptual equivalence was at least 4.83, mean 
-difficulty similarity at least 4.45, and mean structural validity at least 4.91 across the reported variants. These patterns align with the sort of validity argument 
-educators make when claiming alternate forms target the same constructs at similar demand [1]. Together with 47 slots per variant and a high rate of usable-as-is items,
-they support the claim that the system can facilitate variant construction at exam scale, with instructor review still needed for answer keys and edge cases.
+The results support that Question Maker preserves properties that matter for parallel-form style assessment. Mean conceptual equivalence was 4.96 on both variant exams, mean topic alignment 4.98, mean difficulty similarity 4.94 and 4.91, and mean structural validity 5.00 and 4.96. These patterns align with the sort of validity argument educators make when claiming alternate forms target the same constructs at similar demand [1]. Together with 47 slots per variant and the usability counts in Section 6.2, they support the claim that the system can facilitate variant construction at exam scale, with instructor review still needed for occasional answer-key fixes and for items with low distinctness.
 
 
 
 
 
 
-The most frequent need for instructor intervention is answer key ambiguity in a subset of questions, which matches known limitations of LLM-generated assessment content. Items remain editable and unexported until approved, so ambiguous keys are caught before students see them. Section 6.2 shows where difficulty and correctness dimensions lag conceptual alignment on average; we do not yet log per-session counts of ambiguous keys versus misaligned difficulty.
+The judge’s mean answer-correctness score of 4.77 and the small number of “usable with edits” slots point to occasional key or clarity fixes rather than wholesale failure. Items remain editable and unexported until approved, so those fixes are caught before students see them. Low composite scores on individual slots were often driven by distinctness penalties when wording stayed close to the baseline, not by unusability.
 
 
 
@@ -440,8 +429,7 @@ The most frequent need for instructor intervention is answer key ambiguity in a 
 7  Conclusion and Future Work
 
 We asked whether an AI-assisted assessment management system can facilitate equivalent exam variants through structured question metadata and automated variant 
-generation. On a single AP CS A reference exam, two independently generated full variants achieved strong rubric scores and high practical usability under an LLM judge,
-with answer-key review as the main residual risk. We answer the question in the affirmative for this setting, subject to the limitations in Section 6.4.
+generation. On a single AP CS A reference exam, two independently generated full variants achieved composite scores of 86/100 and 85/100 under an LLM judge, with rubric-only bases of 98/100 each and no unusable slots. We answer the question in the affirmative for this setting, subject to the limitations in Section 6.4.
 
 A direct comparison against unconstrained LLM generation was not included; such a baseline would help isolate the value of structured metadata and workflow. We leave
 that comparison, diagram-capable pipelines, more reference exams, live instructor studies, and instrumented measurements of editing time, regeneration counts, and cost
