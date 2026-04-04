@@ -1,6 +1,6 @@
 /**
  * Sidebar section listing assessments with counts, exports, and generation controls.
- * Supports creating new assessments, exporting to Canvas/TXT, and importing from Canvas.
+ * Supports creating new assessments, exporting to Canvas/TXT/Word, and importing from Canvas.
  */
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +25,7 @@ import {
     Trash2,
     AlertTriangle,
     FileText,
+    FileType2,
     Download,
     Layers3,
     Sparkles,
@@ -41,6 +42,7 @@ interface AssessmentSectionProps {
     loadError?: string | null;
     onExportToCanvas?: (assessmentId: number, assessmentName: string) => void;
     onExportToTxt?: (assessmentId: number, assessmentName: string) => void;
+    onExportToWord?: (assessmentId: number, assessmentName: string) => void | Promise<void>;
     onDeleteAssessment?: (assessmentId: number, assessmentName: string) => void;
     onImportFromCanvas?: () => void;
 }
@@ -162,6 +164,7 @@ export const AssessmentSection = ({
     loadError,
     onExportToCanvas,
     onExportToTxt,
+    onExportToWord,
     onDeleteAssessment,
     onImportFromCanvas
 }: AssessmentSectionProps) => {
@@ -174,7 +177,7 @@ export const AssessmentSection = ({
     const [exportDialogAssessment, setExportDialogAssessment] = useState<Assessment | null>(null);
 
     const hasAssessments = assessments.length > 0;
-    const hasAnyExportHandler = Boolean(onExportToCanvas || onExportToTxt);
+    const hasAnyExportHandler = Boolean(onExportToCanvas || onExportToTxt || onExportToWord);
 
     const exportDialogBlockReason = useMemo(() => {
         if (!exportDialogAssessment) return null;
@@ -363,7 +366,7 @@ export const AssessmentSection = ({
 
                                             {hasAnyExportHandler && (
                                                 <Tooltip
-                                                    content="Export to Canvas or download a text file"
+                                                    content="Export to Canvas, Word, or plain text"
                                                     side="bottom"
                                                 >
                                                     <Button
@@ -498,7 +501,7 @@ export const AssessmentSection = ({
                         <DialogTitle>Export assessment</DialogTitle>
                         <DialogDescription>
                             {exportDialogAssessment
-                                ? `"${exportDialogAssessment.name}" — pick Canvas or a plain-text file.`
+                                ? `"${exportDialogAssessment.name}" — pick Canvas, Word, or plain text.`
                                 : 'Pick an export format.'}
                         </DialogDescription>
                     </DialogHeader>
@@ -523,6 +526,25 @@ export const AssessmentSection = ({
                             >
                                 <Upload className="h-4 w-4 shrink-0" />
                                 Export to Canvas
+                            </Button>
+                        )}
+                        {onExportToWord && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-start gap-2 bg-black text-white hover:bg-gray-800 hover:text-white border-black disabled:opacity-50"
+                                disabled={Boolean(exportDialogBlockReason)}
+                                data-tour-id="export-word-btn"
+                                onClick={() => {
+                                    if (!exportDialogAssessment || exportDialogBlockReason) return;
+                                    void Promise.resolve(
+                                        onExportToWord(exportDialogAssessment.id, exportDialogAssessment.name)
+                                    );
+                                    setExportDialogAssessment(null);
+                                }}
+                            >
+                                <FileType2 className="h-4 w-4 shrink-0" />
+                                Export as Word (.docx)
                             </Button>
                         )}
                         {onExportToTxt && (

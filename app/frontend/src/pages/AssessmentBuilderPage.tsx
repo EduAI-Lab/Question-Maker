@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, Upload, FileText } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Upload, FileText, FileType2 } from 'lucide-react';
 import assessmentService from '../services/assessmentService';
 import { courseService } from '../services/courseService';
 import { questionService } from '../services/questionService';
@@ -20,6 +20,12 @@ import { useToast } from '../components/ui/use-toast';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
 import { AssessmentVariantWorkflowPanel } from '../components/study/AssessmentVariantWorkflowPanel';
 import { defaultReasoningData } from './assessments/assessmentViewTypes';
+import {
+    assessmentBlocksToDocxBlob,
+    assessmentBlocksToPlainText,
+    collectAssessmentExportBlocks,
+    slugifyAssessmentBasename
+} from '../utils/assessmentExport';
 
 const AssessmentBuilderPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -38,6 +44,7 @@ const AssessmentBuilderPage = () => {
     const [isEditAssessmentOpen, setIsEditAssessmentOpen] = useState(false);
     const [isCanvasExportOpen, setIsCanvasExportOpen] = useState(false);
     const [isTxtExporting, setIsTxtExporting] = useState(false);
+    const [isWordExporting, setIsWordExporting] = useState(false);
     const [isDeletingAssessment, setIsDeletingAssessment] = useState(false);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
@@ -145,6 +152,9 @@ const AssessmentBuilderPage = () => {
         }
     };
 
+    const resolveVariantForExport = (variantId: number) =>
+        questionVariantEntries.find((e) => e.variant.id === variantId)?.variant;
+
     const handleExportTxt = () => {
         if (!assessment) return;
         if (!hasQuestions) {
@@ -166,28 +176,8 @@ const AssessmentBuilderPage = () => {
         }
         setIsTxtExporting(true);
         try {
-            const entries: Array<{ order: number; text: string }> = [];
-            (assessment.sections ?? []).forEach((section) => {
-                (section.sectionVariants ?? []).forEach((link) => {
-                    const entry = questionVariantEntries.find((e) => e.variant.id === link.variantId);
-                    if (!entry) return;
-                    const v = entry.variant;
-                    const questionText =
-                        v.questionText?.trim() || (v as { questionMetadata?: { description?: string } }).questionMetadata?.description?.trim() || '';
-                    if (!questionText) return;
-                    const parts: string[] = [questionText];
-                    const choices = v.choices && Array.isArray(v.choices) ? v.choices : [];
-                    choices.forEach((c) => {
-                        parts.push(`${c.letter}. ${(c.text || '').trim()}`);
-                    });
-                    const answer = v.answer?.trim();
-                    if (answer) parts.push(`Correct answer: ${answer}`);
-                    const orderValue = link.displayOrder ?? (v as { questionMetadata?: { questionOrder?: Record<number, number> } }).questionMetadata?.questionOrder?.[assessment.id];
-                    const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
-                    entries.push({ order, text: parts.join('\n') });
-                });
-            });
-            if (entries.length === 0) {
+            const blocks = collectAssessmentExportBlocks(assessment, resolveVariantForExport);
+            if (blocks.length === 0) {
                 toast({
                     title: 'Cannot export',
                     description: 'No questions to export for this assessment.',
@@ -195,15 +185,11 @@ const AssessmentBuilderPage = () => {
                 });
                 return;
             }
-            entries.sort((a, b) => a.order - b.order);
-            const content = entries.map((e, i) => `${i + 1}. ${e.text}`).join('\n\n');
+            const content = assessmentBlocksToPlainText(blocks);
             const blob = new Blob([content], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const linkEl = document.createElement('a');
-            const slug = (assessment.name || 'assessment')
-                .replace(/[^a-z0-9]+/gi, '-')
-                .replace(/^-+|-+$/g, '')
-                .toLowerCase() || 'assessment';
+            const slug = slugifyAssessmentBasename(assessment.name, 'assessment');
             linkEl.href = url;
             linkEl.download = `${slug}-questions.txt`;
             document.body.appendChild(linkEl);
@@ -216,6 +202,61 @@ const AssessmentBuilderPage = () => {
             });
         } finally {
             setIsTxtExporting(false);
+        }
+    };
+
+    const handleExportWord = async () => {
+        if (!assessment) return;
+        if (!hasQuestions) {
+            toast({
+                title: 'Cannot export',
+                description: 'No questions in assessment.',
+                variant: 'destructive'
+            });
+            return;
+        }
+        if (hasDraftQuestions) {
+            toast({
+                title: 'Cannot export',
+                description:
+                    'Assessment contains draft questions. Please review all draft questions before exporting.',
+                variant: 'destructive'
+            });
+            return;
+        }
+        setIsWordExporting(true);
+        try {
+            const blocks = collectAssessmentExportBlocks(assessment, resolveVariantForExport);
+            if (blocks.length === 0) {
+                toast({
+                    title: 'Cannot export',
+                    description: 'No questions to export for this assessment.',
+                    variant: 'destructive'
+                });
+                return;
+            }
+            const blob = await assessmentBlocksToDocxBlob(assessment, blocks);
+            const url = URL.createObjectURL(blob);
+            const linkEl = document.createElement('a');
+            const slug = slugifyAssessmentBasename(assessment.name, 'assessment');
+            linkEl.href = url;
+            linkEl.download = `${slug}-questions.docx`;
+            document.body.appendChild(linkEl);
+            linkEl.click();
+            linkEl.remove();
+            URL.revokeObjectURL(url);
+            toast({
+                title: 'Export started',
+                description: 'Questions downloaded as a Word document.'
+            });
+        } catch {
+            toast({
+                title: 'Export failed',
+                description: 'Could not build the Word file. Please try again.',
+                variant: 'destructive'
+            });
+        } finally {
+            setIsWordExporting(false);
         }
     };
 
@@ -519,11 +560,22 @@ const AssessmentBuilderPage = () => {
                                             variant="outline"
                                             size="sm"
                                             onClick={handleExportTxt}
-                                            disabled={isTxtExporting}
+                                            disabled={isTxtExporting || isWordExporting}
                                             className="border-gray-800 bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
                                         >
                                             <FileText className="mr-2 h-4 w-4" />
                                             {isTxtExporting ? 'Exporting…' : 'Export TXT'}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => void handleExportWord()}
+                                            disabled={isTxtExporting || isWordExporting}
+                                            className="border-gray-800 bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-50"
+                                        >
+                                            <FileType2 className="mr-2 h-4 w-4" />
+                                            {isWordExporting ? 'Exporting…' : 'Export Word'}
                                         </Button>
                                     </>
                                 ) : (
@@ -555,6 +607,16 @@ const AssessmentBuilderPage = () => {
                                             >
                                                 <FileText className="mr-2 h-4 w-4" />
                                                 Export TXT
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                disabled
+                                                className="border-gray-800 bg-gray-900 text-white opacity-50"
+                                            >
+                                                <FileType2 className="mr-2 h-4 w-4" />
+                                                Export Word
                                             </Button>
                                         </span>
                                     </Tooltip>

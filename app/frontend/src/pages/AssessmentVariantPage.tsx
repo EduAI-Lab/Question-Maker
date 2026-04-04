@@ -29,6 +29,7 @@ import { QuestionUploadDialog } from '../components/question-bank/QuestionUpload
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
 import type { Assessment, Course, Question } from '../types/question';
 import type { Topic } from '../types/topic';
+import { buildAiReviewDocxBlob } from '../utils/aiReviewExportDocx';
 
 /** Hover text for the Variants column — counts are reviewed-only (drafts excluded). */
 const REVIEWED_VARIANTS_TOOLTIP =
@@ -173,188 +174,6 @@ function downloadTextFile(filename: string, content: string, mimeType: string): 
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-function buildAiReviewWordHtmlReport(
-  result: Awaited<ReturnType<typeof studyService.reviewVariantWithAi>>,
-  baselineName: string,
-  variantName: string
-): string {
-  const rows = [...result.perQuestion];
-  const scoreOf = (r: (typeof rows)[number]) => {
-    if (
-      typeof r.exam_variant_composite_score_1to5 === 'number' &&
-      Number.isFinite(r.exam_variant_composite_score_1to5)
-    ) {
-      const distinctnessFactor =
-        typeof r.exam_variant_distinctness_factor === 'number' && Number.isFinite(r.exam_variant_distinctness_factor)
-          ? r.exam_variant_distinctness_factor
-          : 1;
-      const usabilityAdjusted =
-        typeof r.exam_variant_composite_score_1to5_usability_adjusted === 'number' &&
-        Number.isFinite(r.exam_variant_composite_score_1to5_usability_adjusted)
-          ? r.exam_variant_composite_score_1to5_usability_adjusted
-          : r.exam_variant_composite_score_1to5;
-      return usabilityAdjusted * distinctnessFactor;
-    }
-    const vals = [
-      r.conceptual_equivalence,
-      r.difficulty_similarity,
-      r.structural_validity,
-      r.answer_correctness,
-      r.topic_alignment
-    ].filter((v): v is number => typeof v === 'number');
-    if (vals.length === 0) return 0;
-    return vals.reduce((a, b) => a + b, 0) / vals.length;
-  };
-  const ranked = rows.map((r) => ({ row: r, avg: scoreOf(r) })).sort((a, b) => b.avg - a.avg);
-  const highExamples = ranked.slice(0, Math.min(3, ranked.length));
-  const lowExample = ranked.length > 0 ? ranked[ranked.length - 1] : null;
-  const avg = (k: string) => {
-    const v = result.averages[k];
-    return typeof v === 'number' ? v.toFixed(2) : 'n/a';
-  };
-
-  const rowsHtml = rows
-    .map(
-      (r) => `
-      <tr>
-        <td>${r.slot}</td>
-        <td>${r.conceptual_equivalence ?? '-'}</td>
-        <td>${r.difficulty_similarity ?? '-'}</td>
-        <td>${r.structural_validity ?? '-'}</td>
-        <td>${r.answer_correctness ?? '-'}</td>
-        <td>${r.topic_alignment ?? '-'}</td>
-        <td>${r.distinctness ?? '-'}</td>
-        <td>${escapeHtml(formatUsabilityLabel(r.usability))}</td>
-        <td>${escapeHtml(r.brief_reason ?? '')}</td>
-      </tr>`
-    )
-    .join('');
-
-  const highHtml = highExamples
-    .map(
-      (item, idx) =>
-        `<li>${idx + 1}. Slot ${item.row.slot} (composite ${item.avg.toFixed(2)}/5) - ${escapeHtml(formatUsabilityLabel(item.row.usability))}: ${escapeHtml(item.row.brief_reason ?? '')}</li>`
-    )
-    .join('');
-
-  const lowHtml = lowExample
-    ? `<li>Slot ${lowExample.row.slot} (composite ${lowExample.avg.toFixed(2)}/5) - ${escapeHtml(formatUsabilityLabel(lowExample.row.usability))}: ${escapeHtml(lowExample.row.brief_reason ?? '')}</li>`
-    : '<li>n/a</li>';
-
-  const finalScore0to100 = typeof result.examVariantScoreFinal0to100 === 'number' ? result.examVariantScoreFinal0to100 : null;
-  const baseScore0to100 = typeof result.examVariantScoreBase0to100 === 'number' ? result.examVariantScoreBase0to100 : null;
-  const usablePct = typeof result.usableQuestionPercentage === 'number' ? result.usableQuestionPercentage : null;
-  const reviewSeconds = typeof result.reviewTimeMs === 'number' ? result.reviewTimeMs / 1000 : null;
-  const distinctnessAvg = typeof result.distinctnessAverage1to5 === 'number' ? result.distinctnessAverage1to5 : null;
-  const distinctnessFactorAvg = typeof result.distinctnessFactorAvg === 'number' ? result.distinctnessFactorAvg : null;
-  const overallSummaryText = result.overallSummary?.summaryText ?? 'n/a';
-  const overallStrengthsText = Array.isArray(result.overallSummary?.strengths) ? result.overallSummary.strengths.join(', ') : 'n/a';
-  const overallWeaknessesText = Array.isArray(result.overallSummary?.weaknesses) ? result.overallSummary.weaknesses.join(', ') : 'n/a';
-  const totalScoreCalcSummary = result.totalScoreCalculationSummary ?? null;
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>AI Judge Report</title>
-  <style>
-    body { font-family: Calibri, Arial, sans-serif; line-height: 1.35; color: #111; }
-    h1, h2, h3 { margin: 0 0 8px; }
-    h1 { font-size: 22px; }
-    h2 { font-size: 18px; margin-top: 20px; }
-    h3 { font-size: 15px; margin-top: 14px; }
-    p, li { font-size: 12px; }
-    ul { margin-top: 4px; }
-    table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 11px; }
-    th, td { border: 1px solid #cbd5e1; padding: 6px; vertical-align: top; text-align: left; }
-    th { background: #f1f5f9; }
-    .muted { color: #475569; }
-    .card { border: 1px solid #e2e8f0; padding: 10px; margin-top: 8px; }
-    pre { white-space: pre-wrap; background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px; font-size: 11px; }
-  </style>
-</head>
-<body>
-  <h1>AI Judge Report</h1>
-  <p><strong>Baseline exam:</strong> ${escapeHtml(baselineName)} (#${result.baselineAssessmentId})<br/>
-     <strong>Variant exam:</strong> ${escapeHtml(variantName)} (#${result.variantAssessmentId})<br/>
-     <strong>Model:</strong> ${escapeHtml(result.model)}<br/>
-     <strong>Compared slots:</strong> ${result.comparedSlots}<br/>
-     <strong>Review time:</strong> ${reviewSeconds != null ? reviewSeconds.toFixed(1) : 'n/a'}s</p>
-
-  <h2>Overall score</h2>
-  <div class="card">
-    <p>Final exam variant score: <strong>${finalScore0to100 != null ? finalScore0to100.toFixed(0) : 'n/a'}</strong> / 100<br/>
-       Base (rubric-only): <strong>${baseScore0to100 != null ? baseScore0to100.toFixed(0) : 'n/a'}</strong> / 100<br/>
-       Usable questions: <strong>${usablePct != null ? usablePct.toFixed(0) : 'n/a'}</strong>%<br/>
-       Distinctness: <strong>${distinctnessAvg != null ? distinctnessAvg.toFixed(2) : 'n/a'}</strong>/5 (factor ${distinctnessFactorAvg != null ? distinctnessFactorAvg.toFixed(2) : 'n/a'})</p>
-    ${totalScoreCalcSummary ? `<p class="muted">Total score calculation: ${escapeHtml(totalScoreCalcSummary)}</p>` : ''}
-  </div>
-
-  <h2>Instructor summary</h2>
-  <div class="card">
-    <p><strong>Summary:</strong> ${escapeHtml(overallSummaryText)}</p>
-    <p><strong>Strengths:</strong> ${escapeHtml(overallStrengthsText)}</p>
-    <p><strong>Weaknesses:</strong> ${escapeHtml(overallWeaknessesText)}</p>
-  </div>
-
-  <h2>Aggregate scores</h2>
-  <div class="card">
-    <p>Conceptual equivalence: <strong>${avg('conceptual_equivalence')}</strong><br/>
-       Difficulty similarity: <strong>${avg('difficulty_similarity')}</strong><br/>
-       Structural validity: <strong>${avg('structural_validity')}</strong><br/>
-       Answer correctness: <strong>${avg('answer_correctness')}</strong><br/>
-       Topic alignment: <strong>${avg('topic_alignment')}</strong></p>
-  </div>
-
-  <h2>Usability</h2>
-  <div class="card">
-    <p>Usable as-is: <strong>${result.usabilityCounts.usable_as_is}</strong><br/>
-       Usable with edits: <strong>${result.usabilityCounts.usable_with_edits}</strong><br/>
-       Unusable: <strong>${result.usabilityCounts.unusable}</strong></p>
-  </div>
-
-  <h2>Qualitative examples</h2>
-  <h3>Highest-rated variants (2-3 examples)</h3>
-  <ul>${highHtml || '<li>n/a</li>'}</ul>
-  <h3>Low-rated variant (1 example)</h3>
-  <ul>${lowHtml}</ul>
-
-  <h2>Per-slot results</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Slot</th>
-        <th title="How well the variant preserves the same concept and reasoning intent as the original.">Concept</th>
-        <th title="How similar the variant’s difficulty level is to the original (comparable challenge for students).">Difficulty</th>
-        <th title="Whether the variant is internally valid and unambiguous (clear structure, solvable prompt/options/requirements).">Structure</th>
-        <th title="Whether the provided answer is correct and the distractors/solution are consistent with that answer.">Answer</th>
-        <th title="Whether the variant matches the same course topic (not just loosely related).">Topic</th>
-        <th title="How different the variant is from the original (values/context/structure/scenario), while still preserving the core concept. Low distinctness means near-duplicate wording/parameters.">Distinctness</th>
-        <th>Usability</th>
-        <th>Reason</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rowsHtml}
-    </tbody>
-  </table>
-
-  <h2>Rubric used</h2>
-  <pre>${escapeHtml(result.rubricUsed || '(none)')}</pre>
-  <p class="muted">Generated by Assessment Variant Workflow - AI Review export.</p>
-</body>
-</html>`;
 }
 
 /** Unique question_metadata ids in section order (first occurrence per base question). */
@@ -872,15 +691,31 @@ export function AssessmentVariantPage() {
     );
   };
 
-  const exportAiReviewWord = () => {
+  const exportAiReviewWord = async () => {
     if (!aiReviewResult) return;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const html = buildAiReviewWordHtmlReport(aiReviewResult, aiReviewBaselineName, aiReviewVariantName);
-    downloadTextFile(
-      `ai-review-${aiReviewResult.baselineAssessmentId}-vs-${aiReviewResult.variantAssessmentId}-${stamp}.doc`,
-      html,
-      'application/msword;charset=utf-8'
-    );
+    const filename = `ai-review-${aiReviewResult.baselineAssessmentId}-vs-${aiReviewResult.variantAssessmentId}-${stamp}.docx`;
+    try {
+      const blob = await buildAiReviewDocxBlob(aiReviewResult, aiReviewBaselineName, aiReviewVariantName);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast({
+        title: 'Export started',
+        description: 'AI review downloaded as a Word document (.docx).'
+      });
+    } catch {
+      toast({
+        title: 'Export failed',
+        description: 'Could not build the Word file. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   return (
@@ -1393,8 +1228,8 @@ export function AssessmentVariantPage() {
                 {aiReviewResult && (
                   <div className="space-y-4 rounded-lg border bg-white p-4 text-sm">
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="outline" onClick={exportAiReviewWord}>
-                        Export Word (.doc)
+                      <Button type="button" variant="outline" onClick={() => void exportAiReviewWord()}>
+                        Export Word (.docx)
                       </Button>
                       <Button type="button" variant="outline" onClick={exportAiReviewJson}>
                         Export raw JSON
