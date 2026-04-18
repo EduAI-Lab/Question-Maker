@@ -51,7 +51,9 @@ services:
     volumes:
       - ./app/frontend:/app
       - /app/node_modules
-    command: npm run dev
+    # Bind mount hides image node_modules; the anonymous volume keeps deps across restarts.
+    # Run npm install on start so new packages (e.g. docx) appear without manual volume pruning.
+    command: sh -c "npm install && npm run dev"
     restart: unless-stopped
 
 volumes:
