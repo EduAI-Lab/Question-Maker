@@ -39,6 +39,8 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 - **Implemented:** [assessmentVariantAuth.test.js](../app/backend/test/assessmentVariantAuth.test.js) — all `/api/assessment-variant` routes return `401` without a bearer token.
 - **Implemented:** [eduaiAuth.test.js](../app/backend/test/eduaiAuth.test.js) — EduAI proxy routes return `401` without a bearer token.
 - **Implemented:** [canvasExport.test.js](../app/backend/test/canvasExport.test.js) — `convertVariantToCanvasQuestion` / `parseMCQOptions` (exported from `canvasService.js` for tests only).
+- **Implemented:** [aiExtract.test.js](../app/backend/test/aiExtract.test.js) — `extractQuestionsFromText` returns `[]` when input is empty / whitespace-only (no EduAI).
+- **Implemented:** [questionsAuth.test.js](../app/backend/test/questionsAuth.test.js) — core `/api/questions` and `/extract` routes return `401` without a token.
 - **Express split:** [app.js](../app/backend/src/app.js) exports the app for supertest; [index.js](../app/backend/src/index.js) only starts the server and DB.
 - **DB integration (optional env):** [auth.integration.test.js](../app/backend/test/auth.integration.test.js) — register, login, `/me`, validation, duplicate email. [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — create question, create/fetch assessment. [testDb.js](../app/backend/test/helpers/testDb.js) — connect + `TRUNCATE` helper.
 - If `TEST_DATABASE_URL` is unset, integration suites are **skipped** (Jest still exits 0).
@@ -75,14 +77,14 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 | ID | Type | Cases |
 |----|------|--------|
 | C1 | Service + DB | Create/read/update/delete with valid `courseId` / topic rules. |
-| C2 | HTTP | Authenticated variant and question order endpoints. |
+| C2 | HTTP | `401` without token — [questionsAuth.test.js](../app/backend/test/questionsAuth.test.js). (Variant/order integration: backlog.) |
 
 ### D. Extraction and AI (`extractionUtils`, `aiService`, `saveExtractedQuestions`)
 
 | ID | Type | Cases |
 |----|------|--------|
-| D1 | Unit | Extraction helpers — extend [extraction.test.js](../app/backend/test/extraction.test.js) for edge cases. |
-| D2 | Unit + mock | `extractQuestionsFromText` — mock upstream, assert request/response handling. |
+| D1 | Unit | Extraction helpers — [extraction.test.js](../app/backend/test/extraction.test.js). |
+| D2 | Unit | `extractQuestionsFromText` empty input — [aiExtract.test.js](../app/backend/test/aiExtract.test.js). (Full EduAI path: mock `eduaiService` — backlog.) |
 | D3 | Service + DB | `saveExtractedQuestions` — metadata + variants + optional assessment/section. |
 
 ### E. EduAI (`/api/eduai`, `eduaiService`)
