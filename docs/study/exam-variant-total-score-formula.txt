@@ -1,0 +1,97 @@
+Exam variant total score — how the 0 to 100 score is calculated
+
+This describes the logic used by the AI review for a variant exam compared slot-by-slot to a baseline. All rubric dimensions are scored from 1 to 5 unless noted.
+Research summary (methods text)
+
+We evaluated each generated exam variant against a baseline using an LLM-as-a-judge 
+rubric applied to every aligned question slot. The judge assigned ordinal scores from 
+1 to 5 on five substantive dimensions: conceptual equivalence, difficulty similarity, 
+structural validity, answer correctness, and topic alignment. We combined these into a 
+fixed per-slot weighted composite (conceptual equivalence 0.24; each other dimension 
+0.19), averaged the composites across the exam, and linearly mapped the result from 
+the 1–5 scale to a 0–100 rubric score for reporting. A separate per-slot distinctness
+rating (1–5), converted to a multiplicative penalty factor and averaged across slots, 
+down-weights variants that are too similar to the original irrespective of rubric 
+quality. When enabled, an additional average usability factor (from per-slot labels: 
+usable as-is, usable with edits, unusable) further scales the score to reflect 
+practical usability. The overall variant score is the product of the 0–100 rubric 
+score and these average factors, clamped to [0, 100].
+
+STEP 1 — Per-slot rubric composite (1 to 5)
+
+For each aligned slot i, take the five rubric scores (each 1 to 5):
+
+  conceptual_equivalence
+  difficulty_similarity
+  structural_validity
+  answer_correctness
+  topic_alignment
+
+Weighted average (conceptual equivalence weighted slightly higher than the others):
+
+  composite_i = 0.24 * conceptual_equivalence
+              + 0.19 * difficulty_similarity
+              + 0.19 * structural_validity
+              + 0.19 * answer_correctness
+              + 0.19 * topic_alignment
+
+Missing dimensions are omitted and weights are re-normalized across the dimensions that are present.
+
+Note: distinctness is NOT part of this composite. It is applied later as a penalty factor.
+
+STEP 2 — Base exam average (1 to 5)
+
+N = number of compared slots.
+
+  base_avg_1_to_5 = average of composite_i over i = 1 .. N
+
+STEP 3 — Base score on 0 to 100 scale
+
+Map the 1 to 5 scale to 0 to 100:
+
+  base_score_0_to_100 = ((base_avg_1_to_5 - 1) / 4) * 100
+
+So a perfect 5 becomes 100, a 1 becomes 0.
+
+STEP 4 — Distinctness penalty (average factor across slots)
+
+Each slot has a distinctness rating from 1 to 5. Convert to a factor:
+
+  5 -> 1.0
+  4 -> 0.9
+  3 -> 0.7
+  2 -> 0.4
+  1 -> 0.1
+
+  distinctness_factor_avg = average of those factors over all N slots.
+
+If no distinctness values exist, the factor defaults to 1.0 (no change).
+
+  score_after_distinctness = base_score_0_to_100 * distinctness_factor_avg
+
+STEP 5 — Usability penalty (optional; average factor across slots)
+
+When usability penalty is enabled, each slot has usability:
+
+  usable_as_is      -> factor 1.0
+  usable_with_edits -> factor 0.9
+  unusable          -> factor 0.75
+
+  usability_factor_avg = average of those factors over all N slots.
+
+  score_before_clamp = score_after_distinctness * usability_factor_avg
+
+When usability penalty is off, skip this multiply (equivalent to multiplying by 1.0).
+
+STEP 6 — Final score
+
+  final_score_0_to_100 = score_before_clamp limited to the range 0 through 100 (clamp).
+
+The number shown as the overall variant score is final_score_0_to_100, typically rounded to a whole number for display.
+
+One-line summary of the chain:
+
+  final = clamp( base_0_to_100 * distinctness_factor_avg * [usability_factor_avg if enabled], min=0, max=100 )
+
+
+

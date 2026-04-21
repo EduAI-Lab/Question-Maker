@@ -167,6 +167,7 @@ class EduAIService {
       reasoningDistribution = { factual: 40, analytical: 30, application: 30 },
       systemPromptOverride,
       userPromptOverride,
+      mcqRequiredChoiceCount,
     } = params;
 
     if (!prompt || !courseCode) {
@@ -174,6 +175,16 @@ class EduAIService {
         "Prompt and courseCode are required for question generation"
       );
     }
+
+    const mcqCountEnforced =
+      typeof mcqRequiredChoiceCount === "number" &&
+      Number.isInteger(mcqRequiredChoiceCount) &&
+      mcqRequiredChoiceCount >= 2 &&
+      mcqRequiredChoiceCount <= 26;
+
+    const mcqChoiceCountLine = mcqCountEnforced
+      ? `- "choices" is REQUIRED for MCQ: the array MUST contain exactly ${mcqRequiredChoiceCount} items (not ${mcqRequiredChoiceCount - 1} or ${mcqRequiredChoiceCount + 1}). Use consecutive letters ${Array.from({ length: mcqRequiredChoiceCount }, (_, i) => String.fromCharCode(65 + i)).join(", ")}. Each item: {"letter": "A", "text": "the option text"}.`
+      : `- "choices" is REQUIRED: you MUST include a "choices" array with at least 2 items (typically 4). Each item: {"letter": "A", "text": "the option text"}.`;
 
     const defaultSystemPrompt = `You are an expert question generator for educational assessments. Generate exactly ${numQuestions} high-quality questions based on the course material.
 
@@ -199,9 +210,10 @@ Format each question as a JSON object with these exact fields:
 
 IMPORTANT FOR MCQ QUESTIONS:
 - "content" must contain ONLY the question text, without any choices. Do NOT put options inside content.
-- "choices" is REQUIRED: you MUST include a "choices" array with at least 2 items (typically 4). Each item: {"letter": "A", "text": "the option text"}.
+${mcqChoiceCountLine}
 - Each choice must have a unique letter (A, B, C, D, E, etc.). Never omit "choices" for MCQ.
 - "answer" must be the single letter of the correct choice (e.g., "B").
+${mcqCountEnforced ? `- For this request, if type is MCQ, violating the exact choice count is an error — match the source question's option count.\n` : ""}
 
 Answer Guidelines:
 - For MCQ questions: "answer" must be the letter of the correct choice (e.g., "A", "B", "C", "D")
@@ -236,6 +248,7 @@ Please ensure the questions are appropriate for the course level and cover the k
         courseCode,
         model,
         numQuestions,
+        mcqRequiredChoiceCount: mcqCountEnforced ? mcqRequiredChoiceCount : undefined,
         systemPromptLength: systemPrompt.length,
         userPromptLength: userPrompt.length,
         usingOverrides: Boolean(systemPromptOverride || userPromptOverride),
@@ -323,16 +336,27 @@ Please ensure the questions are appropriate for the course level and cover the k
         );
       }
 
-      // Filter and validate each question
-      const validQuestions = questions.filter(
+      // Normalize missing fields (extraction often omits reasoning_level; default instead of dropping)
+      const questionsNormalized = questions
+        .filter((q) => q && typeof q === "object" && typeof q.content === "string" && q.content.trim())
+        .map((q) => {
+          const difficulty = ["easy", "medium", "hard"].includes(q.difficulty)
+            ? q.difficulty
+            : "medium";
+          const rlRaw = q.reasoning_level ?? q.reasoningLevel;
+          const reasoning_level = ["factual", "analytical", "application"].includes(rlRaw)
+            ? rlRaw
+            : "factual";
+          return { ...q, content: q.content.trim(), difficulty, reasoning_level };
+        });
+
+      const validQuestions = questionsNormalized.filter(
         (q) =>
           q.content &&
           q.difficulty &&
           q.reasoning_level &&
           ["easy", "medium", "hard"].includes(q.difficulty) &&
-          ["factual", "analytical", "application"].includes(
-            q.reasoning_level
-          )
+          ["factual", "analytical", "application"].includes(q.reasoning_level)
       );
 
       if (validQuestions.length === 0) {
@@ -458,13 +482,18 @@ Please ensure the questions are appropriate for the course level and cover the k
 
           // Fallback 2: model returned MCQ but no choices – use placeholders so user can edit
           if (!choices || choices.length === 0) {
-            choices = [
-              { letter: "A", text: "Option A" },
-              { letter: "B", text: "Option B" },
-              { letter: "C", text: "Option C" },
-              { letter: "D", text: "Option D" },
-            ];
-            console.log(`${DEBUG_PREFIX} MCQ had no choices; using placeholders`);
+            if (mcqCountEnforced) {
+              choices = [];
+              console.log(`${DEBUG_PREFIX} MCQ had no choices; leaving empty (strict choice count — caller must retry)`);
+            } else {
+              choices = [
+                { letter: "A", text: "Option A" },
+                { letter: "B", text: "Option B" },
+                { letter: "C", text: "Option C" },
+                { letter: "D", text: "Option D" },
+              ];
+              console.log(`${DEBUG_PREFIX} MCQ had no choices; using placeholders`);
+            }
           }
 
           // Normalize answer to just the letter for MCQ

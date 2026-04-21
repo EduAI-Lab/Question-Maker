@@ -23,6 +23,12 @@ import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
 import { useToast } from '../components/ui/use-toast';
 import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModal';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
+import {
+    assessmentBlocksToDocxBlob,
+    assessmentBlocksToPlainText,
+    collectAssessmentExportBlocks,
+    slugifyAssessmentBasename
+} from '../utils/assessmentExport';
 
 export const Homepage = () => {
   const LAST_SELECTED_COURSE_KEY = 'home:last-selected-course';
@@ -714,43 +720,9 @@ export const Homepage = () => {
         return;
       }
 
-      const entries: Array<{ order: number; text: string }> = [];
+      const blocks = collectAssessmentExportBlocks(assessment);
 
-      assessment.sections?.forEach((section) => {
-        section.sectionVariants?.forEach((link) => {
-          const variant = link.variant;
-          if (!variant) return;
-
-          const questionText =
-            variant.questionText?.trim() ||
-            variant.questionMetadata?.description?.trim() ||
-            '';
-          if (!questionText) return;
-
-          const parts: string[] = [questionText];
-          const choices = variant.choices && Array.isArray(variant.choices) ? variant.choices : [];
-          if (choices.length > 0) {
-            choices.forEach((c) => {
-              parts.push(`${c.letter}. ${(c.text || '').trim()}`);
-            });
-          }
-          const answer = variant.answer?.trim();
-          if (answer) {
-            parts.push(`Correct answer: ${answer}`);
-          }
-
-          const text = parts.join('\n');
-
-          const orderValue =
-            link.displayOrder ??
-            variant.questionMetadata?.questionOrder?.[assessment.id];
-          const order = typeof orderValue === 'number' ? orderValue : Number.MAX_SAFE_INTEGER;
-
-          entries.push({ order, text });
-        });
-      });
-
-      if (entries.length === 0) {
+      if (blocks.length === 0) {
         toast({
           title: 'Cannot export',
           description: 'No questions to export for this assessment.',
@@ -759,15 +731,11 @@ export const Homepage = () => {
         return;
       }
 
-      entries.sort((a, b) => a.order - b.order);
-      const content = entries.map((entry, index) => `${index + 1}. ${entry.text}`).join('\n\n');
+      const content = assessmentBlocksToPlainText(blocks);
       const blob = new Blob([content], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const slug = (assessmentName || 'assessment')
-        .replace(/[^a-z0-9]+/gi, '-')
-        .replace(/^-+|-+$/g, '')
-        .toLowerCase() || 'assessment';
+      const slug = slugifyAssessmentBasename(assessmentName, 'assessment');
       link.href = url;
       link.download = `${slug}-questions.txt`;
       document.body.appendChild(link);
@@ -779,6 +747,72 @@ export const Homepage = () => {
         title: 'Export started',
         description: 'Questions downloaded as a TXT file.'
       });
+    },
+    [filteredAssessments, toast]
+  );
+
+  const handleExportAssessmentToWord = useCallback(
+    async (assessmentId: number, assessmentName: string) => {
+      const assessment = filteredAssessments.find((a) => a.id === assessmentId);
+
+      if (!assessment) {
+        toast({
+          title: 'Export failed',
+          description: 'Assessment not found.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const hasDrafts = assessment.sections?.some((section) =>
+        section.sectionVariants?.some(
+          (link) => link.variant?.questionMetadata?.isDraft === true
+        )
+      );
+
+      if (hasDrafts) {
+        toast({
+          title: 'Cannot export',
+          description: 'Assessment contains draft questions. Please review all draft questions before exporting.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const blocks = collectAssessmentExportBlocks(assessment);
+
+      if (blocks.length === 0) {
+        toast({
+          title: 'Cannot export',
+          description: 'No questions to export for this assessment.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      try {
+        const blob = await assessmentBlocksToDocxBlob(assessment, blocks);
+        const url = URL.createObjectURL(blob);
+        const linkEl = document.createElement('a');
+        const slug = slugifyAssessmentBasename(assessmentName, 'assessment');
+        linkEl.href = url;
+        linkEl.download = `${slug}-questions.docx`;
+        document.body.appendChild(linkEl);
+        linkEl.click();
+        linkEl.remove();
+        URL.revokeObjectURL(url);
+
+        toast({
+          title: 'Export started',
+          description: 'Questions downloaded as a Word document.'
+        });
+      } catch {
+        toast({
+          title: 'Export failed',
+          description: 'Could not build the Word file. Please try again.',
+          variant: 'destructive'
+        });
+      }
     },
     [filteredAssessments, toast]
   );
@@ -842,6 +876,7 @@ export const Homepage = () => {
             setIsCanvasExportOpen(true);
           }}
           onExportToTxt={handleExportAssessmentToTxt}
+          onExportToWord={handleExportAssessmentToWord}
           onDeleteAssessment={handleDeleteAssessment}
           onImportFromCanvas={() => setIsCanvasImportOpen(true)}
         />

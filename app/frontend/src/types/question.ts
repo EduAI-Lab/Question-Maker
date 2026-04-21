@@ -209,6 +209,11 @@ export interface AssessmentBlueprintConfig {
         application: number;
     };
     reasoningData: ReasoningDataState;
+    /** Assessment variant workflow: imported reference vs. system-assembled variant exams */
+    studyRole?: 'reference_baseline' | 'generated_variant';
+    referenceAssessmentId?: number;
+    variantLabel?: string;
+    assembledAt?: string;
 }
 
 export interface AssessmentGenerationParams extends AssessmentBlueprintConfig {
