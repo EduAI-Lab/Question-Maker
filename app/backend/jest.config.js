@@ -3,4 +3,5 @@ export default {
   testEnvironment: 'node',
   transform: {},
   testMatch: ['**/test/**/*.test.js'],
+  setupFiles: ['<rootDir>/test/setup.js'],
 };

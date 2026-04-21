@@ -1,0 +1,138 @@
+# Test plan — Question Maker (EduQuery)
+
+This document maps product features to automated tests, defines layers and priorities, and points maintainers to the right files. It pairs with [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md).
+
+## 1. Goals
+
+| Goal | Success criteria |
+|------|------------------|
+| Regression safety | Changes to auth, questions, assessments, Canvas, EduAI, and the study workflow are covered by tests that run in CI. |
+| Handover | New owners can see *which* feature maps to *which* tests and where to add cases. |
+| Test pyramid | Prefer **unit** tests on pure logic, **integration** tests on HTTP + DB for critical paths; **E2E** only if Playwright/Cypress is added later. |
+
+## 2. Tooling
+
+| Area | Command | Config |
+|------|---------|--------|
+| Backend | `cd app/backend && npm test` | Jest, ESM (`--experimental-vm-modules`) — [jest.config.js](../app/backend/jest.config.js) |
+| Backend coverage | `npm run test:coverage` | Same |
+| Frontend | `cd app/frontend && npm test` | Vitest |
+| Test env | `app/backend/test/setup.js` | Sets fixed `JWT_SECRET` and `ENCRYPTION_KEY` for deterministic tests |
+
+**Integration tests** that need PostgreSQL should use a dedicated database (e.g. `DATABASE_URL` pointing at `eduquery_test`) and migrations/sync as appropriate — document the URL in your deployment notes when that suite is added.
+
+## 3. Current baseline (inventory)
+
+- **Implemented:** [extraction.test.js](../app/backend/test/extraction.test.js) — `extractionUtils` (question blocks, chunking, dedupe).
+- **Implemented:** [health.test.js](../app/backend/test/health.test.js) — public HTTP surface (`/`, `/healthz`, 404).
+- **Implemented:** [encryption.test.js](../app/backend/test/encryption.test.js) — Canvas API key encrypt/decrypt round-trip.
+- **Implemented:** [authService.test.js](../app/backend/test/authService.test.js) — JWT verify helpers (no DB).
+- **Implemented:** [studyExperimentMetrics.test.js](../app/backend/test/studyExperimentMetrics.test.js) — `scoreMetadataMatch` pure scoring.
+- **Implemented:** [studyAuth.test.js](../app/backend/test/studyAuth.test.js) — all `/api/study` routes return `401` without a bearer token.
+- **Express split:** [app.js](../app/backend/src/app.js) exports the app for supertest; [index.js](../app/backend/src/index.js) only starts the server and DB.
+- **Placeholder** frontend dummy test can be removed once real component tests exist.
+
+## 4. Test layers
+
+1. **Unit (no DB):** `extractionUtils`, `encryption`, `studyExperimentMetrics`, validation mappers, Canvas MCQ parsing helpers.
+2. **Service + DB:** `questionService`, `assessmentService`, `assessmentAuthService` — use a test DB or transactional rollback.
+3. **HTTP (supertest):** Authenticated routes with a test user or generated JWT; mock external HTTP (EduAI, Canvas) where the client is injectable.
+4. **Frontend (Vitest + Testing Library):** `api.ts` interceptors, critical hooks, pure export builders.
+
+**Do not** call real EduAI or Canvas in CI; use fixtures and mocks.
+
+## 5. Feature → tests (backlog and IDs)
+
+### A. Authentication (`/api/auth`, `authService`, `middleware/auth`)
+
+| ID | Type | Cases |
+|----|------|--------|
+| A1 | Unit | `verifyToken` valid / invalid / wrong secret (partially covered in authService tests). |
+| A2 | HTTP + DB | `POST /register` — success, duplicate email, validation. |
+| A3 | HTTP + DB | `POST /login` — success, wrong password, unknown user. |
+| A4 | HTTP + DB | `GET /me` — 200 with valid token, 401 without. |
+
+### B. Courses and topics (`/api/course`)
+
+| ID | Type | Cases |
+|----|------|--------|
+| B1 | HTTP + DB | CRUD scoped to `userId`; 403/404 for other user’s data. |
+
+### C. Questions and variants (`questionService`, `routes/questions`, `routes/variants`)
+
+| ID | Type | Cases |
+|----|------|--------|
+| C1 | Service + DB | Create/read/update/delete with valid `courseId` / topic rules. |
+| C2 | HTTP | Authenticated variant and question order endpoints. |
+
+### D. Extraction and AI (`extractionUtils`, `aiService`, `saveExtractedQuestions`)
+
+| ID | Type | Cases |
+|----|------|--------|
+| D1 | Unit | Extraction helpers — extend [extraction.test.js](../app/backend/test/extraction.test.js) for edge cases. |
+| D2 | Unit + mock | `extractQuestionsFromText` — mock upstream, assert request/response handling. |
+| D3 | Service + DB | `saveExtractedQuestions` — metadata + variants + optional assessment/section. |
+
+### E. EduAI (`/api/eduai`, `eduaiService`)
+
+| ID | Type | Cases |
+|----|------|--------|
+| E1 | HTTP + mock | Auth required; proxy error handling. |
+
+### F. Assessments (`assessmentService`, `assessmentSectionService`, `routes/assessments`)
+
+| ID | Type | Cases |
+|----|------|--------|
+| F1 | Service + DB | Blueprint, sections, variant links, reorder. |
+| F2 | HTTP | Happy path: create assessment → section → attach variant. |
+
+### G. Canvas (`canvasService`, `encryption`, export)
+
+| ID | Type | Cases |
+|----|------|--------|
+| G1 | Unit | Encrypt/decrypt (see encryption tests). |
+| G2 | Unit | `convertVariantToCanvasQuestion` / MCQ parsing edge cases. |
+| G3 | Unit + mock | Export sequence against mocked Canvas API. |
+
+### H. Study / experiment workflow (`/api/study`, `studyExperimentService`, `studyMetricsService`)
+
+| ID | Type | Cases |
+|----|------|--------|
+| H1 | Unit | `scoreMetadataMatch` (see [studyExperimentMetrics.test.js](../app/backend/test/studyExperimentMetrics.test.js)). |
+| H2 | HTTP | Validation: `400` for missing `studyRole`, `courseId`, `assessmentIds`, etc. |
+| H3 | Service + DB | One fixture: reference assessment → `assembleEquivalentExamVariants` structure (or clear failure). |
+| H4 | Unit / Service | `computeStudyMetrics` on small deterministic inputs. |
+
+### I. Infrastructure
+
+| ID | Type | Cases |
+|----|------|--------|
+| I1 | HTTP | `/healthz`, `/` — [health.test.js](../app/backend/test/health.test.js). |
+| I2 | HTTP | Unknown route → 404 JSON. |
+
+### J. Frontend (Vitest)
+
+| ID | Type | Cases |
+|----|------|--------|
+| J1 | Unit | `api.ts` — Authorization header, 401 behavior. |
+| J2 | Component | `LoginPage` — submit with mocked service. |
+
+## 6. Suggested implementation order
+
+1. Auth + health (A, I) — foundation for authenticated HTTP tests.  
+2. Questions / variants (C).  
+3. Assessments (F).  
+4. Extraction + EduAI mocks (D, E).  
+5. Canvas (G).  
+6. Study API (H) — validation routes first, then one DB-backed assembly case.  
+7. Frontend (J).
+
+## 7. Handover checklist
+
+- [ ] CI runs `npm test` in `app/backend` and `app/frontend` on every PR.  
+- [ ] `DATABASE_URL` for integration tests is documented when those tests land.  
+- [ ] No production API keys in test code; use `.env.test` or in-memory mocks.
+
+---
+
+*Last updated: aligns with repository layout and [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md).*
