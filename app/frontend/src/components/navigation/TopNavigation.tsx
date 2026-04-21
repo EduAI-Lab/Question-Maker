@@ -142,7 +142,7 @@ export const TopNavigation = (props: TopNavigationProps) => {
                         />
                     </div>
                     <div className="relative">
-                      <Tooltip content="Walk through the app with a guided tour" side="bottom">
+                    <Tooltip content="Walk through the app with a guided tour" side="bottom">
                         <Button
                           variant="ghost"
                           size="sm"
