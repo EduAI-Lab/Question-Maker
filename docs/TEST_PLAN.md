@@ -17,9 +17,15 @@ This document maps product features to automated tests, defines layers and prior
 | Backend | `cd app/backend && npm test` | Jest, ESM (`--experimental-vm-modules`) — [jest.config.js](../app/backend/jest.config.js) |
 | Backend coverage | `npm run test:coverage` | Same |
 | Frontend | `cd app/frontend && npm test` | Vitest |
-| Test env | `app/backend/test/setup.js` | Sets fixed `JWT_SECRET` and `ENCRYPTION_KEY` for deterministic tests |
+| Test env | `app/backend/test/setup.js` | Loads root `.env`, then sets `JWT_SECRET` / `ENCRYPTION_KEY` if missing; if `TEST_DATABASE_URL` is set, it overrides `DATABASE_URL` (use a **separate** Postgres database for integration tests). |
+| DB integration | `cd app/backend && npm run test:integration` | [jest.integration.config.js](../app/backend/jest.integration.config.js) — only `*.integration.test.js`, `maxWorkers: 1` to avoid clobbering a shared test DB. |
+| Full backend | `npm run test:all` | Unit suite then integration suite. |
 
-**Integration tests** that need PostgreSQL should use a dedicated database (e.g. `DATABASE_URL` pointing at `eduquery_test`) and migrations/sync as appropriate — document the URL in your deployment notes when that suite is added.
+**PostgreSQL is required** for `test:integration`. In project root `.env` add, for example:
+
+`TEST_DATABASE_URL=postgresql://USER:PASS@localhost:5432/eduquery_test`
+
+Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will `sync` the schema on connect. **Never** point `TEST_DATABASE_URL` at production data — each run uses `TRUNCATE users ... CASCADE` between cases.
 
 ## 3. Current baseline (inventory)
 
@@ -30,6 +36,8 @@ This document maps product features to automated tests, defines layers and prior
 - **Implemented:** [studyExperimentMetrics.test.js](../app/backend/test/studyExperimentMetrics.test.js) — `scoreMetadataMatch` pure scoring.
 - **Implemented:** [studyAuth.test.js](../app/backend/test/studyAuth.test.js) — all `/api/study` routes return `401` without a bearer token.
 - **Express split:** [app.js](../app/backend/src/app.js) exports the app for supertest; [index.js](../app/backend/src/index.js) only starts the server and DB.
+- **DB integration (optional env):** [auth.integration.test.js](../app/backend/test/auth.integration.test.js) — register, login, `/me`, validation, duplicate email. [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — create question, create/fetch assessment. [testDb.js](../app/backend/test/helpers/testDb.js) — connect + `TRUNCATE` helper.
+- If `TEST_DATABASE_URL` is unset, integration suites are **skipped** (Jest still exits 0).
 - **Placeholder** frontend dummy test can be removed once real component tests exist.
 
 ## 4. Test layers
@@ -130,8 +138,8 @@ This document maps product features to automated tests, defines layers and prior
 ## 7. Handover checklist
 
 - [ ] CI runs `npm test` in `app/backend` and `app/frontend` on every PR.  
-- [ ] `DATABASE_URL` for integration tests is documented when those tests land.  
-- [ ] No production API keys in test code; use `.env.test` or in-memory mocks.
+- [ ] CI (or a manual pre-release step) sets `TEST_DATABASE_URL` and runs `npm run test:integration` in `app/backend` when a Postgres test instance is available.  
+- [ ] No production API keys in test code; use `.env` (local) or CI secrets, not committed credentials.
 
 ---
 

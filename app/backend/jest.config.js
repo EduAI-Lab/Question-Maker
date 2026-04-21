@@ -3,5 +3,6 @@ export default {
   testEnvironment: 'node',
   transform: {},
   testMatch: ['**/test/**/*.test.js'],
+  testPathIgnorePatterns: ['\\.integration\\.test\\.js$'],
   setupFiles: ['<rootDir>/test/setup.js'],
 };
