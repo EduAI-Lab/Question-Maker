@@ -869,3 +869,5 @@ export const importQuizFromCanvas = async (userId, canvasCourseId, quizId, local
     throw new Error(`Failed to import quiz from Canvas: ${error.message}`);
   }
 };
+
+export { convertVariantToCanvasQuestion, parseMCQOptions };

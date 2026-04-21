@@ -39,13 +39,14 @@ flowchart LR
   - `/api/assessments` (`routes/assessments.js`) – assessments, sections, section variants, question presence checks
   - `/api/eduai` (`routes/eduai.js`) – chat, generate, list courses/topics, models
   - `/api/canvas` (`routes/canvas.js`) – connect, list courses, export, mappings
+  - `/api/assessment-variant` (`routes/assessmentVariant.js`) – reference baseline, blueprint snapshot, assemble parallel exams, bank variants, AI review (`services/assessmentVariantService.js`, helpers in `assessmentVariantUtils.js` and `assessmentVariantMetadataScoring.js`).
 
 ## Frontend (app/frontend)
 
 - Entry: `src/main.tsx`, `src/App.tsx` (React Router: login, home, assessment view, help, optional API test).
 - Auth state: `contexts/AuthContext.tsx` (stores token/user, verifies `/api/auth/me`).
 - API client: `services/api.ts` (axios with token injector + 401 handling).
-- Domain services: `services/authService.ts`, `questionService.ts`, `assessmentService.ts`, `courseService.ts`, `eduaiService.ts`, `canvasService.ts`, `apiKeyStorage.ts` (local encryption of provider API keys).
+- Domain services: `services/authService.ts`, `questionService.ts`, `assessmentService.ts`, `courseService.ts`, `eduaiService.ts`, `canvasService.ts`, `assessmentVariantService.ts` (assessment variant workflow API), `apiKeyStorage.ts` (local encryption of provider API keys).
 - Types: `src/types/*.ts` (questions/assessments/courses/topics/auth).
 - UI primitives: `components/ui/*` (shadcn/Tailwind).
 - Key screens/flows (see next section).
@@ -105,6 +106,11 @@ flowchart LR
 ### 9) Export to TXT
 - UI: `Homepage.tsx` and `AssessmentViewPage.tsx` contain TXT export logic (client-side blob download) with draft gating.
 - Backend: Not required (performed client-side using loaded assessment data).
+
+### 10) Assessment variant workflow (parallel exams)
+- UI: `pages/AssessmentVariantPage.tsx`, `components/assessmentVariant/AssessmentVariantWorkflowPanel.tsx` (assessment builder).
+- Frontend: `services/assessmentVariantService.ts` → `/api/assessment-variant/*`.
+- Backend: `routes/assessmentVariant.js` → `assessmentVariantService.js` (assembly, EduAI bank variants, AI rubric review).
 
 ## Integrations
 - **EduAI**: External RAG/chat service. Backend client in `services/eduaiService.js`; endpoints proxy with API key from `.env`. Frontend model picker and provider key handling through `eduaiService.ts` + `apiKeyStorage.ts`.

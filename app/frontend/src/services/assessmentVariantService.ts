@@ -1,5 +1,6 @@
 /**
- * API client for the assessment variant workflow (reference exams, assembly, metrics). Routes remain under `/api/study`.
+ * API client for the assessment variant workflow (reference exams, assembly, AI review).
+ * Routes: `/api/assessment-variant`.
  */
 import api from './api';
 import { apiKeyStorage } from './apiKeyStorage';
@@ -67,20 +68,6 @@ export interface BaselineVariantReadiness {
   allReady: boolean;
 }
 
-export interface StudyMetricsResult {
-  assessmentIds: number[];
-  pairwise: unknown[];
-  workflow: {
-    variantsAppearingInMultipleExams: number;
-    reusedVariantIds: number[];
-    totalQuestionPlacements: number;
-    aiGeneratedVariantPlacements: number;
-    distinctAssessments: number;
-  };
-  referenceComparison: Record<string, unknown> | null;
-  topicNames: Record<number, string>;
-}
-
 export interface VariantAiReviewRow {
   slot: number;
   baselineVariantId: number;
@@ -137,20 +124,22 @@ export interface VariantAiReviewResult {
   perQuestion: VariantAiReviewRow[];
 }
 
-export const studyService = {
+const apiBase = '/api/assessment-variant';
+
+export const assessmentVariantService = {
   async setStudyRole(assessmentId: number, studyRole: StudyRole): Promise<{ blueprintConfig?: unknown }> {
-    const response = await api.patch(`/api/study/assessments/${assessmentId}/role`, { studyRole });
+    const response = await api.patch(`${apiBase}/assessments/${assessmentId}/role`, { studyRole });
     return response.data.data;
   },
 
   async getBlueprintSnapshot(assessmentId: number): Promise<BlueprintSnapshot> {
-    const response = await api.get(`/api/study/assessments/${assessmentId}/blueprint-snapshot`);
+    const response = await api.get(`${apiBase}/assessments/${assessmentId}/blueprint-snapshot`);
     return response.data.data;
   },
 
   async getBaselineVariantReadiness(assessmentId: number, courseId: number): Promise<BaselineVariantReadiness> {
     const response = await api.get(
-      `/api/study/assessments/${assessmentId}/variant-readiness`,
+      `${apiBase}/assessments/${assessmentId}/variant-readiness`,
       { params: { courseId } }
     );
     return response.data.data;
@@ -165,7 +154,7 @@ export const studyService = {
     semesterOverride?: string;
     assessmentTypeOverride?: string;
   }): Promise<AssembleVariantsResult> {
-    const response = await api.post('/api/study/assemble-variants', payload);
+    const response = await api.post(`${apiBase}/assemble-variants`, payload);
     return response.data.data;
   },
 
@@ -179,7 +168,7 @@ export const studyService = {
     semesterOverride?: string;
     assessmentTypeOverride?: string;
   }): Promise<AssembleVariantsResult> {
-    const response = await api.post('/api/study/assemble-by-metadata', payload);
+    const response = await api.post(`${apiBase}/assemble-by-metadata`, payload);
     return response.data.data;
   },
 
@@ -193,18 +182,10 @@ export const studyService = {
   }): Promise<GenerateBankVariantsResult> {
     const model = payload.model ?? 'ollama:gpt-oss:120b';
     const apiKeys = await apiKeyStorage.buildApiKeysForModel(model);
-    const response = await api.post('/api/study/generate-bank-variants', {
+    const response = await api.post(`${apiBase}/generate-bank-variants`, {
       ...payload,
       model,
       apiKeys
-    });
-    return response.data.data;
-  },
-
-  async computeMetrics(assessmentIds: number[], referenceAssessmentId?: number): Promise<StudyMetricsResult> {
-    const response = await api.post('/api/study/metrics', {
-      assessmentIds,
-      referenceAssessmentId
     });
     return response.data.data;
   },
@@ -218,7 +199,7 @@ export const studyService = {
   }): Promise<VariantAiReviewResult> {
     const model = payload.model ?? 'ollama:gpt-oss:120b';
     const apiKeys = await apiKeyStorage.buildApiKeysForModel(model);
-    const response = await api.post('/api/study/review-variant-ai', {
+    const response = await api.post(`${apiBase}/review-variant-ai`, {
       ...payload,
       model,
       apiKeys
@@ -227,4 +208,4 @@ export const studyService = {
   }
 };
 
-export default studyService;
+export default assessmentVariantService;

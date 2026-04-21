@@ -13,8 +13,8 @@ import {
 } from '../schema/index.js';
 import eduaiService from './eduaiService.js';
 import { Op } from 'sequelize';
-import { loadOrderedVariantsForAssessment, aggregateStructure } from './studyMetricsService.js';
-import { scoreMetadataMatch } from './studyExperimentMetrics.js';
+import { loadOrderedVariantsForAssessment, aggregateStructure } from './assessmentVariantUtils.js';
+import { scoreMetadataMatch } from './assessmentVariantMetadataScoring.js';
 
 const VALID_STUDY_ROLES = ['reference_baseline', 'generated_variant'];
 

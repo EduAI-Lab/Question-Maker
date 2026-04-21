@@ -1,6 +1,6 @@
 /**
  * Scores how well a bank question matches a baseline slot (higher = better).
- * Pure helper used by study experiment assembly logic.
+ * Pure helper used by assessment variant assembly (metadata similarity mode).
  */
 export function scoreMetadataMatch(slotMeta, slotVariant, bankMeta, bankVariant) {
   let s = 0;
