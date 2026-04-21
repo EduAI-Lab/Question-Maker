@@ -41,8 +41,11 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 - **Implemented:** [canvasExport.test.js](../app/backend/test/canvasExport.test.js) — `convertVariantToCanvasQuestion` / `parseMCQOptions` (exported from `canvasService.js` for tests only).
 - **Implemented:** [aiExtract.test.js](../app/backend/test/aiExtract.test.js) — `extractQuestionsFromText` returns `[]` when input is empty / whitespace-only (no EduAI).
 - **Implemented:** [questionsAuth.test.js](../app/backend/test/questionsAuth.test.js) — core `/api/questions` and `/extract` routes return `401` without a token.
+- **Implemented:** [assessmentsAuth.test.js](../app/backend/test/assessmentsAuth.test.js) — `/api/assessments` list/detail/create return `401` without a token.
+- **Implemented:** [courseAuth.test.js](../app/backend/test/courseAuth.test.js) — `/api/course` list/detail, topics, create return `401` without a token.
+- **Implemented:** [canvasAuth.test.js](../app/backend/test/canvasAuth.test.js) — Canvas connect/disconnect, courses, export, import, mapping, quizzes return `401` without a token.
 - **Express split:** [app.js](../app/backend/src/app.js) exports the app for supertest; [index.js](../app/backend/src/index.js) only starts the server and DB.
-- **DB integration (optional env):** [auth.integration.test.js](../app/backend/test/auth.integration.test.js) — register, login, `/me`, validation, duplicate email. [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — create question, create/fetch assessment. [testDb.js](../app/backend/test/helpers/testDb.js) — connect + `TRUNCATE` helper.
+- **DB integration (optional env):** [auth.integration.test.js](../app/backend/test/auth.integration.test.js) — register, login, `/me`, validation, duplicate email. [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — create question, create/fetch assessment. [questionsExtractValidation.integration.test.js](../app/backend/test/questionsExtractValidation.integration.test.js) — `400` on `POST /api/questions/extract` (missing/invalid `text` / `courseId`) and `POST /api/questions/extract/save` (missing `courseId`, empty or invalid `questions`). [testDb.js](../app/backend/test/helpers/testDb.js) — connect + `TRUNCATE` helper.
 - If `TEST_DATABASE_URL` is unset, integration suites are **skipped** (Jest still exits 0).
 - **Placeholder** frontend dummy test can be removed once real component tests exist.
 
@@ -71,6 +74,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 | ID | Type | Cases |
 |----|------|--------|
 | B1 | HTTP + DB | CRUD scoped to `userId`; 403/404 for other user’s data. |
+| B2 | HTTP | `401` without token — [courseAuth.test.js](../app/backend/test/courseAuth.test.js). |
 
 ### C. Questions and variants (`questionService`, `routes/questions`, `routes/variants`)
 
@@ -86,6 +90,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 | D1 | Unit | Extraction helpers — [extraction.test.js](../app/backend/test/extraction.test.js). |
 | D2 | Unit | `extractQuestionsFromText` empty input — [aiExtract.test.js](../app/backend/test/aiExtract.test.js). (Full EduAI path: mock `eduaiService` — backlog.) |
 | D3 | Service + DB | `saveExtractedQuestions` — metadata + variants + optional assessment/section. |
+| D4 | HTTP + DB | Extract/save validation `400`s — [questionsExtractValidation.integration.test.js](../app/backend/test/questionsExtractValidation.integration.test.js) (`extract/save` cases). |
 
 ### E. EduAI (`/api/eduai`, `eduaiService`)
 
@@ -99,6 +104,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 |----|------|--------|
 | F1 | Service + DB | Blueprint, sections, variant links, reorder. |
 | F2 | HTTP | Happy path: create assessment → section → attach variant. |
+| F3 | HTTP | `401` without token — [assessmentsAuth.test.js](../app/backend/test/assessmentsAuth.test.js). |
 
 ### G. Canvas (`canvasService`, `encryption`, export)
 
@@ -107,6 +113,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 | G1 | Unit | Encrypt/decrypt (see encryption tests). |
 | G2 | Unit | `convertVariantToCanvasQuestion` / `parseMCQOptions` — [canvasExport.test.js](../app/backend/test/canvasExport.test.js). |
 | G3 | Unit + mock | Full export sequence against mocked Canvas API (backlog). |
+| G4 | HTTP | `401` without token — [canvasAuth.test.js](../app/backend/test/canvasAuth.test.js). |
 
 ### H. Assessment variant workflow (`/api/assessment-variant`, `assessmentVariantService.js`)
 
