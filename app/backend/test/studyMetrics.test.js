@@ -7,7 +7,7 @@ import {
   distributionSimilarity,
   jaccardSimilarity
 } from '../src/services/studyMetricsService.js';
-import { scoreMetadataMatch } from '../src/services/studyExperimentService.js';
+import { scoreMetadataMatch } from '../src/services/studyExperimentMetrics.js';
 
 const KEYS = ['easy', 'medium', 'hard'];
 

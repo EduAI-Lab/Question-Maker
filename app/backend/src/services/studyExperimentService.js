@@ -14,6 +14,7 @@ import {
 import eduaiService from './eduaiService.js';
 import { Op } from 'sequelize';
 import { loadOrderedVariantsForAssessment, aggregateStructure } from './studyMetricsService.js';
+import { scoreMetadataMatch } from './studyExperimentMetrics.js';
 
 const VALID_STUDY_ROLES = ['reference_baseline', 'generated_variant'];
 
@@ -367,16 +368,6 @@ export async function assembleEquivalentExamVariants(userId, params) {
     slotsProcessed: slots.length,
     examCount: examLabels.length
   };
-}
-
-/** Scores how well a bank question matches a baseline slot (higher = better). */
-export function scoreMetadataMatch(slotMeta, slotVariant, bankMeta, bankVariant) {
-  let s = 0;
-  if (slotMeta?.primaryTopicId != null && bankMeta?.primaryTopicId === slotMeta.primaryTopicId) s += 100;
-  if (slotMeta?.type && bankMeta?.type === slotMeta.type) s += 50;
-  if (slotVariant?.difficulty && bankVariant?.difficulty === slotVariant.difficulty) s += 25;
-  if (slotVariant?.reasoningLevel && bankVariant?.reasoningLevel === slotVariant.reasoningLevel) s += 10;
-  return s;
 }
 
 const MIN_METADATA_SCORE = 75;
