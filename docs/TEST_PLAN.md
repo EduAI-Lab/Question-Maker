@@ -39,7 +39,9 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 - **Implemented:** [assessmentVariantAuth.test.js](../app/backend/test/assessmentVariantAuth.test.js) — all `/api/assessment-variant` routes return `401` without a bearer token.
 - **Implemented:** [eduaiAuth.test.js](../app/backend/test/eduaiAuth.test.js) — EduAI proxy routes return `401` without a bearer token.
 - **Implemented:** [canvasExport.test.js](../app/backend/test/canvasExport.test.js) — `convertVariantToCanvasQuestion` / `parseMCQOptions` (exported from `canvasService.js` for tests only).
+- **Implemented:** [canvasExportMocked.test.js](../app/backend/test/canvasExportMocked.test.js) — `exportAssessmentToCanvas` with mocked `axios` and `getAssessmentById` (non–test-mode path: `POST` quiz + `POST` questions, `CanvasCourseMapping.create`).
 - **Implemented:** [aiExtract.test.js](../app/backend/test/aiExtract.test.js) — `extractQuestionsFromText` returns `[]` when input is empty / whitespace-only (no EduAI).
+- **Implemented:** [aiExtractEduaiMocked.test.js](../app/backend/test/aiExtractEduaiMocked.test.js) — full `extractQuestionsFromText` path with mocked `eduaiService` + `Course`/`Topics` (sanitized output, synthetic `courseCode` when course row is missing).
 - **Implemented:** [questionsAuth.test.js](../app/backend/test/questionsAuth.test.js) — core `/api/questions` and `/extract` routes return `401` without a token.
 - **Implemented:** [assessmentsAuth.test.js](../app/backend/test/assessmentsAuth.test.js) — `/api/assessments` list/detail/create return `401` without a token.
 - **Implemented:** [courseAuth.test.js](../app/backend/test/courseAuth.test.js) — `/api/course` list/detail, topics, create return `401` without a token.
@@ -88,7 +90,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 | ID | Type | Cases |
 |----|------|--------|
 | D1 | Unit | Extraction helpers — [extraction.test.js](../app/backend/test/extraction.test.js). |
-| D2 | Unit | `extractQuestionsFromText` empty input — [aiExtract.test.js](../app/backend/test/aiExtract.test.js). (Full EduAI path: mock `eduaiService` — backlog.) |
+| D2 | Unit | `extractQuestionsFromText` empty input — [aiExtract.test.js](../app/backend/test/aiExtract.test.js); EduAI path mocked — [aiExtractEduaiMocked.test.js](../app/backend/test/aiExtractEduaiMocked.test.js). |
 | D3 | Service + DB | `saveExtractedQuestions` — metadata + variants + optional assessment/section. |
 | D4 | HTTP + DB | Extract/save validation `400`s — [questionsExtractValidation.integration.test.js](../app/backend/test/questionsExtractValidation.integration.test.js) (`extract/save` cases). |
 
@@ -112,7 +114,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 |----|------|--------|
 | G1 | Unit | Encrypt/decrypt (see encryption tests). |
 | G2 | Unit | `convertVariantToCanvasQuestion` / `parseMCQOptions` — [canvasExport.test.js](../app/backend/test/canvasExport.test.js). |
-| G3 | Unit + mock | Full export sequence against mocked Canvas API (backlog). |
+| G3 | Unit + mock | `exportAssessmentToCanvas` — [canvasExportMocked.test.js](../app/backend/test/canvasExportMocked.test.js) (axios + schema + `getAssessmentById` mocked; no real Canvas). |
 | G4 | HTTP | `401` without token — [canvasAuth.test.js](../app/backend/test/canvasAuth.test.js). |
 
 ### H. Assessment variant workflow (`/api/assessment-variant`, `assessmentVariantService.js`)
