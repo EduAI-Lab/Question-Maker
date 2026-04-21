@@ -16,7 +16,7 @@ This document maps product features to automated tests, defines layers and prior
 |------|---------|--------|
 | Backend | `cd app/backend && npm test` | Jest, ESM (`--experimental-vm-modules`) — [jest.config.js](../app/backend/jest.config.js) |
 | Backend coverage | `npm run test:coverage` | Same |
-| Frontend | `cd app/frontend && npm test` | Vitest |
+| Frontend | `cd app/frontend && npm test` | Vitest — config merged in [vite.config.ts](../app/frontend/vite.config.ts) |
 | Test env | `app/backend/test/setup.js` | Loads root `.env` (optional); if `TEST_DATABASE_URL` is set, it becomes `DATABASE_URL`. If still unset (e.g. GitHub Actions with no file), a **local stub** `postgres://jest@127.0.0.1:5432/jest_unit_stub` is set so imports succeed — unit tests do not need a real server. You can also set `DATABASE_URL` in the workflow env. `JWT_SECRET` / `ENCRYPTION_KEY` get defaults if missing. |
 | DB integration | `cd app/backend && npm run test:integration` | [jest.integration.config.js](../app/backend/jest.integration.config.js) — only `*.integration.test.js`, `maxWorkers: 1` to avoid clobbering a shared test DB. |
 | Full backend | `npm run test:all` | Unit suite then integration suite. |
@@ -49,14 +49,14 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 - **Express split:** [app.js](../app/backend/src/app.js) exports the app for supertest; [index.js](../app/backend/src/index.js) only starts the server and DB.
 - **DB integration (optional env):** [auth.integration.test.js](../app/backend/test/auth.integration.test.js) — register, login, `/me`, validation, duplicate email. [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — create question, create/fetch assessment. [questionsExtractValidation.integration.test.js](../app/backend/test/questionsExtractValidation.integration.test.js) — `400` on `POST /api/questions/extract` (missing/invalid `text` / `courseId`) and `POST /api/questions/extract/save` (missing `courseId`, empty or invalid `questions`). [testDb.js](../app/backend/test/helpers/testDb.js) — connect + `TRUNCATE` helper.
 - If `TEST_DATABASE_URL` is unset, integration suites are **skipped** (Jest still exits 0).
-- **Placeholder** frontend dummy test can be removed once real component tests exist.
+- **Implemented (frontend):** [api.test.ts](../app/frontend/src/services/api.test.ts) — axios `api` client: `Authorization` when `localStorage.token` is set; `401` clears `token`/`user` and navigates to `/login` unless already on login (local HTTP server; **node** test env).
 
 ## 4. Test layers
 
 1. **Unit (no DB):** `extractionUtils`, `encryption`, `assessmentVariantMetadataScoring` (`scoreMetadataMatch`), validation mappers, Canvas MCQ parsing helpers.
 2. **Service + DB:** `questionService`, `assessmentService`, `assessmentAuthService` — use a test DB or transactional rollback.
 3. **HTTP (supertest):** Authenticated routes with a test user or generated JWT; mock external HTTP (EduAI, Canvas) where the client is injectable.
-4. **Frontend (Vitest + Testing Library):** `api.ts` interceptors, critical hooks, pure export builders.
+4. **Frontend (Vitest + Testing Library):** `api.ts` interceptors — [api.test.ts](../app/frontend/src/services/api.test.ts); component/hook tests (backlog).
 
 **Do not** call real EduAI or Canvas in CI; use fixtures and mocks.
 
@@ -136,7 +136,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 
 | ID | Type | Cases |
 |----|------|--------|
-| J1 | Unit | `api.ts` — Authorization header, 401 behavior. |
+| J1 | Unit | `api.ts` — [api.test.ts](../app/frontend/src/services/api.test.ts) (Bearer header, `401` clears storage + redirect). |
 | J2 | Component | `LoginPage` — submit with mocked service. |
 
 ## 6. Suggested implementation order
