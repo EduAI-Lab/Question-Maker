@@ -17,7 +17,7 @@ This document maps product features to automated tests, defines layers and prior
 | Backend | `cd app/backend && npm test` | Jest, ESM (`--experimental-vm-modules`) — [jest.config.js](../app/backend/jest.config.js) |
 | Backend coverage | `npm run test:coverage` | Same |
 | Frontend | `cd app/frontend && npm test` | Vitest |
-| Test env | `app/backend/test/setup.js` | Loads root `.env`, then sets `JWT_SECRET` / `ENCRYPTION_KEY` if missing; if `TEST_DATABASE_URL` is set, it overrides `DATABASE_URL` (use a **separate** Postgres database for integration tests). |
+| Test env | `app/backend/test/setup.js` | Loads root `.env` (optional); if `TEST_DATABASE_URL` is set, it becomes `DATABASE_URL`. If still unset (e.g. GitHub Actions with no file), a **local stub** `postgres://jest@127.0.0.1:5432/jest_unit_stub` is set so imports succeed — unit tests do not need a real server. You can also set `DATABASE_URL` in the workflow env. `JWT_SECRET` / `ENCRYPTION_KEY` get defaults if missing. |
 | DB integration | `cd app/backend && npm run test:integration` | [jest.integration.config.js](../app/backend/jest.integration.config.js) — only `*.integration.test.js`, `maxWorkers: 1` to avoid clobbering a shared test DB. |
 | Full backend | `npm run test:all` | Unit suite then integration suite. |
 
