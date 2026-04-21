@@ -7,11 +7,13 @@ import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Course } from '../../types/question';
-import { User, HelpCircle, ArrowLeft } from 'lucide-react';
+import { useContext } from 'react';
+import { User, HelpCircle, ArrowLeft, BugOff } from 'lucide-react';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 import { useGuidedTour } from '../../contexts/GuidedTourContext';
 import { Tooltip } from '../ui/tooltip';
+import { BugReportContext } from '../../contexts/BugReportContext';
 
 type TopNavigationProps = (
   | {
@@ -55,6 +57,7 @@ export const TopNavigation = (props: TopNavigationProps) => {
         : undefined;
   const eduaiStatus = useEduAIStatus();
   const { startTour } = useGuidedTour();
+  const bugReportCtx = useContext(BugReportContext);
 
   const handleGuidedTourClick = () => {
     if (typeof customGuidedTourHandler === 'function') {
@@ -158,6 +161,19 @@ export const TopNavigation = (props: TopNavigationProps) => {
                         </span>
                       )}
                     </div>
+                    {bugReportCtx && (
+                      <Tooltip content="Report a bug" side="bottom">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-full"
+                          onClick={() => bugReportCtx.openBugReport()}
+                          aria-label="Report a bug"
+                        >
+                          <BugOff className="h-5 w-5" />
+                        </Button>
+                      </Tooltip>
+                    )}
                     <Tooltip content="Open help and documentation" side="bottom">
                       <Button
                         variant="ghost"
