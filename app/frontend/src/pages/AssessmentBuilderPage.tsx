@@ -18,7 +18,7 @@ import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModa
 import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { AssessmentVariantWorkflowPanel } from '../components/study/AssessmentVariantWorkflowPanel';
+import { AssessmentVariantWorkflowPanel } from '../components/assessmentVariant/AssessmentVariantWorkflowPanel';
 import { defaultReasoningData } from './assessments/assessmentViewTypes';
 import {
     assessmentBlocksToDocxBlob,

@@ -112,4 +112,113 @@ describeDb('Questions & assessments (integration)', () => {
     expect(getOne.body.data.name).toBe('Integration Exam');
     expect(getOne.body.data.courseId).toBe(courseId);
   });
+
+  it('rejects a question with invalid type', async () => {
+    const res = await request(app)
+      .post('/api/questions')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        description: 'X',
+        courseId,
+        primaryTopicId: topicId,
+        type: 'TF'
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a question when primaryTopicId is missing or invalid', async () => {
+    const res = await request(app)
+      .post('/api/questions')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        description: 'X',
+        courseId,
+        primaryTopicId: 'not-a-number',
+        type: 'MCQ'
+      });
+    expect(res.status).toBe(400);
+  });
+
+  it('creates a course via POST and sees it in GET /api/course', async () => {
+    const name = 'Custom Integration Course';
+    const created = await request(app)
+      .post('/api/course')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ name, courseCode: 'INT-999' });
+    expect(created.status).toBe(201);
+    expect(created.body.data.name).toBe(name);
+
+    const list = await request(app)
+      .get('/api/course')
+      .set('Authorization', `Bearer ${authToken}`);
+    const found = list.body.data.some((c) => c.id === created.body.data.id && c.name === name);
+    expect(found).toBe(true);
+  });
+
+  it('creates a question, adds a variant, and lists variants', async () => {
+    const createQ = await request(app)
+      .post('/api/questions')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        description: 'Variant parent',
+        courseId,
+        primaryTopicId: topicId,
+        type: 'MCQ'
+      });
+    expect(createQ.status).toBe(201);
+    const qid = createQ.body.data.id;
+
+    const getSeedAssessment = await request(app)
+      .get('/api/assessments')
+      .set('Authorization', `Bearer ${authToken}`)
+      .query({ courseId });
+    expect(getSeedAssessment.status).toBe(200);
+    const practice = getSeedAssessment.body.data.find((a) => a.name === 'Practice Exam');
+    expect(practice).toBeTruthy();
+    const assessmentId = practice.id;
+
+    const v = await request(app)
+      .post(`/api/questions/${qid}/variants`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        questionText: 'What is 2+2?',
+        difficulty: 'easy',
+        reasoningLevel: 'factual',
+        assessmentId,
+        answer: 'A',
+        choices: [
+          { letter: 'A', text: '4' },
+          { letter: 'B', text: '5' }
+        ],
+        isDraft: false
+      });
+    expect(v.status).toBe(201);
+    expect(v.body.data.id).toBeTruthy();
+
+    const listV = await request(app)
+      .get(`/api/questions/${qid}/variants`)
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(listV.status).toBe(200);
+    expect(Array.isArray(listV.body.data)).toBe(true);
+    expect(listV.body.data.length).toBeGreaterThan(0);
+  });
+
+  it('returns 400 when variant has empty questionText', async () => {
+    const createQ = await request(app)
+      .post('/api/questions')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({
+        description: 'No variant text test',
+        courseId,
+        primaryTopicId: topicId,
+        type: 'MCQ'
+      });
+    const qid = createQ.body.data.id;
+
+    const res = await request(app)
+      .post(`/api/questions/${qid}/variants`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ questionText: '   ' });
+    expect(res.status).toBe(400);
+  });
 });

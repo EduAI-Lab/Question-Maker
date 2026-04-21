@@ -12,7 +12,7 @@ import {
     TextRun,
     WidthType
 } from 'docx';
-import type { VariantAiReviewResult } from '../services/studyService';
+import type { VariantAiReviewResult } from '../services/assessmentVariantService';
 
 function formatUsabilityLabel(value: string): string {
     if (value === 'usable_as_is') return 'Usable as-is';

@@ -23,7 +23,7 @@ import { useToast } from '../components/ui/use-toast';
 import { useCourses } from '../hooks/useCourses';
 import { courseService } from '../services/courseService';
 import assessmentService from '../services/assessmentService';
-import studyService, { type BaselineVariantReadiness } from '../services/studyService';
+import assessmentVariantService, { type BaselineVariantReadiness } from '../services/assessmentVariantService';
 import { eduaiService, type EduAIModelOption } from '../services/eduaiService';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
@@ -34,7 +34,7 @@ import { buildAiReviewDocxBlob } from '../utils/aiReviewExportDocx';
 /** Hover text for the Variants column — counts are reviewed-only (drafts excluded). */
 const REVIEWED_VARIANTS_TOOLTIP =
   'Number of reviewed variants for this question in the bank. Draft variants are not included.';
-const AI_REVIEW_HISTORY_KEY = 'study.aiReview.history.v1';
+const AI_REVIEW_HISTORY_KEY = 'assessmentVariant.aiReview.history.v1';
 const AI_REVIEW_HISTORY_MAX_ITEMS = 40;
 
 const DEFAULT_AI_JUDGE_RUBRIC = `Conceptual equivalence (1-5)
@@ -95,7 +95,7 @@ function formatUsabilityLabel(value: string): string {
   return value.replaceAll('_', ' ');
 }
 
-type AiReviewResult = Awaited<ReturnType<typeof studyService.reviewVariantWithAi>>;
+type AiReviewResult = Awaited<ReturnType<typeof assessmentVariantService.reviewVariantWithAi>>;
 
 interface AiReviewHistoryItem {
   id: string;
@@ -327,7 +327,7 @@ export function AssessmentVariantPage() {
     }
     setVariantReadinessLoading(true);
     try {
-      const data = await studyService.getBaselineVariantReadiness(refId, cid);
+      const data = await assessmentVariantService.getBaselineVariantReadiness(refId, cid);
       setVariantReadiness(data);
     } catch (e) {
       console.warn('Variant readiness check failed', e);
@@ -391,7 +391,7 @@ export function AssessmentVariantPage() {
       return;
     }
     try {
-      await studyService.setStudyRole(id, 'reference_baseline');
+      await assessmentVariantService.setStudyRole(id, 'reference_baseline');
       await loadAssessments(selectedCourse!.id);
       toast({ title: 'Marked as reference baseline' });
     } catch (e: unknown) {
@@ -443,7 +443,7 @@ export function AssessmentVariantPage() {
         return;
       }
 
-      const result = await studyService.generateBankVariants({
+      const result = await assessmentVariantService.generateBankVariants({
         courseId: selectedCourse.id,
         questionIds,
         model: variantModel,
@@ -507,7 +507,7 @@ export function AssessmentVariantPage() {
     }
     setAssembling(true);
     try {
-      const result = await studyService.assembleEquivalentExams({
+      const result = await assessmentVariantService.assembleEquivalentExams({
         referenceAssessmentId: refId,
         courseId: selectedCourse.id,
         examLabels: ['Exam A', 'Exam B', 'Exam C'],
@@ -550,7 +550,7 @@ export function AssessmentVariantPage() {
 
     setAiReviewLoading(true);
     try {
-      const result = await studyService.reviewVariantWithAi({
+      const result = await assessmentVariantService.reviewVariantWithAi({
         baselineAssessmentId: baselineId,
         variantAssessmentId: variantId,
         courseId: cid,

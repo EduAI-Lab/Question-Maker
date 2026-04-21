@@ -6,7 +6,7 @@ This document maps product features to automated tests, defines layers and prior
 
 | Goal | Success criteria |
 |------|------------------|
-| Regression safety | Changes to auth, questions, assessments, Canvas, EduAI, and the study workflow are covered by tests that run in CI. |
+| Regression safety | Changes to auth, questions, assessments, Canvas, EduAI, and the assessment variant workflow are covered by tests that run in CI. |
 | Handover | New owners can see *which* feature maps to *which* tests and where to add cases. |
 | Test pyramid | Prefer **unit** tests on pure logic, **integration** tests on HTTP + DB for critical paths; **E2E** only if Playwright/Cypress is added later. |
 
@@ -33,8 +33,10 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 - **Implemented:** [health.test.js](../app/backend/test/health.test.js) — public HTTP surface (`/`, `/healthz`, 404).
 - **Implemented:** [encryption.test.js](../app/backend/test/encryption.test.js) — Canvas API key encrypt/decrypt round-trip.
 - **Implemented:** [authService.test.js](../app/backend/test/authService.test.js) — JWT verify helpers (no DB).
-- **Implemented:** [studyExperimentMetrics.test.js](../app/backend/test/studyExperimentMetrics.test.js) — `scoreMetadataMatch` pure scoring.
-- **Implemented:** [studyAuth.test.js](../app/backend/test/studyAuth.test.js) — all `/api/study` routes return `401` without a bearer token.
+- **Implemented:** [assessmentVariantMetadataScoring.test.js](../app/backend/test/assessmentVariantMetadataScoring.test.js) — `scoreMetadataMatch` pure scoring (`assessmentVariantMetadataScoring.js`).
+- **Implemented:** [assessmentVariantHttp.integration.test.js](../app/backend/test/assessmentVariantHttp.integration.test.js) — `400` on `/api/assessment-variant` for missing/invalid body (requires `TEST_DATABASE_URL`).
+- **Extended:** [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — question validation, `POST /api/course`, create/list variants, empty variant text `400`.
+- **Implemented:** [assessmentVariantAuth.test.js](../app/backend/test/assessmentVariantAuth.test.js) — all `/api/assessment-variant` routes return `401` without a bearer token.
 - **Express split:** [app.js](../app/backend/src/app.js) exports the app for supertest; [index.js](../app/backend/src/index.js) only starts the server and DB.
 - **DB integration (optional env):** [auth.integration.test.js](../app/backend/test/auth.integration.test.js) — register, login, `/me`, validation, duplicate email. [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — create question, create/fetch assessment. [testDb.js](../app/backend/test/helpers/testDb.js) — connect + `TRUNCATE` helper.
 - If `TEST_DATABASE_URL` is unset, integration suites are **skipped** (Jest still exits 0).
@@ -42,7 +44,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 
 ## 4. Test layers
 
-1. **Unit (no DB):** `extractionUtils`, `encryption`, `studyExperimentMetrics`, validation mappers, Canvas MCQ parsing helpers.
+1. **Unit (no DB):** `extractionUtils`, `encryption`, `assessmentVariantMetadataScoring` (`scoreMetadataMatch`), validation mappers, Canvas MCQ parsing helpers.
 2. **Service + DB:** `questionService`, `assessmentService`, `assessmentAuthService` — use a test DB or transactional rollback.
 3. **HTTP (supertest):** Authenticated routes with a test user or generated JWT; mock external HTTP (EduAI, Canvas) where the client is injectable.
 4. **Frontend (Vitest + Testing Library):** `api.ts` interceptors, critical hooks, pure export builders.
@@ -102,14 +104,13 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 | G2 | Unit | `convertVariantToCanvasQuestion` / MCQ parsing edge cases. |
 | G3 | Unit + mock | Export sequence against mocked Canvas API. |
 
-### H. Study / experiment workflow (`/api/study`, `studyExperimentService`, `studyMetricsService`)
+### H. Assessment variant workflow (`/api/assessment-variant`, `assessmentVariantService.js`)
 
 | ID | Type | Cases |
 |----|------|--------|
-| H1 | Unit | `scoreMetadataMatch` (see [studyExperimentMetrics.test.js](../app/backend/test/studyExperimentMetrics.test.js)). |
-| H2 | HTTP | Validation: `400` for missing `studyRole`, `courseId`, `assessmentIds`, etc. |
+| H1 | Unit | `scoreMetadataMatch` (see [assessmentVariantMetadataScoring.test.js](../app/backend/test/assessmentVariantMetadataScoring.test.js)). |
+| H2 | HTTP | Validation: `400` for missing `studyRole`, `courseId`, etc. (see integration tests). |
 | H3 | Service + DB | One fixture: reference assessment → `assembleEquivalentExamVariants` structure (or clear failure). |
-| H4 | Unit / Service | `computeStudyMetrics` on small deterministic inputs. |
 
 ### I. Infrastructure
 
@@ -132,7 +133,7 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 3. Assessments (F).  
 4. Extraction + EduAI mocks (D, E).  
 5. Canvas (G).  
-6. Study API (H) — validation routes first, then one DB-backed assembly case.  
+6. Assessment variant API (H) — validation routes first, then one DB-backed assembly case.  
 7. Frontend (J).
 
 ## 7. Handover checklist
