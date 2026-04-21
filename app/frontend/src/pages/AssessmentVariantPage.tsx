@@ -694,7 +694,7 @@ export function AssessmentVariantPage() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-4 py-4">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild className="gap-1.5 text-muted-foreground">
-              <Link to="/home">
+              <Link to="/home?tab=assessments">
                 <ArrowLeft className="h-4 w-4" />
                 Home
               </Link>
