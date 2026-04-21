@@ -9,6 +9,7 @@ This document maps product features to automated tests, defines layers and prior
 | Regression safety | Changes to auth, questions, assessments, Canvas, EduAI, and the assessment variant workflow are covered by tests that run in CI. |
 | Handover | New owners can see *which* feature maps to *which* tests and where to add cases. |
 | Test pyramid | Prefer **unit** tests on pure logic, **integration** tests on HTTP + DB for critical paths; **E2E** only if Playwright/Cypress is added later. |
+| **Plan closure** | Every feature ID in §5 has a **Status** and at least one linked test file; optional DB integration is clearly labeled. |
 
 ## 2. Tooling
 
@@ -16,7 +17,7 @@ This document maps product features to automated tests, defines layers and prior
 |------|---------|--------|
 | Backend | `cd app/backend && npm test` | Jest, ESM (`--experimental-vm-modules`) — [jest.config.js](../app/backend/jest.config.js) |
 | Backend coverage | `npm run test:coverage` | Same |
-| Frontend | `cd app/frontend && npm test` | Vitest — [vite.config.ts](../app/frontend/vite.config.ts) (`environment: 'jsdom'`, [vitest.setup.ts](../app/frontend/src/test/vitest.setup.ts)); `api.test.ts` overrides to **node** for a local HTTP stub. |
+| Frontend | `cd app/frontend && npm test` | `vitest run` — [package.json](../app/frontend/package.json); local watch: `npm run test:watch`. [vite.config.ts](../app/frontend/vite.config.ts) uses `jsdom` + [vitest.setup.ts](../app/frontend/src/test/vitest.setup.ts); [api.test.ts](../app/frontend/src/services/api.test.ts) uses `@vitest-environment node` for a local HTTP stub. |
 | Test env | `app/backend/test/setup.js` | Loads root `.env` (optional); if `TEST_DATABASE_URL` is set, it becomes `DATABASE_URL`. If still unset (e.g. GitHub Actions with no file), a **local stub** `postgres://jest@127.0.0.1:5432/jest_unit_stub` is set so imports succeed — unit tests do not need a real server. You can also set `DATABASE_URL` in the workflow env. `JWT_SECRET` / `ENCRYPTION_KEY` get defaults if missing. |
 | DB integration | `cd app/backend && npm run test:integration` | [jest.integration.config.js](../app/backend/jest.integration.config.js) — only `*.integration.test.js`, `maxWorkers: 1` to avoid clobbering a shared test DB. |
 | Full backend | `npm run test:all` | Unit suite then integration suite. |
@@ -29,132 +30,98 @@ Create the empty database once (`CREATE DATABASE eduquery_test;`). The app will 
 
 ## 3. Current baseline (inventory)
 
-- **Implemented:** [extraction.test.js](../app/backend/test/extraction.test.js) — `extractionUtils` (question blocks, chunking, dedupe).
-- **Implemented:** [health.test.js](../app/backend/test/health.test.js) — public HTTP surface (`/`, `/healthz`, 404).
-- **Implemented:** [encryption.test.js](../app/backend/test/encryption.test.js) — Canvas API key encrypt/decrypt round-trip.
-- **Implemented:** [authService.test.js](../app/backend/test/authService.test.js) — JWT verify helpers (no DB).
-- **Implemented:** [assessmentVariantMetadataScoring.test.js](../app/backend/test/assessmentVariantMetadataScoring.test.js) — `scoreMetadataMatch` pure scoring (`assessmentVariantMetadataScoring.js`).
-- **Implemented:** [assessmentVariantHttp.integration.test.js](../app/backend/test/assessmentVariantHttp.integration.test.js) — `400` on `/api/assessment-variant` for missing/invalid body (requires `TEST_DATABASE_URL`).
-- **Extended:** [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — question validation, `POST /api/course`, create/list variants, empty variant text `400`.
-- **Implemented:** [assessmentVariantAuth.test.js](../app/backend/test/assessmentVariantAuth.test.js) — all `/api/assessment-variant` routes return `401` without a bearer token.
-- **Implemented:** [eduaiAuth.test.js](../app/backend/test/eduaiAuth.test.js) — EduAI proxy routes return `401` without a bearer token.
-- **Implemented:** [canvasExport.test.js](../app/backend/test/canvasExport.test.js) — `convertVariantToCanvasQuestion` / `parseMCQOptions` (exported from `canvasService.js` for tests only).
-- **Implemented:** [canvasExportMocked.test.js](../app/backend/test/canvasExportMocked.test.js) — `exportAssessmentToCanvas` with mocked `axios` and `getAssessmentById` (non–test-mode path: `POST` quiz + `POST` questions, `CanvasCourseMapping.create`).
-- **Implemented:** [aiExtract.test.js](../app/backend/test/aiExtract.test.js) — `extractQuestionsFromText` returns `[]` when input is empty / whitespace-only (no EduAI).
-- **Implemented:** [aiExtractEduaiMocked.test.js](../app/backend/test/aiExtractEduaiMocked.test.js) — full `extractQuestionsFromText` path with mocked `eduaiService` + `Course`/`Topics` (sanitized output, synthetic `courseCode` when course row is missing).
-- **Implemented:** [questionsAuth.test.js](../app/backend/test/questionsAuth.test.js) — core `/api/questions` and `/extract` routes return `401` without a token.
-- **Implemented:** [assessmentsAuth.test.js](../app/backend/test/assessmentsAuth.test.js) — `/api/assessments` list/detail/create return `401` without a token.
-- **Implemented:** [courseAuth.test.js](../app/backend/test/courseAuth.test.js) — `/api/course` list/detail, topics, create return `401` without a token.
-- **Implemented:** [canvasAuth.test.js](../app/backend/test/canvasAuth.test.js) — Canvas connect/disconnect, courses, export, import, mapping, quizzes return `401` without a token.
-- **Express split:** [app.js](../app/backend/src/app.js) exports the app for supertest; [index.js](../app/backend/src/index.js) only starts the server and DB.
-- **DB integration (optional env):** [auth.integration.test.js](../app/backend/test/auth.integration.test.js) — register, login, `/me`, validation, duplicate email. [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — create question, create/fetch assessment. [questionsExtractValidation.integration.test.js](../app/backend/test/questionsExtractValidation.integration.test.js) — `400` on `POST /api/questions/extract` (missing/invalid `text` / `courseId`) and `POST /api/questions/extract/save` (missing `courseId`, empty or invalid `questions`). [testDb.js](../app/backend/test/helpers/testDb.js) — connect + `TRUNCATE` helper.
-- If `TEST_DATABASE_URL` is unset, integration suites are **skipped** (Jest still exits 0).
-- **Implemented (frontend):** [api.test.ts](../app/frontend/src/services/api.test.ts) — axios `api` client: `Authorization` when `localStorage.token` is set; `401` clears `token`/`user` and navigates to `/login` unless already on login (local HTTP server; **node** test env). [LoginPage.test.tsx](../app/frontend/src/pages/LoginPage.test.tsx) — login/register submit, error from failed login, auth loading, redirect when `isAuthenticated` (mocked `useAuth` + `FloatingLetters`).
+### Backend — unit (Jest, no real DB)
+
+- [extraction.test.js](../app/backend/test/extraction.test.js) — `extractionUtils` (question blocks, chunking, dedupe).
+- [health.test.js](../app/backend/test/health.test.js) — public HTTP surface (`/`, `/healthz`, 404).
+- [encryption.test.js](../app/backend/test/encryption.test.js) — Canvas API key encrypt/decrypt.
+- [authService.test.js](../app/backend/test/authService.test.js) — JWT `verifyToken` (A1).
+- [assessmentVariantMetadataScoring.test.js](../app/backend/test/assessmentVariantMetadataScoring.test.js) — `scoreMetadataMatch`.
+- [assessmentVariantAuth.test.js](../app/backend/test/assessmentVariantAuth.test.js) — `401` on `/api/assessment-variant` without a token.
+- [eduaiAuth.test.js](../app/backend/test/eduaiAuth.test.js) — EduAI routes `401` without a token.
+- [canvasExport.test.js](../app/backend/test/canvasExport.test.js) — `convertVariantToCanvasQuestion` / `parseMCQOptions`.
+- [canvasExportMocked.test.js](../app/backend/test/canvasExportMocked.test.js) — `exportAssessmentToCanvas` with mocked axios/DB.
+- [aiExtract.test.js](../app/backend/test/aiExtract.test.js) — `extractQuestionsFromText` empty input.
+- [aiExtractEduaiMocked.test.js](../app/backend/test/aiExtractEduaiMocked.test.js) — `extractQuestionsFromText` with mocked EduAI + `Course`/`Topics`.
+- [questionsAuth.test.js](../app/backend/test/questionsAuth.test.js) — `401` on core `/api/questions` and extract routes.
+- [assessmentsAuth.test.js](../app/backend/test/assessmentsAuth.test.js) — `401` on `/api/assessments`.
+- [courseAuth.test.js](../app/backend/test/courseAuth.test.js) — `401` on `/api/course`.
+- [canvasAuth.test.js](../app/backend/test/canvasAuth.test.js) — `401` on Canvas routes.
+
+**Express split:** [app.js](../app/backend/src/app.js) exports the app for supertest; [index.js](../app/backend/src/index.js) only listens and connects the DB.
+
+### Backend — integration (Jest, `TEST_DATABASE_URL` required)
+
+Skipped when unset (exit 0). [testDb.js](../app/backend/test/helpers/testDb.js) — connect + `TRUNCATE`.
+
+- [auth.integration.test.js](../app/backend/test/auth.integration.test.js) — register validation, register/login/GET /me, duplicate email, wrong password, **unknown user login** (A2–A4).
+- [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) — create/list questions, create/fetch assessment, `POST /api/course`, validation errors, add/list variants, empty variant `400` (C1, C2, F2 in part).
+- [questionsExtractValidation.integration.test.js](../app/backend/test/questionsExtractValidation.integration.test.js) — extract and extract/save `400` validation (D4).
+- [eduaiHttpValidation.integration.test.js](../app/backend/test/eduaiHttpValidation.integration.test.js) — EduAI `400` for missing `messages` / `courseCode` / `prompt` (E1).
+- [assessmentVariantHttp.integration.test.js](../app/backend/test/assessmentVariantHttp.integration.test.js) — assessment-variant `400` bodies (H2).
+- [planCoverage.integration.test.js](../app/backend/test/planCoverage.integration.test.js) — **cross-user** `GET /api/course/:id` → `404` (B1); **POST extract/save** success (D3); **POST assemble-variants** for Practice Exam with one label (H3).
+
+### Frontend (Vitest)
+
+- [api.test.ts](../app/frontend/src/services/api.test.ts) — axios `Authorization` + `401` handling (J1).
+- [LoginPage.test.tsx](../app/frontend/src/pages/LoginPage.test.tsx) — login/register, errors, loading, redirect (J2).
 
 ## 4. Test layers
 
-1. **Unit (no DB):** `extractionUtils`, `encryption`, `assessmentVariantMetadataScoring` (`scoreMetadataMatch`), validation mappers, Canvas MCQ parsing helpers.
-2. **Service + DB:** `questionService`, `assessmentService`, `assessmentAuthService` — use a test DB or transactional rollback.
-3. **HTTP (supertest):** Authenticated routes with a test user or generated JWT; mock external HTTP (EduAI, Canvas) where the client is injectable.
-4. **Frontend (Vitest + Testing Library):** `api.ts` — [api.test.ts](../app/frontend/src/services/api.test.ts); `LoginPage` — [LoginPage.test.tsx](../app/frontend/src/pages/LoginPage.test.tsx).
+1. **Unit (no DB):** `extractionUtils`, `encryption`, `assessmentVariantMetadataScoring`, Canvas MCQ helpers, `extractQuestionsFromText` with mocks, `exportAssessmentToCanvas` with mocks.
+2. **Service + DB:** Exercised via integration tests (`saveExtractedQuestions`, `assembleEquivalentExamVariants` paths, seeded courses/assessments).
+3. **HTTP (supertest):** Authed and unauthed routes; no real EduAI/Canvas in CI (mocks for unit; validation routes hit code before upstream).
+4. **Frontend (Vitest + Testing Library):** [api.test.ts](../app/frontend/src/services/api.test.ts), [LoginPage.test.tsx](../app/frontend/src/pages/LoginPage.test.tsx).
 
-**Do not** call real EduAI or Canvas in CI; use fixtures and mocks.
+**Do not** call real EduAI or Canvas in automated suites except local/manual runs; use fixtures and mocks for CI.
 
-## 5. Feature → tests (backlog and IDs)
+## 5. Feature coverage matrix (IDs → status)
 
-### A. Authentication (`/api/auth`, `authService`, `middleware/auth`)
+| ID | Area | Status | Where covered |
+|----|------|--------|---------------|
+| A1 | Auth unit (`verifyToken`) | Done | [authService.test.js](../app/backend/test/authService.test.js) |
+| A2 | Register / validation / duplicate | Done | [auth.integration.test.js](../app/backend/test/auth.integration.test.js) |
+| A3 | Login success / **wrong** password / **unknown** user | Done | [auth.integration.test.js](../app/backend/test/auth.integration.test.js) |
+| A4 | GET /me 200 vs 401 | Done | [auth.integration.test.js](../app/backend/test/auth.integration.test.js) |
+| B1 | Course scoped to `userId` (other user → not found) | Done | [planCoverage.integration.test.js](../app/backend/test/planCoverage.integration.test.js) |
+| B2 | Course `401` without token | Done | [courseAuth.test.js](../app/backend/test/courseAuth.test.js) |
+| C1 | Question create + list | Done | [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) |
+| C2 | Question `401`; variants + list | Done | [questionsAuth.test.js](../app/backend/test/questionsAuth.test.js), [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) |
+| D1 | Extraction utils | Done | [extraction.test.js](../app/backend/test/extraction.test.js) |
+| D2 | `extractQuestionsFromText` | Done | [aiExtract.test.js](../app/backend/test/aiExtract.test.js), [aiExtractEduaiMocked.test.js](../app/backend/test/aiExtractEduaiMocked.test.js) |
+| D3 | `saveExtractedQuestions` via HTTP | Done | [planCoverage.integration.test.js](../app/backend/test/planCoverage.integration.test.js) |
+| D4 | Extract / extract/save `400` | Done | [questionsExtractValidation.integration.test.js](../app/backend/test/questionsExtractValidation.integration.test.js) |
+| E1 | EduAI `401` + `400` validation | Done | [eduaiAuth.test.js](../app/backend/test/eduaiAuth.test.js), [eduaiHttpValidation.integration.test.js](../app/backend/test/eduaiHttpValidation.integration.test.js) |
+| F1 | Assessment DB shape (sections, links) | Partial | `assemble-variants` + [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js) (no dedicated **reorder** test) |
+| F2 | Create assessment, attach variant to seeded Practice Exam | Done | [questionAssessments.integration.test.js](../app/backend/test/questionAssessments.integration.test.js), [planCoverage.integration.test.js](../app/backend/test/planCoverage.integration.test.js) |
+| F3 | Assessments `401` | Done | [assessmentsAuth.test.js](../app/backend/test/assessmentsAuth.test.js) |
+| G1 | Encryption | Done | [encryption.test.js](../app/backend/test/encryption.test.js) |
+| G2 | Canvas question payload helpers | Done | [canvasExport.test.js](../app/backend/test/canvasExport.test.js) |
+| G3 | Export flow mocked | Done | [canvasExportMocked.test.js](../app/backend/test/canvasExportMocked.test.js) |
+| G4 | Canvas `401` | Done | [canvasAuth.test.js](../app/backend/test/canvasAuth.test.js) |
+| H1 | `scoreMetadataMatch` | Done | [assessmentVariantMetadataScoring.test.js](../app/backend/test/assessmentVariantMetadataScoring.test.js) |
+| H2 | Assessment-variant `400` | Done | [assessmentVariantHttp.integration.test.js](../app/backend/test/assessmentVariantHttp.integration.test.js) |
+| H3 | `assembleEquivalentExamVariants` (single exam label) | Done | [planCoverage.integration.test.js](../app/backend/test/planCoverage.integration.test.js) |
+| I1 | Health / root | Done | [health.test.js](../app/backend/test/health.test.js) |
+| I2 | 404 JSON | Done | [health.test.js](../app/backend/test/health.test.js) |
+| J1 | Frontend `api` client | Done | [api.test.ts](../app/frontend/src/services/api.test.ts) |
+| J2 | `LoginPage` | Done | [LoginPage.test.tsx](../app/frontend/src/pages/LoginPage.test.tsx) |
 
-| ID | Type | Cases |
-|----|------|--------|
-| A1 | Unit | `verifyToken` valid / invalid / wrong secret (partially covered in authService tests). |
-| A2 | HTTP + DB | `POST /register` — success, duplicate email, validation. |
-| A3 | HTTP + DB | `POST /login` — success, wrong password, unknown user. |
-| A4 | HTTP + DB | `GET /me` — 200 with valid token, 401 without. |
+**Intentional gaps (future work):** F1 “reorder” endpoints; E2E (Playwright/Cypress); full EduAI/Canvas E2E against sandboxes. Add new rows here when you add tests.
 
-### B. Courses and topics (`/api/course`)
+## 6. Suggested order for *new* tests
 
-| ID | Type | Cases |
-|----|------|--------|
-| B1 | HTTP + DB | CRUD scoped to `userId`; 403/404 for other user’s data. |
-| B2 | HTTP | `401` without token — [courseAuth.test.js](../app/backend/test/courseAuth.test.js). |
-
-### C. Questions and variants (`questionService`, `routes/questions`, `routes/variants`)
-
-| ID | Type | Cases |
-|----|------|--------|
-| C1 | Service + DB | Create/read/update/delete with valid `courseId` / topic rules. |
-| C2 | HTTP | `401` without token — [questionsAuth.test.js](../app/backend/test/questionsAuth.test.js). (Variant/order integration: backlog.) |
-
-### D. Extraction and AI (`extractionUtils`, `aiService`, `saveExtractedQuestions`)
-
-| ID | Type | Cases |
-|----|------|--------|
-| D1 | Unit | Extraction helpers — [extraction.test.js](../app/backend/test/extraction.test.js). |
-| D2 | Unit | `extractQuestionsFromText` empty input — [aiExtract.test.js](../app/backend/test/aiExtract.test.js); EduAI path mocked — [aiExtractEduaiMocked.test.js](../app/backend/test/aiExtractEduaiMocked.test.js). |
-| D3 | Service + DB | `saveExtractedQuestions` — metadata + variants + optional assessment/section. |
-| D4 | HTTP + DB | Extract/save validation `400`s — [questionsExtractValidation.integration.test.js](../app/backend/test/questionsExtractValidation.integration.test.js) (`extract/save` cases). |
-
-### E. EduAI (`/api/eduai`, `eduaiService`)
-
-| ID | Type | Cases |
-|----|------|--------|
-| E1 | HTTP | `401` without token — [eduaiAuth.test.js](../app/backend/test/eduaiAuth.test.js). (Mock upstream / 4xx validation: backlog.) |
-
-### F. Assessments (`assessmentService`, `assessmentSectionService`, `routes/assessments`)
-
-| ID | Type | Cases |
-|----|------|--------|
-| F1 | Service + DB | Blueprint, sections, variant links, reorder. |
-| F2 | HTTP | Happy path: create assessment → section → attach variant. |
-| F3 | HTTP | `401` without token — [assessmentsAuth.test.js](../app/backend/test/assessmentsAuth.test.js). |
-
-### G. Canvas (`canvasService`, `encryption`, export)
-
-| ID | Type | Cases |
-|----|------|--------|
-| G1 | Unit | Encrypt/decrypt (see encryption tests). |
-| G2 | Unit | `convertVariantToCanvasQuestion` / `parseMCQOptions` — [canvasExport.test.js](../app/backend/test/canvasExport.test.js). |
-| G3 | Unit + mock | `exportAssessmentToCanvas` — [canvasExportMocked.test.js](../app/backend/test/canvasExportMocked.test.js) (axios + schema + `getAssessmentById` mocked; no real Canvas). |
-| G4 | HTTP | `401` without token — [canvasAuth.test.js](../app/backend/test/canvasAuth.test.js). |
-
-### H. Assessment variant workflow (`/api/assessment-variant`, `assessmentVariantService.js`)
-
-| ID | Type | Cases |
-|----|------|--------|
-| H1 | Unit | `scoreMetadataMatch` (see [assessmentVariantMetadataScoring.test.js](../app/backend/test/assessmentVariantMetadataScoring.test.js)). |
-| H2 | HTTP | Validation: `400` for missing `studyRole`, `courseId`, etc. (see integration tests). |
-| H3 | Service + DB | One fixture: reference assessment → `assembleEquivalentExamVariants` structure (or clear failure). |
-
-### I. Infrastructure
-
-| ID | Type | Cases |
-|----|------|--------|
-| I1 | HTTP | `/healthz`, `/` — [health.test.js](../app/backend/test/health.test.js). |
-| I2 | HTTP | Unknown route → 404 JSON. |
-
-### J. Frontend (Vitest)
-
-| ID | Type | Cases |
-|----|------|--------|
-| J1 | Unit | `api.ts` — [api.test.ts](../app/frontend/src/services/api.test.ts) (Bearer header, `401` clears storage + redirect). |
-| J2 | Component | [LoginPage.test.tsx](../app/frontend/src/pages/LoginPage.test.tsx) — mock `useAuth` (`login` / `register` / `isLoading` / `isAuthenticated`). |
-
-## 6. Suggested implementation order
-
-1. Auth + health (A, I) — foundation for authenticated HTTP tests.  
-2. Questions / variants (C).  
-3. Assessments (F).  
-4. Extraction + EduAI mocks (D, E).  
-5. Canvas (G).  
-6. Assessment variant API (H) — validation routes first, then one DB-backed assembly case.  
-7. Frontend (J).
+1. F1 — section reorder or blueprint edge cases (integration).  
+2. E2E — critical smoke on staging.  
+3. Any new route — mirror with `401` + validation `400` + one happy path.
 
 ## 7. Handover checklist
 
-- [ ] CI runs `npm test` in `app/backend` and `app/frontend` on every PR.  
-- [ ] CI (or a manual pre-release step) sets `TEST_DATABASE_URL` and runs `npm run test:integration` in `app/backend` when a Postgres test instance is available.  
-- [ ] No production API keys in test code; use `.env` (local) or CI secrets, not committed credentials.
+- [x] **CI** ([feature-ci.yml](../.github/workflows/feature-ci.yml)) runs `npm test` in `app/backend` and `app/frontend` on feature branches and PRs to `dev`.  
+- [ ] **Integration in CI** — set `TEST_DATABASE_URL` and run `cd app/backend && npm run test:integration` in a job with Postgres (e.g. `services: postgres`) when you want DB tests on every PR. Local: `TEST_DATABASE_URL=... npm run test:all`.  
+- [x] **No production secrets in repo** — use root `.env` (gitignored) or CI secrets; [test setup](../app/backend/test/setup.js) uses stubs when env is missing.  
+- [x] **Frontend tests are non-interactive** — `npm test` runs `vitest run` (one shot); use `npm run test:watch` during development.  
 
 ---
 
-*Last updated: aligns with repository layout and [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md).*
+*Last updated: feature coverage matrix completed; [feature-ci.yml](../.github/workflows/feature-ci.yml) and Vitest `run` mode reflected.*

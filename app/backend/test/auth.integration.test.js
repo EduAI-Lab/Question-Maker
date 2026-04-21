@@ -88,6 +88,15 @@ describeDb('Auth API (integration)', () => {
     expect(badLogin.status).toBe(500);
   });
 
+  it('rejects login for an unknown email with a generic error', async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'no-such-user@local.test', password: 'secret12' });
+    expect(res.status).toBe(500);
+    expect(res.body.success).toBe(false);
+    expect(String(res.body.error || '')).toMatch(/invalid|password|email/i);
+  });
+
   it('returns error when email is already registered', async () => {
     const email = 'dup@local.test';
     const password = 'secret12';
