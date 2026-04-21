@@ -1,6 +1,6 @@
 /**
  * Assessment variant workflow: (1) baseline reference exam → (2) generate variants from those questions →
- * (3) assemble parallel exams matching baseline structure → (4) similarity metrics.
+ * (3) assemble parallel exams matching baseline structure → (4) AI review.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -219,16 +219,12 @@ export function AssessmentVariantPage() {
   const [generatingVariants, setGeneratingVariants] = useState(false);
   const [variantGenMode, setVariantGenMode] = useState<'all' | 'missing' | null>(null);
   const [assembling, setAssembling] = useState(false);
-  const [metricsLoading, setMetricsLoading] = useState(false);
   const [lastAssembled, setLastAssembled] = useState<Array<{ id: number; name: string }>>([]);
   const [availableModels, setAvailableModels] = useState<EduAIModelOption[]>([]);
   const [variantModel, setVariantModel] = useState('ollama:gpt-oss:120b');
   const [variantReadiness, setVariantReadiness] = useState<BaselineVariantReadiness | null>(null);
   const [variantReadinessLoading, setVariantReadinessLoading] = useState(false);
   const [variantUserPrompt, setVariantUserPrompt] = useState('');
-  const [metricsData, setMetricsData] = useState<Awaited<ReturnType<typeof studyService.computeMetrics>> | null>(
-    null
-  );
   const [aiReviewLoading, setAiReviewLoading] = useState(false);
   const [aiReviewBaselineId, setAiReviewBaselineId] = useState<string>('');
   const [aiReviewVariantId, setAiReviewVariantId] = useState<string>('');
@@ -415,7 +411,6 @@ export function AssessmentVariantPage() {
     }
     setGeneratingVariants(true);
     setVariantGenMode(mode);
-    setMetricsData(null);
     setLastAssembled([]);
     try {
       const detail = await loadAssessmentDetail(refId);
@@ -511,7 +506,6 @@ export function AssessmentVariantPage() {
       return;
     }
     setAssembling(true);
-    setMetricsData(null);
     try {
       const result = await studyService.assembleEquivalentExams({
         referenceAssessmentId: refId,
@@ -538,30 +532,6 @@ export function AssessmentVariantPage() {
       });
     } finally {
       setAssembling(false);
-    }
-  };
-
-  const runMetrics = async () => {
-    const refId = Number(baselineAssessmentId);
-    const ids = [refId, ...lastAssembled.map((a) => a.id)].filter((x) => Number.isFinite(x) && x > 0);
-    const unique = [...new Set(ids)];
-    if (unique.length < 2) {
-      toast({ variant: 'destructive', title: 'Assemble exam variants first' });
-      return;
-    }
-    setMetricsLoading(true);
-    try {
-      const data = await studyService.computeMetrics(unique, refId);
-      setMetricsData(data);
-      toast({ title: 'Similarity metrics computed' });
-    } catch (e: unknown) {
-      toast({
-        variant: 'destructive',
-        title: 'Metrics failed',
-        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Try again.'
-      });
-    } finally {
-      setMetricsLoading(false);
     }
   };
 
@@ -762,7 +732,7 @@ export function AssessmentVariantPage() {
         <p className="text-sm text-muted-foreground">
           <strong className="font-medium text-foreground">Order:</strong> set the baseline reference exam, ensure each base
           question has enough variants (or generate one AI variant per question that still needs an alternate),
-          assemble a parallel exam, then run the similarity checker.
+          then assemble a parallel exam.
         </p>
 
         <section className="space-y-4">
@@ -1062,77 +1032,7 @@ export function AssessmentVariantPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">4 · Similarity checker</h2>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Structural similarity &amp; workflow metrics</CardTitle>
-              <CardDescription>
-                Compares topic, difficulty, and question-type distributions (1 − JSD), Jaccard overlap on base questions, and
-                cross-exam variant reuse — your &quot;similarity code&quot; summary for analysis.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={runMetrics}
-                disabled={metricsLoading || lastAssembled.length === 0}
-              >
-                {metricsLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Computing…
-                  </>
-                ) : (
-                  'Run similarity checker'
-                )}
-              </Button>
-
-              {metricsData && (
-                <div className="space-y-4 rounded-lg border bg-white p-4 text-sm">
-                  <div>
-                    <span className="font-medium">Workflow</span>
-                    <p className="text-muted-foreground">
-                      Cross-exam variant reuse: {metricsData.workflow.variantsAppearingInMultipleExams} · AI placements:{' '}
-                      {metricsData.workflow.aiGeneratedVariantPlacements} / {metricsData.workflow.totalQuestionPlacements}
-                    </p>
-                  </div>
-                  {Array.isArray(metricsData.pairwise) && metricsData.pairwise.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[640px] border-collapse text-left text-xs">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="p-2">Pair</th>
-                            <th className="p-2">Topic sim</th>
-                            <th className="p-2">Difficulty sim</th>
-                            <th className="p-2">Type sim</th>
-                            <th className="p-2">Base Jaccard</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(metricsData.pairwise as Array<Record<string, number>>).map((row, i) => (
-                            <tr key={i} className="border-b border-slate-100">
-                              <td className="p-2">
-                                #{row.assessmentIdA} / #{row.assessmentIdB}
-                              </td>
-                              <td className="p-2">{(row.topicDistributionSimilarity ?? 0).toFixed(3)}</td>
-                              <td className="p-2">{(row.difficultyDistributionSimilarity ?? 0).toFixed(3)}</td>
-                              <td className="p-2">{(row.questionTypeDistributionSimilarity ?? 0).toFixed(3)}</td>
-                              <td className="p-2">{(row.baseQuestionJaccard ?? 0).toFixed(3)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">5 · AI review</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">4 · AI review</h2>
           <Card>
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-2">
