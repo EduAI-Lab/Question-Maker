@@ -1,301 +1,224 @@
-# EduQuery.ai - AI-Powered Question Generation Platform
+# EduQuery.ai - Question Maker
 
-A modern, full-stack application for generating educational questions using AI. Built with Node.js/Express backend and React frontend with TypeScript.
+Full-stack platform for building course question banks and assessments with AI-assisted workflows.
 
-## 🚀 Features
+## Features
 
-- **AI-Powered Question Generation**: Support for multiple AI providers (Groq, OpenAI, DeepSeek)
-- **Question Management**: Create, edit, delete, and organize questions
-- **Class Organization**: Organize questions by classes/courses
-- **File Upload**: Upload documents to generate questions automatically
-- **Question Classification**: Automatic difficulty and Bloom's taxonomy classification
-- **Modern UI**: Clean, responsive interface with dark/light theme support
-- **Authentication**: Secure JWT-based authentication
-- **Docker Support**: Easy deployment with Docker and Docker Compose
+- Secure auth with per-user data scoping.
+- Course and topic onboarding from EduAI.
+- Question and variant authoring (manual + AI-assisted).
+- OCR upload flow (PDF/image) to extract and review questions before save.
+- Assessment builder with section-level variant matching.
+- Canvas LMS integration:
+  - Export local assessments to Canvas.
+  - Import Canvas quizzes into local assessments.
+- Assessment variant workflow:
+  - Mark baseline exam.
+  - Generate missing variants.
+  - Assemble parallel exams (A/B/C).
+  - Run AI rubric review between baseline and variant exams.
+- Export assessments to TXT and Word (`.docx`).
+- Guided tour across core pages.
+- Built-in bug reporting with admin triage dashboard.
 
-## 🏗️ Architecture
+## Architecture
 
-### Backend (Node.js/Express)
-- **Framework**: Express.js with TypeScript
-- **Database**: PostgreSQL with Sequelize ORM
-- **Authentication**: JWT + bcrypt
-- **AI Integration**: Multiple AI providers with fallback support
-- **Security**: Helmet, CORS, rate limiting
+### Backend (`app/backend`)
 
-### Frontend (React/TypeScript)
-- **Framework**: React 18 with TypeScript
-- **Routing**: React Router 7
-- **UI Components**: Radix UI with Tailwind CSS
-- **State Management**: Custom hooks with React Query
-- **Theme**: Dark/light mode support
-- **Build Tool**: Vite
+- Node.js + Express (ESM JavaScript).
+- PostgreSQL + Sequelize.
+- JWT auth + bcrypt password hashing.
+- Security middleware: Helmet, CORS, compression, production rate limiting.
+- Service modules for auth, questions, assessments, EduAI, Canvas, assessment variants, and bug reports.
 
-## 📁 Project Structure
+### Frontend (`app/frontend`)
 
-```
-eduquery-ai/
+- React + TypeScript + Vite.
+- React Router v7.
+- Tailwind + Radix/shadcn-style UI primitives.
+- Context-driven app state for auth, guided tour, and bug reporting.
+- Axios API client with token injection and 401 handling.
+
+## Project Structure
+
+```text
+question-maker/
 ├── app/
-│   ├── backend/                 # Node.js/Express API
+│   ├── backend/
 │   │   ├── src/
-│   │   │   ├── config/         # Configuration files
-│   │   │   ├── models/         # Database models
-│   │   │   ├── services/       # Business logic
-│   │   │   ├── routes/         # API routes
-│   │   │   └── middleware/     # Express middleware
-│   │   ├── package.json
-│   │   └── Dockerfile
-│   └── frontend/               # React application
-│       ├── src/
-│       │   ├── components/     # React components
-│       │   ├── pages/          # Page components
-│       │   ├── hooks/          # Custom hooks
-│       │   ├── services/       # API services
-│       │   └── types/          # TypeScript types
-│       ├── package.json
-│       └── Dockerfile
-├── docker-compose.yml          # Production setup
-├── docker-compose.dev.yml      # Development setup
+│   │   │   ├── config/
+│   │   │   ├── middleware/
+│   │   │   ├── routes/
+│   │   │   ├── schema/
+│   │   │   ├── services/
+│   │   │   └── utils/
+│   │   └── test/
+│   └── frontend/
+│       ├── src/components/
+│       ├── src/contexts/
+│       ├── src/hooks/
+│       ├── src/pages/
+│       ├── src/services/
+│       ├── src/types/
+│       └── src/utils/
+├── docs/
+├── docker-compose.yml
+├── docker-compose.dev.yml
 └── README.md
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- Docker and Docker Compose
-- PostgreSQL (if running locally)
+- npm
+- PostgreSQL (for local non-Docker runs)
+- Docker + Docker Compose (optional but recommended)
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Docker Compose
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd eduquery-ai
-   ```
+1. Clone and enter the repo.
+2. Copy `.env.example` to `.env` and fill required secrets.
+3. Start:
 
-2. **Set up environment variables**
-   ```bash
-   # Copy the environment file
-   cp .env.example .env
-   
-   # Edit the file with your API keys
-   nano .env
-   ```
+```bash
+npm run dev:up
+```
 
-3. **Start the application**
-   ```bash
-   # Development
-   docker-compose -f docker-compose.dev.yml up -d
-   
-   # Production
-   docker-compose up -d
-   ```
+Useful commands:
 
-4. **Access the application**
-   - Frontend: http://localhost:3000 (production) or http://localhost:5173 (development)
-   - Backend API: http://localhost:8000
+```bash
+npm run dev:down
+npm run dev:logs
+npm run dev:build
+```
 
 ### Option 2: Local Development
 
-1. **Environment Setup**
-   ```bash
-   # Copy and configure the environment file
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+1. Create `.env` from `.env.example`.
+2. Start backend:
 
-2. **Backend Setup**
-   ```bash
-   cd app/backend
-   npm install
-   npm run dev
-   ```
-
-3. **Frontend Setup**
-   ```bash
-   cd app/frontend
-   npm install
-   npm run dev
-   ```
-
-4. **Database Setup**
-   - Install PostgreSQL
-   - Create a database named `eduquery`
-   - Update `DATABASE_URL` in the root `.env` file
-
-## 🔧 Configuration
-
-### Environment Variables
-
-#### Single .env File (Project Root)
-```env
-# ===========================================
-# SHARED CONFIGURATION
-# ===========================================
-NODE_ENV=development
-APP_NAME=EduQuery.ai
-APP_VERSION=1.0.0
-
-# ===========================================
-# BACKEND CONFIGURATION
-# ===========================================
-PORT=8000
-DATABASE_URL=postgresql://postgres:password@postgres:5432/eduquery
-JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRES_IN=24h
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-GROQ_API_KEY=your-groq-api-key
-OPENAI_API_KEY=your-openai-api-key
-DEEPSEEK_API_KEY=your-deepseek-api-key
-
-# ===========================================
-# FRONTEND CONFIGURATION
-# ===========================================
-VITE_API_URL=http://localhost:8000
-VITE_APP_NAME=EduQuery.ai
-VITE_APP_VERSION=1.0.0
-```
-
-**Note**: Frontend variables are prefixed with `VITE_` and are exposed to the browser. Backend variables are server-side only.
-
-## 📚 API Documentation
-
-### Authentication
-- `POST /api/auth/register` - Register a new user
-- `POST /api/auth/login` - Login user
-- `GET /api/auth/me` - Get current user
-
-### Questions
-- `GET /api/questions` - Get all questions
-- `POST /api/questions` - Create a question
-- `GET /api/questions/:id` - Get specific question
-- `PUT /api/questions/:id` - Update question
-- `DELETE /api/questions/:id` - Delete question
-- `POST /api/questions/generate` - Generate questions with AI
-- `POST /api/questions/approve` - Approve generated questions
-
-### Classes
-- `GET /api/classes` - Get all classes
-- `POST /api/classes` - Create a class
-- `GET /api/classes/:id` - Get specific class
-- `PUT /api/classes/:id` - Update class
-- `DELETE /api/classes/:id` - Delete class
-
-
-## 🛠️ Development
-
-### Backend Development
 ```bash
 cd app/backend
-npm run dev          # Start development server
-npm test            # Run tests
-npm run lint        # Lint code
+npm install
+npm run dev
 ```
 
-### Frontend Development
+3. Start frontend in another terminal:
+
 ```bash
 cd app/frontend
-npm run dev         # Start development server
-npm run build       # Build for production
-npm run preview     # Preview production build
+npm install
+npm run dev
 ```
 
-### Database Migrations
+Default local endpoints:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8000`
+
+## Environment Variables
+
+Use a single root `.env` file. See `.env.example` for full defaults.
+
+Important variables for current features:
+
+- Core:
+  - `NODE_ENV`
+  - `PORT`
+  - `DATABASE_URL`
+  - `JWT_SECRET`
+  - `JWT_EXPIRES_IN`
+  - `CORS_ORIGINS`
+- AI / EduAI:
+  - `EDUAI_API_URL`
+  - `EDUAI_API_KEY`
+  - `EDUAI_IGNORED_COURSE_CODES` (optional list)
+- Security / encryption:
+  - `ENCRYPTION_KEY` (required in production)
+- Bug reports:
+  - Default admin dashboard user: `admin@mail.com` (see developer guide).
+  - `BUG_REPORT_ADMIN_EMAILS` (optional comma-separated **additional** admin emails)
+- Frontend build vars:
+  - `VITE_API_URL`
+  - `VITE_APP_NAME`
+  - `VITE_APP_VERSION`
+
+## API Surface (high level)
+
+- Auth: `/api/auth`
+- Courses/topics: `/api/course`
+- Questions/variants: `/api/questions`
+- Assessments/sections: `/api/assessments`
+- EduAI proxy: `/api/eduai`
+- Canvas integration: `/api/canvas`
+- Assessment variant workflow: `/api/assessment-variant`
+- Bug reports: `/api/bug-reports`
+
+## Frontend Routes (high level)
+
+- `/login`
+- `/courses`
+- `/home`
+- `/assessments/:id/builder`
+- `/assessment-variant`
+- `/help`
+- `/admin/bug-reports` (admin users only)
+
+## Development Commands
+
+### Backend
+
 ```bash
 cd app/backend
-# The database will be automatically synced in development mode
-```
-
-## 🐳 Docker Commands
-
-### Quick Commands (Recommended)
-```bash
-# Development
-npm run dev:up          # Start development containers
-npm run dev:down        # Stop development containers
-npm run dev:restart     # Restart development containers
-npm run dev:logs        # View development logs
-npm run dev:build       # Rebuild and start development containers
-
-# Production
-npm run prod:up         # Start production containers
-npm run prod:down       # Stop production containers
-```
-
-### Full Docker Commands
-```bash
-# Development
-docker-compose -f docker-compose.dev.yml up -d
-docker-compose -f docker-compose.dev.yml down
-
-# Production
-docker-compose up -d
-docker-compose down
-
-# View logs
-docker-compose logs -f [service-name]
-
-# Rebuild services
-docker-compose build [service-name]
-```
-
-## 🧪 Testing
-
-```bash
-# Backend tests
-cd app/backend
+npm run dev
 npm test
+npm run test:integration
+npm run lint
+```
 
-# Frontend tests
+### Frontend
+
+```bash
 cd app/frontend
+npm run dev
+npm run build
 npm test
+npm run lint
 ```
 
-## 📦 Deployment
+### Seed / Populate Helpers
 
-### Production Deployment
+```bash
+npm run populate:backend
+cd app/backend && npm run seed:production
+```
 
-1. **Set up environment variables**
-2. **Build and start with Docker Compose**
-   ```bash
-   docker-compose up -d
-   ```
+## Documentation
 
-3. **Configure reverse proxy** (Nginx/Apache)
-4. **Set up SSL certificates**
-5. **Configure monitoring and logging**
+| Topic | Where |
+|--------|--------|
+| **Testing** (integration DB, commands) | [docs/TEST_PLAN.md](docs/TEST_PLAN.md) |
+| **Architecture and workflows** | [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) |
+| **Troubleshooting** | [docs/troubleshooting/](docs/troubleshooting/) — [MONITORING_SETUP.md](docs/troubleshooting/MONITORING_SETUP.md), [PRODUCTION.md](docs/troubleshooting/PRODUCTION.md) |
+| **Deployment and CI/CD** | [docs/deployment/README.md](docs/deployment/README.md) |
+| **Cron / scheduled pull on the server** | [docs/deployment/cron.md](docs/deployment/cron.md) |
 
-### Environment-specific Configurations
+**Note:** The **cron**-based job that auto-pulls and deploys on the server may be disabled, broken, or misconfigured. If you do not see new releases, troubleshoot using [docs/deployment/cron.md](docs/deployment/cron.md) and [docs/troubleshooting/PRODUCTION.md](docs/troubleshooting/PRODUCTION.md), or **deploy manually** (see [docs/deployment/README.md](docs/deployment/README.md), e.g. SSH, `git pull`, Docker).
 
-- **Development**: Hot reloading, debug logging
-- **Production**: Optimized builds, security headers, rate limiting
+In-app user guide: open **`/help`** after signing in.
 
-## 🤝 Contributing
+### GitHub Personal Access Token (new developers)
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+GitHub no longer accepts account passwords for Git over HTTPS. To run CI/CD and to **pull updates on the production server**, configure a **Personal Access Token** in all three places:
 
-## 📄 License
+1. **Local root `.env`** — add `GITHUB_PERSONAL_ACCESS_TOKEN=<your-token>` (deploy scripts such as [`scripts/daily-deploy.sh`](scripts/daily-deploy.sh) also accept `PERSONAL_ACCESS_TOKEN` or `GITHUB_TOKEN` in that file).
+2. **GitHub repository secrets** — in the repo on GitHub: **Settings → Secrets and variables → Actions**, create a secret with the token. Use the **name expected by your workflows** (the deployment guide lists `PERSONAL_ACCESS_TOKEN`; align the secret name with what `.github/workflows/*.yml` references).
+3. **Production `.env` on the server** — add the same token (e.g. `GITHUB_PERSONAL_ACCESS_TOKEN` or `PERSONAL_ACCESS_TOKEN`) next to the app’s other secrets so automated or manual `git pull` against private or protected remotes succeeds.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+More context: [docs/deployment/README.md](docs/deployment/README.md) (CI/CD and secrets), [docs/deployment/cron.md](docs/deployment/cron.md) (env variable names), [docs/features/CI-CD.md](docs/features/CI-CD.md).
 
-## 🆘 Support
+## License
 
-For support and questions:
-- Create an issue in the repository
-- Check the documentation
-- Review the API endpoints
-
-## 🔄 Changelog
-
-### v1.0.0
-- Initial release
-- Node.js/Express backend
-- React frontend with TypeScript
-- AI question generation
-- Class management
-- Docker containerization
+MIT
