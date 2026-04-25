@@ -268,7 +268,7 @@ curl -X GET "https://eduai.ok.ubc.ca/api/ai-models" \
 
 Manage topics for a specific course. Admin role required for creating and deleting topics.
 
-**Base URL (question-maker app, local):** `http://localhost:5173`
+#### Request
 
 **Endpoints**: 
 - `GET /api/courses/:courseId/topics` - List all topics
@@ -277,10 +277,10 @@ Manage topics for a specific course. Admin role required for creating and deleti
 
 **Headers**:
 - `Content-Type: application/json`
-- `x-api-key: YOUR_API_KEY` (EduAI production); for local question-maker app use your auth (e.g. session cookie or Bearer token as configured)
+- `x-api-key: YOUR_API_KEY`
 
 **URL Parameters**:
-- `courseId` (string): Course identifier (e.g. course code or numeric ID)
+- `courseId` (string): Course identifier
 
 **Body Parameters** (POST):
 - `name` (string): Topic name
@@ -291,14 +291,6 @@ Manage topics for a specific course. Admin role required for creating and deleti
 - *Note: Either `topicId` or `name` must be provided*
 
 #### Examples
-
-##### Create Course Topic (real API call – question-maker local)
-```bash
-curl -X POST "http://localhost:5173/api/courses/COURSE_ID/topics" \
-  -H "Content-Type: application/json" \
-  -d "{\"name\": \"Logic and Proofs\"}"
-```
-Replace `COURSE_ID` with the target course identifier (e.g. course code or id). Add auth headers if your app requires them (e.g. `Cookie: ...` or `Authorization: Bearer ...`).
 
 ##### Get Course Topics (Windows - PowerShell)
 ```powershell
@@ -316,18 +308,21 @@ curl -X GET "https://eduai.ok.ubc.ca/api/courses/COURSE_ID/topics" \
 
 ##### Create Course Topic (Windows - PowerShell)
 ```powershell
-curl -X POST "http://localhost:5173/api/courses/COURSE_ID/topics" `
+curl -X POST "https://eduai.ok.ubc.ca/api/courses/COURSE_ID/topics" `
   -H "Content-Type: application/json" `
-  -d "{\"name\": \"Logic and Proofs\"}"
+  -H "x-api-key: YOUR_API_KEY" `
+  -d '{
+    "name": "Introduction to Machine Learning"
+  }'
 ```
 
-##### Create Course Topic (EduAI production – Linux/macOS)
+##### Create Course Topic (Linux/macOS)
 ```bash
 curl -X POST "https://eduai.ok.ubc.ca/api/courses/COURSE_ID/topics" \
   -H "Content-Type: application/json" \
   -H "x-api-key: YOUR_API_KEY" \
   -d '{
-    "name": "Logic and Proofs"
+    "name": "Introduction to Machine Learning"
   }'
 ```
 

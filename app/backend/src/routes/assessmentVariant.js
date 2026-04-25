@@ -1,5 +1,5 @@
 /**
- * Routes for the assessment variant workflow (API path `/api/study`): reference marking, blueprint snapshot, assembly, metrics.
+ * Routes for the assessment variant workflow (API path `/api/assessment-variant`).
  */
 import express from 'express';
 import { authenticateToken } from '../middleware/auth.js';
@@ -11,12 +11,11 @@ import {
   assembleExamVariantsByMetadataSimilarity,
   generateBankVariantsForQuestions,
   reviewVariantExamWithAi
-} from '../services/studyExperimentService.js';
-import { computeStudyMetrics } from '../services/studyMetricsService.js';
+} from '../services/assessmentVariantService.js';
 
 const router = express.Router();
 
-/** PATCH /api/study/assessments/:id/role — set blueprintConfig.studyRole for an assessment. */
+/** PATCH /api/assessment-variant/assessments/:id/role — set blueprintConfig.studyRole for an assessment. */
 router.patch('/assessments/:id/role', authenticateToken, async (req, res, next) => {
   try {
     if (!('studyRole' in req.body)) {
@@ -33,7 +32,7 @@ router.patch('/assessments/:id/role', authenticateToken, async (req, res, next) 
   }
 });
 
-/** GET /api/study/assessments/:id/blueprint-snapshot — ordered slots + aggregates for a reference exam. */
+/** GET /api/assessment-variant/assessments/:id/blueprint-snapshot — ordered slots + aggregates for a reference exam. */
 router.get('/assessments/:id/blueprint-snapshot', authenticateToken, async (req, res, next) => {
   try {
     const snapshot = await getBlueprintSnapshot(Number(req.params.id), req.user.id);
@@ -43,7 +42,7 @@ router.get('/assessments/:id/blueprint-snapshot', authenticateToken, async (req,
   }
 });
 
-/** GET /api/study/assessments/:id/variant-readiness?courseId= — non-draft variant counts per base question on baseline. */
+/** GET /api/assessment-variant/assessments/:id/variant-readiness?courseId= */
 router.get('/assessments/:id/variant-readiness', authenticateToken, async (req, res, next) => {
   try {
     const courseId = req.query.courseId;
@@ -63,7 +62,7 @@ router.get('/assessments/:id/variant-readiness', authenticateToken, async (req, 
   }
 });
 
-/** POST /api/study/assemble-variants — build parallel exams from a reference assessment. */
+/** POST /api/assessment-variant/assemble-variants */
 router.post('/assemble-variants', authenticateToken, async (req, res, next) => {
   try {
     const {
@@ -99,7 +98,7 @@ router.post('/assemble-variants', authenticateToken, async (req, res, next) => {
   }
 });
 
-/** POST /api/study/assemble-by-metadata — parallel exams using bank questions with similar metadata per slot. */
+/** POST /api/assessment-variant/assemble-by-metadata */
 router.post('/assemble-by-metadata', authenticateToken, async (req, res, next) => {
   try {
     const {
@@ -135,7 +134,7 @@ router.post('/assemble-by-metadata', authenticateToken, async (req, res, next) =
   }
 });
 
-/** POST /api/study/generate-bank-variants — EduAI alternate variants per question id (promotes primary variant). */
+/** POST /api/assessment-variant/generate-bank-variants */
 router.post('/generate-bank-variants', authenticateToken, async (req, res, next) => {
   try {
     const { questionIds, courseId, model, apiKeys, variantsToAdd, variantPromptInstructions } = req.body;
@@ -162,30 +161,7 @@ router.post('/generate-bank-variants', authenticateToken, async (req, res, next)
   }
 });
 
-/** POST /api/study/metrics — pairwise structural similarity and workflow stats. */
-router.post('/metrics', authenticateToken, async (req, res, next) => {
-  try {
-    const { assessmentIds, referenceAssessmentId } = req.body;
-    if (!Array.isArray(assessmentIds) || assessmentIds.length < 1) {
-      return res.status(400).json({
-        success: false,
-        error: 'assessmentIds must be a non-empty array'
-      });
-    }
-
-    const metrics = await computeStudyMetrics(
-      assessmentIds.map(Number),
-      req.user.id,
-      { referenceAssessmentId: referenceAssessmentId ? Number(referenceAssessmentId) : undefined }
-    );
-
-    res.json({ success: true, data: metrics });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/** POST /api/study/review-variant-ai — AI judge compares variant exam against baseline using rubric. */
+/** POST /api/assessment-variant/review-variant-ai */
 router.post('/review-variant-ai', authenticateToken, async (req, res, next) => {
   try {
     const { baselineAssessmentId, variantAssessmentId, courseId, model, apiKeys, rubricText, applyUsabilityPenalty, includeOverallSummary } = req.body;

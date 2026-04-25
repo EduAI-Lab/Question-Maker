@@ -7,6 +7,17 @@ import jwt from 'jsonwebtoken';
 import { User } from '../schema/index.js';
 import { config } from '../config/settings.js';
 import { seedCoursesForNewUser } from './seedNewUserService.js';
+import { isBugReportAdminEmail } from './bugReportService.js';
+
+/** Shape returned to clients from login/register/me (no secrets). */
+function toPublicUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    createdDate: user.createdDate ?? user.createdAt,
+    isBugReportAdmin: isBugReportAdminEmail(user.email)
+  };
+}
 
 /** Creates a user with hashed credentials and returns a JWT/user payload. */
 async function registerUser(userData) {
@@ -39,11 +50,7 @@ async function registerUser(userData) {
   );
 
   return {
-    user: {
-      id: user.id,
-      email: user.email,
-      createdDate: user.createdDate,
-    },
+    user: toPublicUser(user),
     token,
   };
 }
@@ -72,11 +79,7 @@ async function loginUser(credentials) {
   );
 
   return {
-    user: {
-      id: user.id,
-      email: user.email,
-      createdDate: user.createdDate,
-    },
+    user: toPublicUser(user),
     token,
   };
 }
@@ -93,11 +96,7 @@ async function getUserById(userId) {
     throw new Error('User not found');
   }
 
-  return {
-    id: user.id,
-    email: user.email,
-    createdDate: user.createdDate,
-  };
+  return toPublicUser(user);
 }
 
 export {

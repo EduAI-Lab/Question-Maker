@@ -9,12 +9,13 @@ import {
   Variants,
   Question_Metadata,
   Course,
-  Topics
+  Topics,
+  VariantSelectionCursor
 } from '../schema/index.js';
 import eduaiService from './eduaiService.js';
 import { Op } from 'sequelize';
-import { loadOrderedVariantsForAssessment, aggregateStructure } from './studyMetricsService.js';
-import { scoreMetadataMatch } from './studyExperimentMetrics.js';
+import { loadOrderedVariantsForAssessment, aggregateStructure } from './assessmentVariantUtils.js';
+import { scoreMetadataMatch } from './assessmentVariantMetadataScoring.js';
 
 const VALID_STUDY_ROLES = ['reference_baseline', 'generated_variant'];
 
@@ -174,12 +175,48 @@ export async function getBlueprintSnapshot(assessmentId, userId) {
 /**
  * Picks a variant id for `questionMetadataId`, avoiding ids in `excludeIds`, preferring not `avoidVariantId`.
  */
+async function getSelectionCursorForUpdate({ questionMetadataId, courseId, transaction }) {
+  let cursor = await VariantSelectionCursor.findOne({
+    where: { questionMetadataId, courseId },
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
+  if (cursor) {
+    return cursor;
+  }
+
+  try {
+    cursor = await VariantSelectionCursor.create(
+      {
+        questionMetadataId,
+        courseId,
+        nextOffset: 0,
+        lastVariantId: null
+      },
+      { transaction }
+    );
+    return cursor;
+  } catch (error) {
+    // Another transaction may create this row first due to unique key race.
+    cursor = await VariantSelectionCursor.findOne({
+      where: { questionMetadataId, courseId },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (cursor) {
+      return cursor;
+    }
+    throw error;
+  }
+}
+
 async function pickVariantForSlot({
   questionMetadataId,
   courseId,
   excludeIds,
   avoidVariantId,
-  includeDrafts
+  includeDrafts,
+  transaction
 }) {
   const where = {
     questionMetadataId
@@ -203,7 +240,8 @@ async function pickVariantForSlot({
         required: true
       }
     ],
-    order: [['id', 'ASC']]
+    order: [['id', 'ASC']],
+    transaction
   });
 
   if (candidates.length === 0) {
@@ -212,7 +250,20 @@ async function pickVariantForSlot({
 
   const preferred = candidates.filter((c) => c.id !== avoidVariantId);
   const pool = preferred.length > 0 ? preferred : candidates;
-  return pool[0].id;
+  const cursor = await getSelectionCursorForUpdate({ questionMetadataId, courseId, transaction });
+  const offset = Number.isInteger(cursor.nextOffset) ? cursor.nextOffset : 0;
+  const pickIndex = ((offset % pool.length) + pool.length) % pool.length;
+  const picked = pool[pickIndex].id;
+
+  await cursor.update(
+    {
+      nextOffset: offset + 1,
+      lastVariantId: picked
+    },
+    { transaction }
+  );
+
+  return picked;
 }
 
 /**
@@ -222,7 +273,7 @@ export async function assembleEquivalentExamVariants(userId, params) {
   const {
     referenceAssessmentId,
     courseId,
-    examLabels = ['Exam A', 'Exam B', 'Exam C'],
+    examLabels = ['Variant exam'],
     namePrefix = null,
     includeDrafts = false,
     semesterOverride = null,
@@ -313,7 +364,8 @@ export async function assembleEquivalentExamVariants(userId, params) {
           courseId,
           excludeIds: [...excludeIds],
           avoidVariantId: referenceVariantId,
-          includeDrafts
+          includeDrafts,
+          transaction: t
         });
 
         if (picked == null) {
@@ -421,7 +473,7 @@ export async function assembleExamVariantsByMetadataSimilarity(userId, params) {
   const {
     referenceAssessmentId,
     courseId,
-    examLabels = ['Exam A', 'Exam B', 'Exam C'],
+    examLabels = ['Variant exam'],
     namePrefix = null,
     includeDrafts = true,
     semesterOverride = null,
@@ -515,12 +567,13 @@ export async function assembleExamVariantsByMetadataSimilarity(userId, params) {
           courseId,
           excludeIds: [...excludeIds],
           avoidVariantId: slotVariant.id,
-          includeDrafts
+          includeDrafts,
+          transaction: t
         });
 
         if (picked == null) {
           throw new Error(
-            `No variant available for matched bank question ${match.questionMetadataId} at slot ${i + 1} (need ≥3 non-draft variants per concept for three exams, or enable drafts).`
+            `No variant available for matched bank question ${match.questionMetadataId} at slot ${i + 1} (add more non-draft variants in the bank for that question, or enable drafts).`
           );
         }
 

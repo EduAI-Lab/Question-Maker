@@ -13,6 +13,8 @@ import { AssessmentSections } from './AssessmentSections.js';
 import { SectionVariants } from './SectionVariants.js';
 import { CanvasIntegration } from './CanvasIntegration.js';
 import { CanvasCourseMapping } from './CanvasCourseMapping.js';
+import { BugReport } from './BugReport.js';
+import { VariantSelectionCursor } from './VariantSelectionCursor.js';
 
 // Define associations
 
@@ -65,6 +67,18 @@ CanvasCourseMapping.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 Course.hasOne(CanvasCourseMapping, { foreignKey: 'localCourseId', as: 'canvasMapping' });
 CanvasCourseMapping.belongsTo(Course, { foreignKey: 'localCourseId', as: 'localCourse' });
 
+User.hasMany(BugReport, { foreignKey: 'userId', as: 'bugReports' });
+BugReport.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+Course.hasMany(VariantSelectionCursor, { foreignKey: 'courseId', as: 'variantSelectionCursors' });
+VariantSelectionCursor.belongsTo(Course, { foreignKey: 'courseId', as: 'course' });
+
+Question_Metadata.hasMany(VariantSelectionCursor, { foreignKey: 'questionMetadataId', as: 'selectionCursors' });
+VariantSelectionCursor.belongsTo(Question_Metadata, { foreignKey: 'questionMetadataId', as: 'questionMetadata' });
+
+Variants.hasMany(VariantSelectionCursor, { foreignKey: 'lastVariantId', as: 'selectionCursorLastPicked' });
+VariantSelectionCursor.belongsTo(Variants, { foreignKey: 'lastVariantId', as: 'lastVariant' });
+
 export {
   sequelize,
   User,
@@ -76,5 +90,7 @@ export {
   AssessmentSections,
   SectionVariants,
   CanvasIntegration,
-  CanvasCourseMapping
+  CanvasCourseMapping,
+  BugReport,
+  VariantSelectionCursor
 };

@@ -1,6 +1,6 @@
 /**
  * Assessment variant workflow: (1) baseline reference exam → (2) generate variants from those questions →
- * (3) assemble parallel exams matching baseline structure → (4) AI review.
+ * (3) assemble one variant exam matching baseline structure → (4) AI review.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -23,7 +23,7 @@ import { useToast } from '../components/ui/use-toast';
 import { useCourses } from '../hooks/useCourses';
 import { courseService } from '../services/courseService';
 import assessmentService from '../services/assessmentService';
-import studyService, { type BaselineVariantReadiness } from '../services/studyService';
+import assessmentVariantService, { type BaselineVariantReadiness } from '../services/assessmentVariantService';
 import { eduaiService, type EduAIModelOption } from '../services/eduaiService';
 import { QuestionUploadDialog } from '../components/question-bank/QuestionUploadDialog';
 import { CanvasImportDialog } from '../components/canvas/CanvasImportDialog';
@@ -34,7 +34,7 @@ import { buildAiReviewDocxBlob } from '../utils/aiReviewExportDocx';
 /** Hover text for the Variants column — counts are reviewed-only (drafts excluded). */
 const REVIEWED_VARIANTS_TOOLTIP =
   'Number of reviewed variants for this question in the bank. Draft variants are not included.';
-const AI_REVIEW_HISTORY_KEY = 'study.aiReview.history.v1';
+const AI_REVIEW_HISTORY_KEY = 'assessmentVariant.aiReview.history.v1';
 const AI_REVIEW_HISTORY_MAX_ITEMS = 40;
 
 const DEFAULT_AI_JUDGE_RUBRIC = `Conceptual equivalence (1-5)
@@ -95,7 +95,7 @@ function formatUsabilityLabel(value: string): string {
   return value.replaceAll('_', ' ');
 }
 
-type AiReviewResult = Awaited<ReturnType<typeof studyService.reviewVariantWithAi>>;
+type AiReviewResult = Awaited<ReturnType<typeof assessmentVariantService.reviewVariantWithAi>>;
 
 interface AiReviewHistoryItem {
   id: string;
@@ -327,7 +327,7 @@ export function AssessmentVariantPage() {
     }
     setVariantReadinessLoading(true);
     try {
-      const data = await studyService.getBaselineVariantReadiness(refId, cid);
+      const data = await assessmentVariantService.getBaselineVariantReadiness(refId, cid);
       setVariantReadiness(data);
     } catch (e) {
       console.warn('Variant readiness check failed', e);
@@ -391,7 +391,7 @@ export function AssessmentVariantPage() {
       return;
     }
     try {
-      await studyService.setStudyRole(id, 'reference_baseline');
+      await assessmentVariantService.setStudyRole(id, 'reference_baseline');
       await loadAssessments(selectedCourse!.id);
       toast({ title: 'Marked as reference baseline' });
     } catch (e: unknown) {
@@ -443,7 +443,7 @@ export function AssessmentVariantPage() {
         return;
       }
 
-      const result = await studyService.generateBankVariants({
+      const result = await assessmentVariantService.generateBankVariants({
         courseId: selectedCourse.id,
         questionIds,
         model: variantModel,
@@ -507,17 +507,21 @@ export function AssessmentVariantPage() {
     }
     setAssembling(true);
     try {
-      const result = await studyService.assembleEquivalentExams({
+      const result = await assessmentVariantService.assembleEquivalentExams({
         referenceAssessmentId: refId,
         courseId: selectedCourse.id,
-        examLabels: ['Exam A', 'Exam B', 'Exam C'],
+        examLabels: ['Variant exam'],
         namePrefix: baselineAssessment?.name ?? 'Variant exam',
         includeDrafts: true
       });
       setLastAssembled(result.createdAssessments.map((a) => ({ id: a.id, name: a.name })));
+      const firstId = result.createdAssessments[0]?.id;
+      if (firstId != null) {
+        setAiReviewVariantId(String(firstId));
+      }
       toast({
-        title: 'Parallel exams assembled',
-        description: `${result.examCount} exams in ${result.assemblyTimeMs} ms — same structure as baseline (different variants per slot).`
+        title: 'Variant exam assembled',
+        description: `${result.examCount} exam(s) in ${result.assemblyTimeMs} ms — same structure as baseline (different variants per slot when available).`
       });
       if (result.warnings?.length) {
         console.warn('Assembly warnings', result.warnings);
@@ -527,7 +531,7 @@ export function AssessmentVariantPage() {
       toast({
         variant: 'destructive',
         title: 'Assembly failed',
-        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Need enough distinct variants per baseline slot (≥3 reviewed variants per base for three exams).',
+        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Need enough distinct variants per baseline slot (at least one alternate per question, reviewed non-drafts unless drafts are allowed).',
         duration: Number.POSITIVE_INFINITY
       });
     } finally {
@@ -550,7 +554,7 @@ export function AssessmentVariantPage() {
 
     setAiReviewLoading(true);
     try {
-      const result = await studyService.reviewVariantWithAi({
+      const result = await assessmentVariantService.reviewVariantWithAi({
         baselineAssessmentId: baselineId,
         variantAssessmentId: variantId,
         courseId: cid,
@@ -732,7 +736,7 @@ export function AssessmentVariantPage() {
         <p className="text-sm text-muted-foreground">
           <strong className="font-medium text-foreground">Order:</strong> set the baseline reference exam, ensure each base
           question has enough variants (or generate one AI variant per question that still needs an alternate),
-          then assemble a parallel exam.
+          then assemble a single variant exam that mirrors the baseline structure.
         </p>
 
         <section className="space-y-4">
@@ -987,13 +991,13 @@ export function AssessmentVariantPage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">3 · Assemble parallel exams</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">3 · Assemble variant exam</h2>
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Match baseline structure</CardTitle>
               <CardDescription>
-                Builds Exam A, B, and C with the same ordering and the same base question per slot as the baseline, using
-                different variants so wording does not repeat across versions when possible.
+                Builds one assessment with the same ordering and the same base question per slot as the baseline, picking
+                alternate variants so wording differs from the reference when possible.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1008,7 +1012,7 @@ export function AssessmentVariantPage() {
                     Assembling…
                   </>
                 ) : (
-                  'Assemble Exam A, B & C'
+                  'Assemble variant exam'
                 )}
               </Button>
               {lastAssembled.length > 0 && (

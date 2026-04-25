@@ -1,17 +1,17 @@
 # Question Maker — Developer Guide
 
-Concise technical guide for new contributors. Pairs with the HelpPage.tsx user guide but focuses on how flows are implemented and where to find code.
+Concise technical guide for contributors. This mirrors current app behavior and complements the end-user guide in `app/frontend/src/pages/HelpPage.tsx`.
 
 ## System Architecture (high level)
 
 ```mermaid
 flowchart LR
-    User["User Browser<br/>React/Vite"] -->|HTTPS| Apache["Apache Proxy<br/>routes /api → backend,<br/>/* → frontend"]
+    User["User Browser<br/>React/Vite"] -->|HTTPS| Apache["Apache Proxy<br/>routes /api -> backend,<br/>/* -> frontend"]
     Apache -->|HTTP| Frontend["Nginx + React build"]
     Apache -->|HTTP /api| Backend["Node/Express API"]
     Backend -->|TCP 5432| Postgres["PostgreSQL<br/>Question/Assessment data"]
-    Backend -->|HTTPS| EduAI["EduAI API<br/>question gen/extract"]
-    Backend -->|HTTPS| Canvas["Canvas LMS API<br/>quiz export"]
+    Backend -->|HTTPS| EduAI["EduAI API<br/>generation/extraction/models"]
+    Backend -->|HTTPS| Canvas["Canvas LMS API<br/>import/export"]
 
     classDef ext fill:#eef5ff,stroke:#3b82f6,stroke-width:1px,color:#0b1f33;
     classDef svc fill:#f5f5f5,stroke:#4b5563,stroke-width:1px,color:#111827;
@@ -19,93 +19,145 @@ flowchart LR
     class User ext; class Apache,Frontend,Backend svc; class Postgres db; class EduAI,Canvas ext;
 ```
 
-## Backend (app/backend)
+## Backend (`app/backend`)
 
 - Models & associations:
-  - Core tables: `User`, `Course`, `Topics`, `Question_Metadata` (question shell), `Variants` (question text/answers), `Assessments`, `AssessmentSections`, `SectionVariants`, `CanvasIntegration` (encrypted API key), `CanvasCourseMapping`.
-- Middleware: `middleware/auth.js` (JWT guard), `middleware/errorHandler.js` (404 + error responses).
-- Services (business logic):
-  - Auth: `services/authService.js` (register/login/JWT, bcrypt).
-  - Questions & variants: `services/questionService.js` (CRUD, validation, per-user scoping via course, secondary topic normalization, bulk create, extraction save flow, order per assessment).
-  - Assessments & sections: `services/assessmentService.js`, `services/assessmentSectionService.js` (blueprints, sections, variant links, order updates, removal helpers).
-  - AI: `services/aiService.js` (legacy Groq/OpenAI/DeepSeek, text extraction via EduAI), `services/eduaiService.js` (EduAI client, question generation/chat).
-  - Canvas: `services/canvasService.js` (integration storage, mock mode, quiz/question export, MCQ parsing).
-  - Encryption: `utils/encryption.js` (AES-256-GCM for Canvas API keys).
-- Routes (Express):
+  - Core tables: `User`, `Course`, `Topics`, `Question_Metadata`, `Variants`, `Assessments`, `AssessmentSections`, `SectionVariants`, `CanvasIntegration`, `CanvasCourseMapping`, `BugReport`.
+- Middleware:
+  - `middleware/auth.js` (JWT guard), `middleware/errorHandler.js` (404 + error responses).
+- Services:
+  - Auth: `services/authService.js` (register/login/JWT, bcrypt, `isBugReportAdmin` flag projection).
+  - Questions/variants: `services/questionService.js` (CRUD, topic normalization, extraction save flow, ordering).
+  - Assessments/sections: `services/assessmentService.js`, `services/assessmentSectionService.js`.
+  - AI: `services/aiService.js` (extraction wrapper), `services/eduaiService.js` (models/generation/chat proxy).
+  - Canvas: `services/canvasService.js` (integration storage, quiz import/export).
+  - Assessment variant workflow: `services/assessmentVariantService.js`.
+  - Bug reports: `services/bugReportService.js` (create/list/status update + admin email checks).
+  - Encryption: `utils/encryption.js` (AES-256-GCM for Canvas credentials).
+- Routes:
   - `/api/auth` (`routes/auth.js`)
-  - `/api/course` (`routes/course.js`) – courses/topics
-  - `/api/questions` (`routes/questions.js`) – metadata + variants + AI generate/extract + approve/save + order
-  - `/api/questions/*` (`routes/variants.js`) – variant CRUD by question
-  - `/api/assessments` (`routes/assessments.js`) – assessments, sections, section variants, question presence checks
-  - `/api/eduai` (`routes/eduai.js`) – chat, generate, list courses/topics, models
-  - `/api/canvas` (`routes/canvas.js`) – connect, list courses, export, mappings
+  - `/api/course` (`routes/course.js`)
+  - `/api/questions` + `/api/questions/*` (`routes/questions.js`, `routes/variants.js`)
+  - `/api/assessments` (`routes/assessments.js`)
+  - `/api/eduai` (`routes/eduai.js`)
+  - `/api/canvas` (`routes/canvas.js`)
+  - `/api/assessment-variant` (`routes/assessmentVariant.js`)
+  - `/api/bug-reports` (`routes/bugReports.js`)
 
-## Frontend (app/frontend)
+## Frontend (`app/frontend`)
 
-- Entry: `src/main.tsx`, `src/App.tsx` (React Router: login, home, assessment view, help, optional API test).
-- Auth state: `contexts/AuthContext.tsx` (stores token/user, verifies `/api/auth/me`).
-- API client: `services/api.ts` (axios with token injector + 401 handling).
-- Domain services: `services/authService.ts`, `questionService.ts`, `assessmentService.ts`, `courseService.ts`, `eduaiService.ts`, `canvasService.ts`, `apiKeyStorage.ts` (local encryption of provider API keys).
-- Types: `src/types/*.ts` (questions/assessments/courses/topics/auth).
-- UI primitives: `components/ui/*` (shadcn/Tailwind).
-- Key screens/flows (see next section).
+- App wiring: `src/main.tsx`, `src/App.tsx`.
+  - Routes include `/login`, `/courses`, `/home`, `/assessments/:id/builder`, `/assessment-variant`, `/help`, `/admin/bug-reports`.
+- State/providers:
+  - `contexts/AuthContext.tsx`, `GuidedTourContext.tsx`, `BugReportContext.tsx`.
+- API client:
+  - `services/api.ts` (axios token injection + 401 handling).
+- Domain services:
+  - `services/authService.ts`, `questionService.ts`, `assessmentService.ts`, `courseService.ts`, `eduaiService.ts`, `canvasService.ts`, `assessmentVariantService.ts`, `bugReportApi.ts`.
+  - `services/apiKeyStorage.ts` stores provider API keys in browser local storage (encrypted at rest in the browser context).
+- Key screens:
+  - `pages/CourseSelectionPage.tsx`, `Homepage.tsx`, `AssessmentBuilderPage.tsx`, `AssessmentVariantPage.tsx`, `HelpPage.tsx`, `BugReportsAdminPage.tsx`.
 
-## Main Product Flows with Code Pointers
+## Main Product Flows (Code Pointers)
 
-### 1) Auth (Login/Register)
+### 1) Auth (Login/Register + role flags)
 - UI: `pages/LoginPage.tsx`.
-- Frontend service: `services/authService.ts`; context `AuthContext.tsx`.
-- Backend: `routes/auth.js` → `services/authService.js` (bcrypt + JWT).
+- Backend: `routes/auth.js` -> `services/authService.js`.
+- Notes:
+  - New users are seeded with starter data (`seedNewUserService.js`).
+  - Public auth payload includes `isBugReportAdmin` derived from email.
 
-### 2) Onboarding: Add Courses & Topics
-- UI: Profile dialog `components/profile/ProfileCoursesDialog.tsx`; course fetch hook `hooks/useCourses.ts`; course list in `components/navigation/TopNavigation.tsx`.
-- Backend: `/api/course` routes in `routes/course.js`; model `Course`, `Topics`.
-- EduAI import of courses/topics: frontend `eduaiService.listCourses()/listCourseTopics()`, backend proxy `routes/eduai.js` → `services/eduaiService.js`.
-
-### 3) Create Questions Manually
-- UI: `components/questions/AddQuestionDialog.tsx`; rendered from `pages/Homepage.tsx`.
-- Backend: POST `/api/questions` → `questionService.createQuestion`; variants created via `/api/questions/:id/variants` → `createVariant`.
-- Data: `Question_Metadata` + at least one `Variant`.
-
-### 4) Generate Questions with EduAI (per question)
-- UI: Right-hand panel in `AddQuestionDialog` uses `services/eduaiService.ts` to call `/api/eduai/generate-questions`.
-- Backend: `routes/eduai.js` → `services/eduaiService.js` (calls external EduAI API with course code/model/apiKeys). Local storage of provider keys encrypted via `apiKeyStorage.ts`.
-
-### 5) Create Variants (Manual or AI)
-- UI: `QuestionDetailView.tsx`, `QuestionCard` actions, `AddQuestionDialog` (variant tab).
-- Backend: POST `/api/questions/:id/variants` → `questionService.createVariant`; PUT/DELETE via `routes/variants.js`.
-- AI variant generation reuses EduAI generate flow (frontend constructs prompt; backend same endpoint).
-
-### 6) Upload Assessment PDF/Image → OCR → Extract → Auto-create
-- UI: `components/question-bank/QuestionUploadDialog.tsx`
-  - OCR: pdfjs + Tesseract in browser.
-  - Calls backend `/api/questions/extract` with text, courseId, model/apiKeys.
-  - Review list allows editing difficulty/type/topics, include/exclude.
-  - Save: POST `/api/questions/extract/save` (can also create Assessment + Section).
+### 2) Course selection + onboarding
+- UI:
+  - `pages/CourseSelectionPage.tsx` (entry after login).
+  - `components/profile/ProfileCoursesDialog.tsx` to link/import courses + topics.
 - Backend:
-  - `routes/questions.js` → `aiService.extractQuestionsFromText` (delegates to EduAI extraction) and `questionService.saveExtractedQuestions` (creates questions, variants, optional assessment+section, links section variants).
-  - Topic fallback/creation handled in `saveExtractedQuestions`.
+  - `routes/course.js` for local course/topic CRUD.
+  - `routes/eduai.js` for EduAI course/topic listing.
 
-### 7) Build Assessments (Blueprints, Sections, Matching)
-- UI: Assessments tab in `pages/Homepage.tsx`; detailed builder `pages/AssessmentViewPage.tsx` with panels `pages/assessments/*` and components `components/assessments/*` (GenerateAssessmentModal, SectionCard, CreateSectionPanel, MatchingQuestionsPanel).
+### 3) Guided tour
+- UI:
+  - Triggered from top nav and help page.
+  - `contexts/GuidedTourContext.tsx` + `tour/tourSteps.ts`.
+- Behavior:
+  - Can auto-start for newly registered users.
+  - Can navigate between `/courses` and `/home` as part of tour step actions.
+
+### 4) Questions and variants (manual + AI)
+- UI:
+  - `components/questions/AddQuestionDialog.tsx`
+  - `components/question-detail/QuestionDetailView.tsx`
 - Backend:
-  - Assessments CRUD: `routes/assessments.js` → `assessmentService`.
-  - Sections & variant links: `routes/assessments.js` → `assessmentSectionService` (create/update/delete sections, add/remove variants, order).
-  - Question presence/draft checks: `checkQuestionInAssessments`, `removeQuestionFromAllSections`.
-- Data: `Assessments`, `AssessmentSections`, `SectionVariants`, variant `assessmentId`, question `questionOrder` map for ordering inside assessments.
+  - `routes/questions.js` + `routes/variants.js` -> `services/questionService.js`
+  - AI generation via `routes/eduai.js` -> `services/eduaiService.js`.
 
-### 8) Export to Canvas
-- UI: `components/canvas/CanvasExportDialog.tsx` (invoked from Assessments list/page). Blocks export if any draft variants.
-- Backend: POST `/api/canvas/export/:assessmentId` → `canvasService.exportAssessmentToCanvas`:
-  - Loads assessment + sections/variants (`assessmentService.getAssessmentById`).
-  - Creates Canvas quiz, then posts questions (MCQ parsing in `convertVariantToCanvasQuestion`).
-  - Stores mapping in `CanvasCourseMapping`; uses `CanvasIntegration` (API key encrypted).
-  - Test mode uses mock data.
+### 5) Upload file -> OCR -> extract questions
+- UI:
+  - `components/question-bank/QuestionUploadDialog.tsx` uses pdf.js + Tesseract client-side OCR.
+  - Homepage supports background extraction (toast + later review).
+- Backend:
+  - POST `/api/questions/extract` (extract)
+  - POST `/api/questions/extract/save` (persist to question bank, optionally assessment/section).
 
-### 9) Export to TXT
-- UI: `Homepage.tsx` and `AssessmentViewPage.tsx` contain TXT export logic (client-side blob download) with draft gating.
-- Backend: Not required (performed client-side using loaded assessment data).
+### 6) Build assessments
+- UI:
+  - `Homepage.tsx` assessments tab + `AssessmentBuilderPage.tsx`.
+  - Section workflows in `components/assessments/*`.
+- Backend:
+  - `routes/assessments.js` -> `assessmentService.js`, `assessmentSectionService.js`.
+
+### 7) Canvas integration (import + export)
+- UI:
+  - Export: `components/canvas/CanvasExportDialog.tsx`
+  - Import: `components/canvas/CanvasImportDialog.tsx`
+- Backend:
+  - `routes/canvas.js` -> `canvasService.js`
+- Notes:
+  - Export and document generation paths are guarded against draft variants.
+  - Import supports skipped-question reporting for unsupported Canvas types.
+
+### 8) Document export (TXT + Word)
+- UI:
+  - `Homepage.tsx` export handlers use `utils/assessmentExport.ts`.
+  - TXT and DOCX are generated client-side and downloaded.
+- Backend:
+  - Not required for file generation.
+
+### 9) Assessment variant workflow (parallel exams + AI judge)
+- UI:
+  - `pages/AssessmentVariantPage.tsx` (full workflow)
+  - `components/assessmentVariant/AssessmentVariantWorkflowPanel.tsx` (builder side panel)
+- Backend:
+  - `routes/assessmentVariant.js` -> `assessmentVariantService.js`.
+- Capabilities:
+  - Mark baseline reference exam.
+  - Generate bank variants for all/missing slots.
+  - Assemble Exam A/B/C with matched structure.
+  - Run AI review and export AI review artifacts.
+
+### 10) Bug reporting and admin triage
+- UI:
+  - Floating report button and modal from `contexts/BugReportContext.tsx` + `components/bug-report/BugReportDialog.tsx`.
+  - Admin review page `pages/BugReportsAdminPage.tsx`.
+- Backend:
+  - `routes/bugReports.js` -> `services/bugReportService.js`.
+- Notes:
+  - Captures recent console/fetch diagnostics and screenshot in browser (`hooks/useBugReportCapture.ts`).
+  - Admin access is email-based (`DEFAULT_BUG_REPORT_ADMIN_EMAIL` plus `BUG_REPORT_ADMIN_EMAILS` env list).
+
+## Environment / Config notes
+
+- Core backend config is centralized in `src/config/settings.js`.
+- Important env variables for current features:
+  - `EDUAI_API_URL`, `EDUAI_API_KEY`, `EDUAI_IGNORED_COURSE_CODES`
+  - `ENCRYPTION_KEY` (required in production; used for Canvas secret encryption)
+  - `BUG_REPORT_ADMIN_EMAILS` (comma-separated additional admin emails)
 
 ## Integrations
-- **EduAI**: External RAG/chat service. Backend client in `services/eduaiService.js`; endpoints proxy with API key from `.env`. Frontend model picker and provider key handling through `eduaiService.ts` + `apiKeyStorage.ts`.
-- **Canvas**: Backend `canvasService.js` handles REST calls or mock mode; API key encrypted at rest; front-end dialog to connect/export.
+
+- **EduAI**:
+  - Backend proxy client in `services/eduaiService.js`.
+  - Frontend model and key UX in `services/eduaiService.ts` + `services/apiKeyStorage.ts`.
+- **Canvas LMS**:
+  - Import/export via `services/canvasService.js`.
+  - Integration credential storage encrypted server-side.

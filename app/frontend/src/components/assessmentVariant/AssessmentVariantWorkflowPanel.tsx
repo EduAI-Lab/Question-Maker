@@ -1,5 +1,5 @@
 /**
- * Assessment variant workflow: mark reference exam, blueprint snapshot, assemble variant exams, run metrics.
+ * Assessment variant workflow: mark reference exam, blueprint snapshot, assemble one variant exam.
  */
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { useToast } from '../ui/use-toast';
-import studyService, { type BlueprintSnapshot } from '../../services/studyService';
+import assessmentVariantService, { type BlueprintSnapshot } from '../../services/assessmentVariantService';
 
 type BlueprintConfig = { studyRole?: string; referenceAssessmentId?: number } | null | undefined;
 
@@ -32,15 +32,13 @@ export const AssessmentVariantWorkflowPanel = ({
   const [snapshot, setSnapshot] = React.useState<BlueprintSnapshot | null>(null);
   const [loadingSnapshot, setLoadingSnapshot] = React.useState(false);
   const [assembling, setAssembling] = React.useState(false);
-  const [metricsLoading, setMetricsLoading] = React.useState(false);
   const [lastAssembledIds, setLastAssembledIds] = React.useState<number[]>([]);
-  const [metricsSummary, setMetricsSummary] = React.useState<string | null>(null);
 
   const studyRole = blueprintConfig?.studyRole ?? null;
 
   const handleMarkReference = async () => {
     try {
-      await studyService.setStudyRole(assessmentId, 'reference_baseline');
+      await assessmentVariantService.setStudyRole(assessmentId, 'reference_baseline');
       await onAssessmentRefresh();
       toast({
         title: 'Reference baseline updated',
@@ -57,7 +55,7 @@ export const AssessmentVariantWorkflowPanel = ({
 
   const handleClearRole = async () => {
     try {
-      await studyService.setStudyRole(assessmentId, null);
+      await assessmentVariantService.setStudyRole(assessmentId, null);
       await onAssessmentRefresh();
       toast({ title: 'Workflow role cleared' });
     } catch (e: unknown) {
@@ -72,7 +70,7 @@ export const AssessmentVariantWorkflowPanel = ({
   const handleLoadSnapshot = async () => {
     try {
       setLoadingSnapshot(true);
-      const data = await studyService.getBlueprintSnapshot(assessmentId);
+      const data = await assessmentVariantService.getBlueprintSnapshot(assessmentId);
       setSnapshot(data);
     } catch (e: unknown) {
       toast({
@@ -88,19 +86,18 @@ export const AssessmentVariantWorkflowPanel = ({
   const handleAssemble = async () => {
     try {
       setAssembling(true);
-      setMetricsSummary(null);
-      const result = await studyService.assembleEquivalentExams({
+      const result = await assessmentVariantService.assembleEquivalentExams({
         referenceAssessmentId: assessmentId,
         courseId,
         namePrefix: assessmentName,
-        examLabels: ['Exam A', 'Exam B', 'Exam C'],
+        examLabels: ['Variant exam'],
         includeDrafts: false
       });
       const ids = result.createdAssessments.map((a) => a.id);
       setLastAssembledIds(ids);
       toast({
-        title: 'Variant exams created',
-        description: `${result.examCount} exams in ${result.assemblyTimeMs} ms. ${result.warnings.length ? `${result.warnings.length} warning(s) — see panel.` : ''}`
+        title: 'Variant exam created',
+        description: `${result.examCount} exam(s) in ${result.assemblyTimeMs} ms. ${result.warnings.length ? `${result.warnings.length} warning(s) — see panel.` : ''}`
       });
       if (result.warnings.length > 0) {
         console.warn('Assessment variant workflow assembly warnings', result.warnings);
@@ -113,36 +110,6 @@ export const AssessmentVariantWorkflowPanel = ({
       });
     } finally {
       setAssembling(false);
-    }
-  };
-
-  const handleMetrics = async () => {
-    const ids = [assessmentId, ...lastAssembledIds].filter((id, i, arr) => arr.indexOf(id) === i);
-    if (ids.length < 2) {
-      toast({
-        title: 'Need more exams',
-        description: 'Assemble variant exams first, or add other assessment IDs via the workflow metrics API.',
-        variant: 'destructive'
-      });
-      return;
-    }
-    try {
-      setMetricsLoading(true);
-      const data = await studyService.computeMetrics(ids, assessmentId);
-      const w = data.workflow;
-      setMetricsSummary(
-        `Pairwise metrics computed. Cross-exam variant reuse: ${w.variantsAppearingInMultipleExams} (IDs: ${w.reusedVariantIds.join(', ') || 'none'}). ` +
-          `AI variant placements: ${w.aiGeneratedVariantPlacements} / ${w.totalQuestionPlacements}.`
-      );
-      toast({ title: 'Metrics ready', description: 'Summary shown below; full JSON in devtools network response.' });
-    } catch (e: unknown) {
-      toast({
-        title: 'Metrics failed',
-        description: (e as { response?: { data?: { error?: string } } })?.response?.data?.error ?? 'Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setMetricsLoading(false);
     }
   };
 
@@ -160,7 +127,7 @@ export const AssessmentVariantWorkflowPanel = ({
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Mark an imported exam as ground truth, assemble three parallel exams from the bank, then compare structural similarity.
+          Mark an imported exam as ground truth, then assemble one variant exam from the question bank.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -201,7 +168,7 @@ export const AssessmentVariantWorkflowPanel = ({
                 Assembling…
               </>
             ) : (
-              'Assemble Exam A, B & C'
+              'Assemble variant exam'
             )}
           </Button>
           {lastAssembledIds.length > 0 && (
@@ -220,20 +187,6 @@ export const AssessmentVariantWorkflowPanel = ({
             </div>
           )}
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={handleMetrics} disabled={metricsLoading}>
-            {metricsLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Computing…
-              </>
-            ) : (
-              'Compare metrics (reference + last assembled)'
-            )}
-          </Button>
-        </div>
-        {metricsSummary && <p className="text-sm text-gray-700">{metricsSummary}</p>}
       </CardContent>
     </Card>
   );
