@@ -347,7 +347,7 @@ export const HelpPage = () => {
                         <li>Select a course and baseline assessment.</li>
                         <li>Mark the baseline as reference.</li>
                         <li>Check variant readiness per baseline slot and generate missing variants with AI when needed.</li>
-                        <li>Assemble parallel exams (Exam A/B/C) with matched structure and different variants.</li>
+                        <li>Assemble a variant exam with matched structure and different variants from the bank.</li>
                         <li>Run AI review (baseline vs variant exam), then export review results (Word or JSON).</li>
                     </ol>
                 </section>

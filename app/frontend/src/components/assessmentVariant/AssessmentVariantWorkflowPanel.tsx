@@ -1,5 +1,5 @@
 /**
- * Assessment variant workflow: mark reference exam, blueprint snapshot, assemble variant exams.
+ * Assessment variant workflow: mark reference exam, blueprint snapshot, assemble one variant exam.
  */
 import * as React from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -90,14 +90,14 @@ export const AssessmentVariantWorkflowPanel = ({
         referenceAssessmentId: assessmentId,
         courseId,
         namePrefix: assessmentName,
-        examLabels: ['Exam A', 'Exam B', 'Exam C'],
+        examLabels: ['Variant exam'],
         includeDrafts: false
       });
       const ids = result.createdAssessments.map((a) => a.id);
       setLastAssembledIds(ids);
       toast({
-        title: 'Variant exams created',
-        description: `${result.examCount} exams in ${result.assemblyTimeMs} ms. ${result.warnings.length ? `${result.warnings.length} warning(s) — see panel.` : ''}`
+        title: 'Variant exam created',
+        description: `${result.examCount} exam(s) in ${result.assemblyTimeMs} ms. ${result.warnings.length ? `${result.warnings.length} warning(s) — see panel.` : ''}`
       });
       if (result.warnings.length > 0) {
         console.warn('Assessment variant workflow assembly warnings', result.warnings);
@@ -127,7 +127,7 @@ export const AssessmentVariantWorkflowPanel = ({
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          Mark an imported exam as ground truth, then assemble three parallel exams from the question bank.
+          Mark an imported exam as ground truth, then assemble one variant exam from the question bank.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -168,7 +168,7 @@ export const AssessmentVariantWorkflowPanel = ({
                 Assembling…
               </>
             ) : (
-              'Assemble Exam A, B & C'
+              'Assemble variant exam'
             )}
           </Button>
           {lastAssembledIds.length > 0 && (
