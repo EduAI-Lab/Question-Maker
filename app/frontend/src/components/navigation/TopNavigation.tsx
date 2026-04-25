@@ -7,11 +7,15 @@ import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 import { Course } from '../../types/question';
-import { User, HelpCircle, ArrowLeft } from 'lucide-react';
+import { useContext } from 'react';
+import { User, HelpCircle, ArrowLeft, BugOff } from 'lucide-react';
 import { EduAIStatusBadge } from '../eduai/EduAIStatusBadge';
 import { useEduAIStatus } from '../../hooks/useEduAIStatus';
 import { useGuidedTour } from '../../contexts/GuidedTourContext';
 import { Tooltip } from '../ui/tooltip';
+import { Link } from 'react-router-dom';
+import { BugReportContext } from '../../contexts/BugReportContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 type TopNavigationProps = (
   | {
@@ -55,6 +59,9 @@ export const TopNavigation = (props: TopNavigationProps) => {
         : undefined;
   const eduaiStatus = useEduAIStatus();
   const { startTour } = useGuidedTour();
+  const bugReportCtx = useContext(BugReportContext);
+  const { user } = useAuth();
+  const showBugReportsAdminLink = Boolean(user?.isBugReportAdmin);
 
   const handleGuidedTourClick = () => {
     if (typeof customGuidedTourHandler === 'function') {
@@ -142,6 +149,16 @@ export const TopNavigation = (props: TopNavigationProps) => {
                         />
                     </div>
                     <div className="relative">
+                    {showBugReportsAdminLink && (
+                      <Tooltip content="Review submitted bug reports" side="bottom">
+                        <Link
+                          to="/admin/bug-reports"
+                          className="inline-flex items-center justify-center rounded-md px-3 h-8 text-sm font-medium text-blue-700 hover:bg-accent hover:text-accent-foreground transition-colors mr-1"
+                        >
+                          Bug reports
+                        </Link>
+                      </Tooltip>
+                    )}
                     <Tooltip content="Walk through the app with a guided tour" side="bottom">
                         <Button
                           variant="ghost"
@@ -158,6 +175,19 @@ export const TopNavigation = (props: TopNavigationProps) => {
                         </span>
                       )}
                     </div>
+                    {bugReportCtx && (
+                      <Tooltip content="Report a bug" side="bottom">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="rounded-full"
+                          onClick={() => bugReportCtx.openBugReport()}
+                          aria-label="Report a bug"
+                        >
+                          <BugOff className="h-5 w-5" />
+                        </Button>
+                      </Tooltip>
+                    )}
                     <Tooltip content="Open help and documentation" side="bottom">
                       <Button
                         variant="ghost"

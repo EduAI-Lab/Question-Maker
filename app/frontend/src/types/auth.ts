@@ -5,6 +5,8 @@ export interface User {
   id: number;
   email: string;
   createdAt: string;
+  /** True when the account is the built-in bug admin (admin@mail.com) or listed in BUG_REPORT_ADMIN_EMAILS. */
+  isBugReportAdmin?: boolean;
 }
 
 export interface AuthResponse {

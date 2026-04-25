@@ -71,7 +71,8 @@ const {
   SectionVariants,
   AssessmentSections,
   CanvasIntegration,
-  CanvasCourseMapping
+  CanvasCourseMapping,
+  BugReport
 } = schemaModule;
 
 /**
@@ -100,6 +101,7 @@ const populateDatabase = async () => {
     await CanvasCourseMapping.destroy({ where: {} });
     await CanvasIntegration.destroy({ where: {} });
     await Course.destroy({ where: {} });
+    await BugReport.destroy({ where: {} });
     await User.destroy({ where: {} });
     console.log('Existing data cleared.');
 
@@ -117,6 +119,10 @@ const populateDatabase = async () => {
       },
       {
         email: 'c@mail.com',
+        passwordHash: hashedPassword
+      },
+      {
+        email: 'admin@mail.com',
         passwordHash: hashedPassword
       }
     ]);

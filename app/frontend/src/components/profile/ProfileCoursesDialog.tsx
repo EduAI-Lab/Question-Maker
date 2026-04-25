@@ -48,7 +48,7 @@ export const ProfileCoursesDialog = ({
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
-    const { logout } = useAuth();
+    const { logout, user } = useAuth();
     const navigate = useNavigate();
     const eduaiStatus = useEduAIStatus();
     const { startTour } = useGuidedTour();
@@ -430,6 +430,22 @@ export const ProfileCoursesDialog = ({
                         </div>
                     )}
                 </div>
+
+                {user?.isBugReportAdmin && (
+                    <div className="border-t px-6 py-2">
+                        <Button
+                            type="button"
+                            variant="link"
+                            className="h-auto p-0 text-sm text-blue-700"
+                            onClick={() => {
+                                navigate('/admin/bug-reports');
+                                onClose();
+                            }}
+                        >
+                            Bug reports (admin)
+                        </Button>
+                    </div>
+                )}
 
                 <DialogFooter className="flex items-center justify-between">
                     <Button

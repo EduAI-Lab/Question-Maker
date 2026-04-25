@@ -14,6 +14,8 @@ import AssessmentBuilderPage from './pages/AssessmentBuilderPage';
 import { HelpPage } from './pages/HelpPage';
 import { AssessmentVariantPage } from './pages/AssessmentVariantPage';
 import { GuidedTourProvider } from './contexts/GuidedTourContext';
+import { BugReportProvider } from './contexts/BugReportContext';
+import { BugReportsAdminPage } from './pages/BugReportsAdminPage';
 
 function RedirectAssessmentToBuilder() {
   const { id } = useParams<{ id: string }>();
@@ -33,24 +35,27 @@ function App() {
       <AuthProvider>
         <GuidedTourProvider>
           <Router>
-            <div className="min-h-screen bg-background">
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/courses" element={<CourseSelectionPage />} />
-                <Route path="/home" element={<Homepage />} />
-                <Route path="/landing" element={<Navigate to="/home" replace />} />
-                {process.env.NODE_ENV === 'development' && (
-                  <Route path="/api-test" element={<ApiTestPage />} />
-                )}
-                <Route path="/assessments/:id" element={<RedirectAssessmentToBuilder />} />
-                <Route path="/assessments/:id/builder" element={<AssessmentBuilderPage />} />
-                <Route path="/help" element={<HelpPage />} />
-                <Route path="/assessment-variant" element={<AssessmentVariantPage />} />
-                <Route path="/study" element={<RedirectLegacyStudyRoute />} />
-                <Route path="/" element={<Navigate to="/login" replace />} />
-              </Routes>
-              <Toaster />
-            </div>
+            <BugReportProvider>
+              <div className="min-h-screen bg-background">
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/courses" element={<CourseSelectionPage />} />
+                  <Route path="/home" element={<Homepage />} />
+                  <Route path="/landing" element={<Navigate to="/home" replace />} />
+                  {process.env.NODE_ENV === 'development' && (
+                    <Route path="/api-test" element={<ApiTestPage />} />
+                  )}
+                  <Route path="/assessments/:id" element={<RedirectAssessmentToBuilder />} />
+                  <Route path="/assessments/:id/builder" element={<AssessmentBuilderPage />} />
+                  <Route path="/help" element={<HelpPage />} />
+                  <Route path="/assessment-variant" element={<AssessmentVariantPage />} />
+                  <Route path="/study" element={<RedirectLegacyStudyRoute />} />
+                  <Route path="/admin/bug-reports" element={<BugReportsAdminPage />} />
+                  <Route path="/" element={<Navigate to="/login" replace />} />
+                </Routes>
+                <Toaster />
+              </div>
+            </BugReportProvider>
           </Router>
         </GuidedTourProvider>
       </AuthProvider>

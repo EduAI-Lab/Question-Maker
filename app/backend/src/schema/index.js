@@ -13,6 +13,7 @@ import { AssessmentSections } from './AssessmentSections.js';
 import { SectionVariants } from './SectionVariants.js';
 import { CanvasIntegration } from './CanvasIntegration.js';
 import { CanvasCourseMapping } from './CanvasCourseMapping.js';
+import { BugReport } from './BugReport.js';
 
 // Define associations
 
@@ -65,6 +66,9 @@ CanvasCourseMapping.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 Course.hasOne(CanvasCourseMapping, { foreignKey: 'localCourseId', as: 'canvasMapping' });
 CanvasCourseMapping.belongsTo(Course, { foreignKey: 'localCourseId', as: 'localCourse' });
 
+User.hasMany(BugReport, { foreignKey: 'userId', as: 'bugReports' });
+BugReport.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
 export {
   sequelize,
   User,
@@ -76,5 +80,6 @@ export {
   AssessmentSections,
   SectionVariants,
   CanvasIntegration,
-  CanvasCourseMapping
+  CanvasCourseMapping,
+  BugReport
 };
