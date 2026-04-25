@@ -18,7 +18,6 @@ import { DeleteConfirmationModal } from '../components/ui/DeleteConfirmationModa
 import { Tooltip } from '../components/ui/tooltip';
 import { useToast } from '../components/ui/use-toast';
 import { QuestionDetailView } from '../components/question-detail/QuestionDetailView';
-import { AssessmentVariantWorkflowPanel } from '../components/assessmentVariant/AssessmentVariantWorkflowPanel';
 import { defaultReasoningData } from './assessments/assessmentViewTypes';
 import {
     assessmentBlocksToDocxBlob,
@@ -484,16 +483,6 @@ const AssessmentBuilderPage = () => {
                         </Button>
                         <div className="text-sm text-muted-foreground">Assessment Builder</div>
                     </div>
-
-                    {assessment.course?.id ? (
-                        <AssessmentVariantWorkflowPanel
-                            assessmentId={assessment.id}
-                            courseId={assessment.course.id}
-                            assessmentName={assessment.name}
-                            blueprintConfig={assessment.blueprintConfig}
-                            onAssessmentRefresh={refreshQuestionsAndAssessment}
-                        />
-                    ) : null}
 
                     <Card className="border border-gray-200">
                         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
