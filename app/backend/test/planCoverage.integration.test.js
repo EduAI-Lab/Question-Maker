@@ -40,6 +40,9 @@ describeDb('Plan coverage (integration)', () => {
     await truncateTestDatabase();
   });
 
+  const extractFirstSectionVariantId = (assessment) =>
+    assessment?.sections?.[0]?.sectionVariants?.[0]?.variant?.id ?? null;
+
   it('returns 404 when fetching another user course by id', async () => {
     const reg1 = await request(app)
       .post('/api/auth/register')
@@ -168,5 +171,243 @@ describeDb('Plan coverage (integration)', () => {
     expect(asm.body.success).toBe(true);
     expect(asm.body.data.createdAssessments.length).toBe(1);
     expect(asm.body.data.slotsProcessed).toBeGreaterThan(0);
+  });
+
+  it('rotates slot variant picks fairly across runs and avoids baseline when alternatives exist', async () => {
+    const reg = await request(app)
+      .post('/api/auth/register')
+      .send({ email: `asm-rr-${Date.now()}@local.test`, password: 'secret12' });
+    expect(reg.status).toBe(201);
+    const token = reg.body.data.token;
+
+    const courses = await request(app)
+      .get('/api/course')
+      .set('Authorization', `Bearer ${token}`);
+    const courseId = courses.body.data[0].id;
+
+    const topics = await request(app)
+      .get(`/api/course/${courseId}/topics`)
+      .set('Authorization', `Bearer ${token}`);
+    const topicId = topics.body.data[0].id;
+
+    const createQ = await request(app)
+      .post('/api/questions')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        description: 'Round-robin assembly metadata',
+        courseId,
+        primaryTopicId: topicId,
+        type: 'MCQ'
+      });
+    expect(createQ.status).toBe(201);
+    const questionId = createQ.body.data.id;
+
+    const createBaseline = await request(app)
+      .post('/api/assessments')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        type: 'Quiz',
+        name: 'RR Baseline',
+        semester: '2026W',
+        courseId
+      });
+    expect(createBaseline.status).toBe(201);
+    const baselineId = createBaseline.body.data.id;
+
+    const createSection = await request(app)
+      .post(`/api/assessments/${baselineId}/sections`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Exam', position: 0 });
+    expect(createSection.status).toBe(201);
+    const sectionId = createSection.body.data.id;
+
+    const createVariant = async (text) =>
+      request(app)
+        .post(`/api/questions/${questionId}/variants`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          questionText: text,
+          difficulty: 'easy',
+          reasoningLevel: 'factual',
+          answer: 'D',
+          choices: [
+            { letter: 'A', text: '1' },
+            { letter: 'B', text: '2' },
+            { letter: 'C', text: '3' },
+            { letter: 'D', text: '4' }
+          ],
+          isDraft: false
+        });
+
+    const baselineVariantRes = await createVariant('Baseline stem A)1 B)2 C)3 D)4');
+    const altOneRes = await createVariant('Alternate 1 A)1 B)2 C)3 D)4');
+    const altTwoRes = await createVariant('Alternate 2 A)1 B)2 C)3 D)4');
+    expect(baselineVariantRes.status).toBe(201);
+    expect(altOneRes.status).toBe(201);
+    expect(altTwoRes.status).toBe(201);
+
+    const baselineVariantId = baselineVariantRes.body.data.id;
+    const addToSection = await request(app)
+      .post(`/api/assessments/${baselineId}/sections/${sectionId}/variants`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ variantId: baselineVariantId, displayOrder: 0 });
+    expect(addToSection.status).toBe(201);
+
+    const assembleOnce = async (label) =>
+      request(app)
+        .post('/api/assessment-variant/assemble-variants')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          referenceAssessmentId: baselineId,
+          courseId,
+          examLabels: [label],
+          includeDrafts: false
+        });
+
+    const asm1 = await assembleOnce('RR-1');
+    const asm2 = await assembleOnce('RR-2');
+    const asm3 = await assembleOnce('RR-3');
+    expect(asm1.status).toBe(201);
+    expect(asm2.status).toBe(201);
+    expect(asm3.status).toBe(201);
+
+    const asm1Id = asm1.body.data.createdAssessments[0].id;
+    const asm2Id = asm2.body.data.createdAssessments[0].id;
+    const asm3Id = asm3.body.data.createdAssessments[0].id;
+
+    const detail1 = await request(app).get(`/api/assessments/${asm1Id}`).set('Authorization', `Bearer ${token}`);
+    const detail2 = await request(app).get(`/api/assessments/${asm2Id}`).set('Authorization', `Bearer ${token}`);
+    const detail3 = await request(app).get(`/api/assessments/${asm3Id}`).set('Authorization', `Bearer ${token}`);
+    expect(detail1.status).toBe(200);
+    expect(detail2.status).toBe(200);
+    expect(detail3.status).toBe(200);
+
+    const picked1 = extractFirstSectionVariantId(detail1.body.data);
+    const picked2 = extractFirstSectionVariantId(detail2.body.data);
+    const picked3 = extractFirstSectionVariantId(detail3.body.data);
+    expect(picked1).toBeTruthy();
+    expect(picked2).toBeTruthy();
+    expect(picked3).toBeTruthy();
+    expect(picked1).not.toBe(baselineVariantId);
+    expect(picked2).not.toBe(baselineVariantId);
+    expect(picked3).not.toBe(baselineVariantId);
+    expect(picked2).not.toBe(picked1);
+    expect(picked3).toBe(picked1);
+  });
+
+  it('advances cursor safely under concurrent assembly requests', async () => {
+    const reg = await request(app)
+      .post('/api/auth/register')
+      .send({ email: `asm-race-${Date.now()}@local.test`, password: 'secret12' });
+    expect(reg.status).toBe(201);
+    const token = reg.body.data.token;
+
+    const courses = await request(app)
+      .get('/api/course')
+      .set('Authorization', `Bearer ${token}`);
+    const courseId = courses.body.data[0].id;
+
+    const topics = await request(app)
+      .get(`/api/course/${courseId}/topics`)
+      .set('Authorization', `Bearer ${token}`);
+    const topicId = topics.body.data[0].id;
+
+    const createQ = await request(app)
+      .post('/api/questions')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        description: 'Concurrent assembly metadata',
+        courseId,
+        primaryTopicId: topicId,
+        type: 'MCQ'
+      });
+    expect(createQ.status).toBe(201);
+    const questionId = createQ.body.data.id;
+
+    const baseline = await request(app)
+      .post('/api/assessments')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        type: 'Quiz',
+        name: 'Concurrent Baseline',
+        semester: '2026W',
+        courseId
+      });
+    expect(baseline.status).toBe(201);
+    const baselineId = baseline.body.data.id;
+
+    const section = await request(app)
+      .post(`/api/assessments/${baselineId}/sections`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Exam', position: 0 });
+    expect(section.status).toBe(201);
+    const sectionId = section.body.data.id;
+
+    const makeVariant = async (text) =>
+      request(app)
+        .post(`/api/questions/${questionId}/variants`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          questionText: text,
+          difficulty: 'easy',
+          reasoningLevel: 'factual',
+          answer: 'D',
+          choices: [
+            { letter: 'A', text: '1' },
+            { letter: 'B', text: '2' },
+            { letter: 'C', text: '3' },
+            { letter: 'D', text: '4' }
+          ],
+          isDraft: false
+        });
+
+    const refRes = await makeVariant('Ref A)1 B)2 C)3 D)4');
+    const altOneRes = await makeVariant('Race Alt 1 A)1 B)2 C)3 D)4');
+    const altTwoRes = await makeVariant('Race Alt 2 A)1 B)2 C)3 D)4');
+    expect(refRes.status).toBe(201);
+    expect(altOneRes.status).toBe(201);
+    expect(altTwoRes.status).toBe(201);
+
+    const addRef = await request(app)
+      .post(`/api/assessments/${baselineId}/sections/${sectionId}/variants`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ variantId: refRes.body.data.id, displayOrder: 0 });
+    expect(addRef.status).toBe(201);
+
+    const payload = {
+      referenceAssessmentId: baselineId,
+      courseId,
+      includeDrafts: false
+    };
+
+    const [asmA, asmB] = await Promise.all([
+      request(app)
+        .post('/api/assessment-variant/assemble-variants')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ ...payload, examLabels: ['Concurrent-A'] }),
+      request(app)
+        .post('/api/assessment-variant/assemble-variants')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ ...payload, examLabels: ['Concurrent-B'] })
+    ]);
+    expect(asmA.status).toBe(201);
+    expect(asmB.status).toBe(201);
+
+    const aId = asmA.body.data.createdAssessments[0].id;
+    const bId = asmB.body.data.createdAssessments[0].id;
+    const [aDetail, bDetail] = await Promise.all([
+      request(app).get(`/api/assessments/${aId}`).set('Authorization', `Bearer ${token}`),
+      request(app).get(`/api/assessments/${bId}`).set('Authorization', `Bearer ${token}`)
+    ]);
+    expect(aDetail.status).toBe(200);
+    expect(bDetail.status).toBe(200);
+
+    const pickedA = extractFirstSectionVariantId(aDetail.body.data);
+    const pickedB = extractFirstSectionVariantId(bDetail.body.data);
+    expect(pickedA).toBeTruthy();
+    expect(pickedB).toBeTruthy();
+    expect(new Set([pickedA, pickedB]).size).toBe(2);
+    expect(pickedA).not.toBe(refRes.body.data.id);
+    expect(pickedB).not.toBe(refRes.body.data.id);
   });
 });
