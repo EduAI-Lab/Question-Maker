@@ -103,6 +103,7 @@ Add these secrets in GitHub repository settings:
 3. **`OPENAI_API_KEY`** - OpenAI API key for AI features
 
 4. **`EDUAI_API_KEY`** - EduAI API key for educational AI features
+   - EduAI renews this key about every month. Update the value in GitHub secrets, the server `.env`, and your local `.env` when it changes, or EduAI-powered features will stop. Longer-term notes: [Future work](../FUTURE_WORK.md).
 
 5. **`PERSONAL_ACCESS_TOKEN`** - GitHub Personal Access Token
    - For Git operations and API access
@@ -437,4 +438,5 @@ sudo cp /etc/httpd/conf.d/question-maker.conf question-maker.conf.backup
 ---
 
 **For detailed implementation history, see [DEPLOYMENT_IMPLEMENTATION.md](./DEPLOYMENT_IMPLEMENTATION.md)**  
-**For architecture details, see [ARCHITECTURE.md](./ARCHITECTURE.md)**
+**For architecture details, see [ARCHITECTURE.md](./ARCHITECTURE.md)**  
+**For planned improvements (plain language), see [Future work](../FUTURE_WORK.md)**
