@@ -1,45 +1,56 @@
-# EduQuery.ai - Question Maker
+# EduQuery.ai — Question Maker
 
-Full-stack platform for building course question banks and assessments with AI-assisted workflows.
+Full-stack app for building course question banks and assessments, with AI-assisted authoring, Canvas import/export, and assessment variant workflows.
 
-## Features
+## Tech stack
 
-- Secure auth with per-user data scoping.
-- Course and topic onboarding from EduAI.
-- Question and variant authoring (manual + AI-assisted).
-- OCR upload flow (PDF/image) to extract and review questions before save.
-- Assessment builder with section-level variant matching.
-- Canvas LMS integration:
-  - Export local assessments to Canvas.
-  - Import Canvas quizzes into local assessments.
-- Assessment variant workflow:
-  - Mark baseline exam.
-  - Generate missing variants.
-  - Assemble parallel exams (A/B/C).
-  - Run AI rubric review between baseline and variant exams.
-- Export assessments to TXT and Word (`.docx`).
-- Guided tour across core pages.
-- Built-in bug reporting with admin triage dashboard.
+| Layer    | Technology |
+| -------- | ---------- |
+| Frontend | React 19, TypeScript, Vite, React Router v7, Tailwind, Radix/shadcn-style UI |
+| Backend  | Node.js, Express (ESM), Sequelize, PostgreSQL |
+| Auth     | JWT + bcrypt |
+| Integrations | EduAI API, Canvas (per-user API keys from the app UI) |
+| Testing  | Jest (unit + integration), Vitest (frontend) |
 
-## Architecture
+## Prerequisites
 
-### Backend (`app/backend`)
+- **Node.js** 18+
+- **npm**
+- **Docker** + Docker Compose (recommended for Postgres + aligned URLs), or a local **PostgreSQL** instance
 
-- Node.js + Express (ESM JavaScript).
-- PostgreSQL + Sequelize.
-- JWT auth + bcrypt password hashing.
-- Security middleware: Helmet, CORS, compression, production rate limiting.
-- Service modules for auth, questions, assessments, EduAI, Canvas, assessment variants, and bug reports.
+## Getting started
 
-### Frontend (`app/frontend`)
+1. **Clone** the repository and open the project root.
 
-- React + TypeScript + Vite.
-- React Router v7.
-- Tailwind + Radix/shadcn-style UI primitives.
-- Context-driven app state for auth, guided tour, and bug reporting.
-- Axios API client with token injection and 401 handling.
+2. **Environment** — copy the example file and edit values:
 
-## Project Structure
+   ```bash
+   cp .env.example .env
+   ```
+
+   See [Environment variables](#environment-variables) below. Use a `DATABASE_URL` host of `postgres` when the API runs inside Docker Compose, and `localhost` when the API runs on your machine against a local Postgres.
+
+3. **Run with Docker Compose (dev)** — starts Postgres, backend, and frontend:
+
+   ```bash
+   npm run dev:up
+   ```
+
+   Other useful commands: `npm run dev:down`, `npm run dev:logs`, `npm run dev:build`.
+
+4. **Run locally (two terminals)** — if you prefer npm on the host with your own Postgres:
+
+   ```bash
+   # Terminal 1 — API (http://localhost:8000)
+   cd app/backend && npm install && npm run dev
+
+   # Terminal 2 — UI (http://localhost:5173)
+   cd app/frontend && npm install && npm run dev
+   ```
+
+   Point the UI at the API with `VITE_API_URL` in `.env` (default `http://localhost:8000`).
+
+## Project structure
 
 ```text
 question-maker/
@@ -67,157 +78,100 @@ question-maker/
 └── README.md
 ```
 
-## Quick Start
+## Features (overview)
 
-### Prerequisites
+- Auth with per-user data; courses/topics from EduAI; question and variant authoring (manual + AI); OCR upload; assessment builder; Canvas export/import; variant workflow (baseline, parallel exams, rubric review); TXT/Word export; guided tour; in-app bug reports with admin triage.
 
-- Node.js 18+
-- npm
-- PostgreSQL (for local non-Docker runs)
-- Docker + Docker Compose (optional but recommended)
+High-level **API** prefixes: `/api/auth`, `/api/course`, `/api/questions`, `/api/assessments`, `/api/eduai`, `/api/canvas`, `/api/assessment-variant`, `/api/bug-reports`.
 
-### Option 1: Docker Compose
+**UI routes** include `/login`, `/courses`, `/home`, `/assessments/:id/builder`, `/assessment-variant`, `/help`, `/admin/bug-reports` (admins).
 
-1. Clone and enter the repo.
-2. Copy `.env.example` to `.env` and fill required secrets.
-3. Start:
+## Environment variables
 
-```bash
-npm run dev:up
-```
+Copy [.env.example](.env.example) to `.env` at the **repository root**. Canvas API keys are **not** set here — users connect Canvas from the app.
 
-Useful commands:
+| Variable | Required | Description |
+| -------- | -------- | ----------- |
+| `NODE_ENV` | Yes | `development` or `production` |
+| `PORT` | No | API port (default `8000`) |
+| `DATABASE_URL` | Yes | PostgreSQL URL; host `postgres` in Compose, `localhost` for local API |
+| `JWT_SECRET` | Yes | Secret for signing JWTs |
+| `JWT_EXPIRES_IN` | No | Token lifetime (default `24h`) |
+| `BCRYPT_ROUNDS` | No | bcrypt cost (default `12`) |
+| `CORS_ORIGINS` | No | Comma-separated allowed origins |
+| `ENCRYPTION_KEY` | Yes in prod | 64-char hex; encrypts stored Canvas credentials |
+| `LOG_LEVEL` | No | e.g. `info`, `debug` |
+| `EDUAI_API_URL` | For EduAI | Base URL (default UBC EduAI) |
+| `EDUAI_API_KEY` | For EduAI | API key from EduAI |
+| `EDUAI_IGNORED_COURSE_CODES` | No | Comma-separated codes hidden in the course list |
+| `GROQ_API_KEY` | No | Direct LLM provider for question generation |
+| `OPENAI_API_KEY` | No | Same |
+| `DEEPSEEK_API_KEY` | No | Same |
+| `DEFAULT_NUM_QUESTIONS`, `MAX_QUESTIONS` | No | AI batch limits |
+| `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX` | No | Production rate limiting |
+| `BUG_REPORT_ADMIN_EMAILS` | No | Extra admin emails for bug triage (see [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)) |
+| `VITE_API_URL` | No | Browser → API URL (default `http://localhost:8000`) |
+| `TEST_DATABASE_URL` | Tests only | Integration test database URL |
 
-```bash
-npm run dev:down
-npm run dev:logs
-npm run dev:build
-```
+**Production Compose** may use `POSTGRES_PASSWORD_PRODUCTION` (see [docker-compose.yml](docker-compose.yml)). **Automated server deploys** may use `GITHUB_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`, or `PERSONAL_ACCESS_TOKEN` — see [docs/deployment/cron.md](docs/deployment/cron.md) and [docs/deployment/README.md](docs/deployment/README.md).
 
-### Option 2: Local Development
+## Scripts
 
-1. Create `.env` from `.env.example`.
-2. Start backend:
+### Root
 
-```bash
-cd app/backend
-npm install
-npm run dev
-```
+| Command | Description |
+| ------- | ----------- |
+| `npm run dev:up` | Docker Compose dev stack |
+| `npm run dev:down` | Stop dev stack |
+| `npm run dev:logs` | Follow Compose logs |
+| `npm run dev:build` | Dev stack with rebuild |
+| `npm run populate:backend` | Run backend populate script from root |
+| `npm run seed:production` | Seed production-style questions (see script) |
 
-3. Start frontend in another terminal:
+### Backend (`app/backend`)
 
-```bash
-cd app/frontend
-npm install
-npm run dev
-```
+| Command | Description |
+| ------- | ----------- |
+| `npm run dev` | API with nodemon |
+| `npm start` | Production start |
+| `npm test` | Unit tests |
+| `npm run test:integration` | Integration tests (needs DB) |
+| `npm run lint` | ESLint |
+| `npm run populate` | Populate DB helper |
+| `npm run seed:production` | Seed script |
 
-Default local endpoints:
+### Frontend (`app/frontend`)
 
-- Frontend: `http://localhost:5173`
-- Backend: `http://localhost:8000`
+| Command | Description |
+| ------- | ----------- |
+| `npm run dev` | Vite dev server |
+| `npm run build` | Production build |
+| `npm test` | Vitest |
+| `npm run lint` | Lint |
 
-## Environment Variables
+## Testing
 
-Use a single root `.env` file. See `.env.example` for full defaults.
+- Backend: `cd app/backend && npm test` and `npm run test:integration` (integration needs PostgreSQL; optional `TEST_DATABASE_URL`).
+- Frontend: `cd app/frontend && npm test`.
 
-Important variables for current features:
-
-- Core:
-  - `NODE_ENV`
-  - `PORT`
-  - `DATABASE_URL`
-  - `JWT_SECRET`
-  - `JWT_EXPIRES_IN`
-  - `CORS_ORIGINS`
-- AI / EduAI:
-  - `EDUAI_API_URL`
-  - `EDUAI_API_KEY`
-  - `EDUAI_IGNORED_COURSE_CODES` (optional list)
-- Security / encryption:
-  - `ENCRYPTION_KEY` (required in production)
-- Bug reports:
-  - Default admin dashboard user: `admin@mail.com` (see developer guide).
-  - `BUG_REPORT_ADMIN_EMAILS` (optional comma-separated **additional** admin emails)
-- Frontend build vars:
-  - `VITE_API_URL`
-  - `VITE_APP_NAME`
-  - `VITE_APP_VERSION`
-
-## API Surface (high level)
-
-- Auth: `/api/auth`
-- Courses/topics: `/api/course`
-- Questions/variants: `/api/questions`
-- Assessments/sections: `/api/assessments`
-- EduAI proxy: `/api/eduai`
-- Canvas integration: `/api/canvas`
-- Assessment variant workflow: `/api/assessment-variant`
-- Bug reports: `/api/bug-reports`
-
-## Frontend Routes (high level)
-
-- `/login`
-- `/courses`
-- `/home`
-- `/assessments/:id/builder`
-- `/assessment-variant`
-- `/help`
-- `/admin/bug-reports` (admin users only)
-
-## Development Commands
-
-### Backend
-
-```bash
-cd app/backend
-npm run dev
-npm test
-npm run test:integration
-npm run lint
-```
-
-### Frontend
-
-```bash
-cd app/frontend
-npm run dev
-npm run build
-npm test
-npm run lint
-```
-
-### Seed / Populate Helpers
-
-```bash
-npm run populate:backend
-cd app/backend && npm run seed:production
-```
+Details: [docs/TEST_PLAN.md](docs/TEST_PLAN.md).
 
 ## Documentation
 
 | Topic | Where |
 |--------|--------|
-| **Testing** (integration DB, commands) | [docs/TEST_PLAN.md](docs/TEST_PLAN.md) |
-| **Architecture and workflows** | [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) |
-| **Troubleshooting** | [docs/troubleshooting/](docs/troubleshooting/) — [MONITORING_SETUP.md](docs/troubleshooting/MONITORING_SETUP.md), [PRODUCTION.md](docs/troubleshooting/PRODUCTION.md) |
-| **Deployment and CI/CD** | [docs/deployment/README.md](docs/deployment/README.md) |
-| **Cron / scheduled pull on the server** | [docs/deployment/cron.md](docs/deployment/cron.md) |
+| Testing (integration DB, commands) | [docs/TEST_PLAN.md](docs/TEST_PLAN.md) |
+| Architecture and workflows | [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md) |
+| Troubleshooting | [docs/troubleshooting/](docs/troubleshooting/) — [MONITORING_SETUP.md](docs/troubleshooting/MONITORING_SETUP.md), [PRODUCTION.md](docs/troubleshooting/PRODUCTION.md) |
+| Deployment and CI/CD | [docs/deployment/README.md](docs/deployment/README.md) |
+| Cron / scheduled pull on the server | [docs/deployment/cron.md](docs/deployment/cron.md) |
+| CI/CD feature notes | [docs/features/CI-CD.md](docs/features/CI-CD.md) |
 
-**Note:** The **cron**-based job that auto-pulls and deploys on the server may be disabled, broken, or misconfigured. If you do not see new releases, troubleshoot using [docs/deployment/cron.md](docs/deployment/cron.md) and [docs/troubleshooting/PRODUCTION.md](docs/troubleshooting/PRODUCTION.md), or **deploy manually** (see [docs/deployment/README.md](docs/deployment/README.md), e.g. SSH, `git pull`, Docker).
+The cron-based server job may be disabled or misconfigured. If releases do not appear, see [docs/deployment/cron.md](docs/deployment/cron.md) and [docs/troubleshooting/PRODUCTION.md](docs/troubleshooting/PRODUCTION.md), or deploy manually per [docs/deployment/README.md](docs/deployment/README.md).
 
-In-app user guide: open **`/help`** after signing in.
+**In-app guide:** open `/help` after signing in.
 
-### GitHub Personal Access Token (new developers)
-
-GitHub no longer accepts account passwords for Git over HTTPS. To run CI/CD and to **pull updates on the production server**, configure a **Personal Access Token** in all three places:
-
-1. **Local root `.env`** — add `GITHUB_PERSONAL_ACCESS_TOKEN=<your-token>` (deploy scripts such as [`scripts/daily-deploy.sh`](scripts/daily-deploy.sh) also accept `PERSONAL_ACCESS_TOKEN` or `GITHUB_TOKEN` in that file).
-2. **GitHub repository secrets** — in the repo on GitHub: **Settings → Secrets and variables → Actions**, create a secret with the token. Use the **name expected by your workflows** (the deployment guide lists `PERSONAL_ACCESS_TOKEN`; align the secret name with what `.github/workflows/*.yml` references).
-3. **Production `.env` on the server** — add the same token (e.g. `GITHUB_PERSONAL_ACCESS_TOKEN` or `PERSONAL_ACCESS_TOKEN`) next to the app’s other secrets so automated or manual `git pull` against private or protected remotes succeeds.
-
-More context: [docs/deployment/README.md](docs/deployment/README.md) (CI/CD and secrets), [docs/deployment/cron.md](docs/deployment/cron.md) (env variable names), [docs/features/CI-CD.md](docs/features/CI-CD.md).
+**GitHub HTTPS:** for CI/CD or production `git pull`, use a Personal Access Token — align names with [.github/workflows/](.github/workflows/) and store secrets as in [docs/deployment/README.md](docs/deployment/README.md).
 
 ## License
 
